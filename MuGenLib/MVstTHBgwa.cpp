@@ -1,0 +1,870 @@
+/*
+*  MVstTHBgwa.cpp
+*  HBqgen
+*
+*  Created by ajg67 on 11/8/12.
+*   Copyright (c) 2012 SEELE. All rights reserved.
+*
+*
+*	to compile statically on CAC:
+*	icc -I/home/fs01/ajg67/gslLibs/include -L/home/fs01/ajg67/gslLibs/lib MVstTHBgwa.cpp HBqgen.cpp -o MVstTHBgwa -O3 -lgsl -lz /opt/intel/composer_xe_2011_sp1.6.233/mkl/lib/intel64/libmkl_solver_lp64.a -Wl,--start-group /opt/intel/composer_xe_2011_sp1.6.233/mkl/lib/intel64/libmkl_intel_lp64.a /opt/intel/composer_xe_2011_sp1.6.233/mkl/lib/intel64/libmkl_intel_thread.a /opt/intel/composer_xe_2011_sp1.6.233/mkl/lib/intel64/libmkl_core.a -Wl,--end-group -DHAVE_INLINE -DGSL_RANGE_CHECK_OFF -fopenmp -lpthread -lifcore -static
+*
+*/
+#include <omp.h>
+#include <gsl/gsl_matrix.h>
+#include <gsl/gsl_vector.h>
+#include <vector>
+#include <string>
+#include <sstream>
+#include <iostream>
+#include <ctime>
+#include <cmath>
+#include <cctype>
+#include <cstdio>
+
+#include "MuGenLib.h"
+
+using std::vector;
+using std::string;
+using std::cout;
+using std::cerr;
+using std::endl;
+using std::flush;
+using std::stringstream;
+using std::remove;
+
+int main(int argc, char *argv[]){
+	/*
+		Parsing command line flags
+	*/
+	bool sOn = false;
+	bool bOn = false;
+	bool tOn = false;
+	bool nOn = false;
+	bool gOn = false;
+	bool pOn = false;
+	bool lOn = false;
+	bool fOn = false;
+	bool cOn = false;
+	bool COn = false;
+	bool SOn = false;
+	bool mOn = false;
+	bool MOn = false;
+	bool rOn = false;
+	
+	// intitialize the flag variables with default values
+	double nuE  = 3.0;
+	double nuG  = 3.0;
+	double nuB  = 3.0;
+	double ldCt = 0.75;
+	int Nbnin   = 10;
+	int Nsamp   = 10;
+	int Nthin   = 1;
+	size_t Nsnp = 10000;
+	size_t Nmul = 5;
+	int nThr    = 4;
+	string cNum;
+	bool miss  = false;
+	string model("SM"); // default is single marker; other possibilities: VS == variable selection; RS == rank selection; flag -r controls this
+	
+	string dfNam("Y.gbin");
+	string mMatFnam("simMatNAind.gbin");
+	string mVecFnam("simTotNAind.gbin");
+	string LNout("LN.gbin");
+	//string GCout("GC.gbin");
+	string SgEout("Sig_e.gbin");
+	string SgRout("Sig_rep.gbin");
+	//string SgSout("Sig_sca.gbin");
+	string SgAout("Sig_a.gbin");
+	string betOut("betSNP.gbin");
+	string pepOut("PEP.gbin");
+	string snpIn("MESAsnp.gbin");
+	string missF("");
+	
+	for (int iArg = 1; iArg < argc; iArg++) {
+		char *pchar = argv[iArg];
+		switch (pchar[0]) {
+			case '-':{
+				if (!pchar[1]) {
+					cerr << "ERROR: forgot character after flag" << endl;
+					exit(0);
+				}
+				else
+					if (pchar[2]) {
+						cerr << "ERROR: unrecognized flag of more than one character" << endl;
+						exit(0);
+					}
+
+				switch (pchar[1]) {
+					case 's':
+						sOn = true;
+						break;
+						
+					case 'b':
+						bOn = true;
+						break;
+						
+					case 't':
+						tOn = true;
+						break;
+						
+					case 'M':
+						MOn = true;
+						break;
+						
+					case 'n':
+						nOn = true;
+						break;
+						
+					case 'g':
+						gOn = true;
+						break;
+						
+					case 'p':
+						pOn = true;
+						break;
+						
+					case 'l':
+						lOn = true;
+						break;
+						
+					case 'f':
+						fOn = true;
+						break;
+						
+					case 'c':
+						cOn = true;
+						break;
+						
+					case 'C':
+						COn = true;
+						break;
+						
+					case 'S':
+						SOn = true;
+						break;
+					
+					case 'm':
+						mOn  = true;
+						miss = true;
+						break;
+						
+					case 'r':
+						rOn  = true;
+						break;
+						
+					case 'h':
+						cerr << "usage:\n"
+						<< "MVstTHBgwa [-s MCMC_sample_number] [-b burnin_length] [-t thinning_ratio] [-M multiple_of_sample#_to_keep] [-c chain_ID] [-C thread_number] [-m missing_indicator_file_tag] [-n Student_t_nu_for_reps] [-g Student_t_nu_for_PCs] [-S number_of_snps] [-f response_data_file_ID]" << endl;
+						exit(0);
+					default:
+						cerr << "ERROR: unrecognized flag " << pchar[1] << endl;
+						exit(0);
+				}
+			}
+				break;
+				
+			default:{
+				if (sOn) {
+					sOn   = false;
+					Nsamp = atoi(pchar);
+				}
+				else
+					if (bOn) {
+						bOn   = false;
+						Nbnin = atoi(pchar);
+					}
+				else
+					if (tOn) {
+						tOn   = false;
+						Nthin = atoi(pchar);
+					}
+				else
+					if (MOn) {
+						MOn  = false;
+						Nmul = atoi(pchar);
+					}
+				else
+					if (cOn) {
+						cOn = false;
+						cNum = pchar;
+					}
+				else
+					if (COn) {
+						COn = false;
+						nThr = atoi(pchar);
+					}
+				else
+					if (SOn) {
+						SOn = false;
+						Nsnp = atoi(pchar);
+					}
+				else
+					if (mOn) {
+						mOn = false;
+						missF = pchar;
+						
+						mMatFnam = mMatFnam.substr(0,11);
+						mMatFnam += pchar;
+						mMatFnam += ".gbin";
+						
+						mVecFnam = mVecFnam.substr(0,11);
+						mVecFnam += pchar;
+						mVecFnam += ".gbin";
+					}
+				else
+					if (fOn) {
+						fOn = false;
+						dfNam = dfNam[0];
+						dfNam += pchar;
+						dfNam += ".gbin";
+						
+						LNout = LNout.substr(0, 2);
+						LNout += pchar;
+						LNout += "_";
+						
+						//GCout = GCout.substr(0, 2);
+						//GCout += pchar;
+						//GCout += "_";
+						
+						SgEout = SgEout.substr(0, 5);
+						SgEout += pchar;
+						SgEout += "_";
+						
+						SgRout = SgRout.substr(0, 7);
+						SgRout += pchar;
+						SgRout += "_";
+						
+						/*
+						SgSout = SgSout.substr(0, 7);
+						SgSout += pchar;
+						SgSout += "_";
+						*/
+						
+						SgAout = SgAout.substr(0, 5);
+						SgAout += pchar;
+						SgAout += "_";
+						
+						betOut = betOut.substr(0, 6);
+						betOut += pchar;
+						betOut += "_";
+						
+						pepOut = pepOut.substr(0, 3);
+						pepOut += pchar;
+						pepOut += "_";
+						
+					}
+				else
+					if (rOn){
+						rOn = false;
+						model = pchar;
+					}
+				else
+					if (lOn){
+						lOn = false;
+						ldCt = atof(pchar);
+					}
+				else
+					if (nOn){
+						nOn = false;
+						nuE = atof(pchar);
+				}
+				else
+					if (gOn){
+						gOn = false;
+						nuG = atof(pchar);
+					}
+				else {
+					pOn = false;
+					nuB = atof(pchar);
+				}
+			}
+				break;
+		}
+	}
+	
+	if ((model != "SM") && (model != "VS") && (model != "RS")) {
+		cerr << "ERROR: Specified SNP model (" << model << ") not supported." << endl;
+		exit(-1);
+	}
+	
+	stringstream nuOSr;
+	nuOSr << nuE;
+	string rString = nuOSr.str();
+	size_t perPs = rString.find('.');
+	if (perPs != string::npos) {
+		rString.erase(perPs, 1);
+	}
+	
+	stringstream nuOSg;
+	nuOSg << nuG;
+	string gString = nuOSg.str();
+	perPs = gString.find('.');
+	if (perPs != string::npos) {
+		gString.erase(perPs, 1);
+	}
+	
+	stringstream nuOSb;
+	nuOSb << nuB;
+	string bString = nuOSb.str();
+	perPs = bString.find('.');
+	if (perPs != string::npos) {
+		bString.erase(perPs, 1);
+	}
+	
+	LNout += rString;
+	LNout += "_";
+	LNout += gString;
+	LNout += "_";
+	LNout += bString;
+	if (miss) {
+		LNout += "_";
+		LNout += missF;
+	}
+	LNout += "_";
+	LNout += model;
+	LNout += "_";
+	LNout += cNum;
+	LNout += ".gbin";
+	
+	/*
+	GCout += rString;
+	GCout += "_";
+	GCout += gString;
+	if (miss) {
+		GCout += "_";
+		GCout += missF;
+	}
+	GCout += "_";
+	GCout += cNum;
+	GCout += ".gbin";
+	*/
+	 
+	SgRout += rString;
+	SgRout += "_";
+	SgRout += gString;
+	SgRout += "_";
+	SgRout += bString;
+	if (miss) {
+		SgRout += "_";
+		SgRout += missF;
+	}
+	SgRout += "_";
+	SgRout += model;
+	SgRout += "_";
+	SgRout += cNum;
+	SgRout += ".gbin";
+	
+	SgEout += rString;
+	SgEout += "_";
+	SgEout += gString;
+	SgEout += "_";
+	SgEout += bString;
+	if (miss) {
+		SgEout += "_";
+		SgEout += missF;
+	}
+	SgEout += "_";
+	SgEout += model;
+	SgEout += "_";
+	SgEout += cNum;
+	SgEout += ".gbin";
+	
+	/*
+	SgSout += rString;
+	SgSout += "_";
+	SgSout += gString;
+	if (miss) {
+		SgSout += "_";
+		SgSout += missF;
+	}
+	SgSout += "_";
+	SgSout += model;
+	SgSout += "_";
+	SgSout += cNum;
+	SgSout += ".gbin";
+	*/
+	
+	SgAout += rString;
+	SgAout += "_";
+	SgAout += gString;
+	SgAout += "_";
+	SgAout += bString;
+	if (miss) {
+		SgAout += "_";
+		SgAout += missF;
+	}
+	SgAout += "_";
+	SgAout += model;
+	SgAout += "_";
+	SgAout += cNum;
+	SgAout += ".gbin";
+	
+	betOut += rString;
+	betOut += "_";
+	betOut += gString;
+	betOut += "_";
+	betOut += bString;
+	if (miss) {
+		betOut += "_";
+		betOut += missF;
+	}
+	betOut += "_";
+	betOut += model;
+	betOut += "_";
+	betOut += cNum;
+	betOut += ".gbin";
+	
+	pepOut += rString;
+	pepOut += "_";
+	pepOut += gString;
+	pepOut += "_";
+	pepOut += bString;
+	if (miss) {
+		pepOut += "_";
+		pepOut += missF;
+	}
+	pepOut += "_";
+	pepOut += model;
+	pepOut += "_";
+	pepOut += cNum;
+	pepOut += ".gbin";
+	
+	const size_t d   = 10;
+	const size_t Ntt = 4500;
+	const size_t Nrp = 2250;
+	const size_t Nln = 750;
+	const size_t Npc = 749;
+	
+	
+	/*
+	 *	Initialization using constructors
+	 */
+	
+	RanIndex e2rp  = RanIndex(Ntt, Nrp, string("RPind.gbin"));
+	RanIndex rp2ln = RanIndex(Nrp, Nln, string("LNind.gbin"));
+	RanIndex rp2mu = RanIndex(Nrp);
+	RanIndex ln2mu = RanIndex(Nln);
+	RanIndex gm2pr = RanIndex(Npc);
+	RanIndex mu2pr = RanIndex();
+	
+	
+	Grp *datI;
+	if (miss) {
+		datI = new MuGrpMiss(dfNam, mMatFnam, mVecFnam, e2rp, d);
+	}
+	else {
+		datI = new MuGrp(dfNam, e2rp, d);
+	}
+	
+	Grp &dat = *datI;
+	
+	MuGrp muRepI(dat, e2rp, rp2ln);
+	Grp &muRep = muRepI;
+	
+	MuGrp datDevI = dat - muRep;
+	Grp &datDev   = datDevI;
+	
+	BetaGrpPC gammaI(muRep, string("MESAevec.gbin"), string("MESAeval.gbin"), Npc, rp2ln, gm2pr, nThr);
+	Grp &gamma = gammaI;
+	
+	MuGrp muRspI = muRep - gamma;
+	Grp &muRsp   = muRspI;
+	
+	MuGrp muI(muRsp, rp2mu, mu2pr);
+	Grp &mu = muI;
+	
+	MuGrp scaRspI = muRep - mu - gamma;
+	Grp &scaRsp   = scaRspI;
+	
+	MuGrpPEX scaI(scaRsp, rp2ln, ln2mu, 0.000001, nThr);
+	Grp &sca   = scaI;
+	
+	MuGrp muScaI(sca, ln2mu, mu2pr);
+	Grp &muSca = muScaI;
+	
+	MuGrp muLnI = mu + gamma + sca;
+	Grp &muLn   = muLnI;
+	
+	MuGrp repDevI = muRep - muLn;
+	Grp &repDev   = repDevI;
+	
+	MuGrp gmRspI = muRep - mu - sca;
+	Grp &gmRsp   = gmRspI;
+	
+	MuGrp gsI = gamma + sca;
+	Grp &gs   = gsI;
+	
+	SigmaI SigIe(datDev, SgEout, 1.0, 2.0);
+	SigmaI SigIrep(repDev, SgRout, 1.0, 2.0);
+	SigmaI SigIsca(sca, 1.0, 2.0);
+	SigmaI SigIa(gamma, SgAout, 1.0, 2.0);
+	SigmaI SigIpr(d, 0.000001);
+	
+	Qgrp qE;
+	
+	if (miss) {
+		qE = Qgrp(Ntt, nuE, mVecFnam);
+	}
+	else {
+		qE = Qgrp(Ntt, nuE);
+	}
+	Qgrp qG(Npc, nuG);
+	cout << "Initial set-up done.  Starting SNP initialization..." << endl;
+	
+	for (int iPre = 0; iPre < ceil(0.2*Nbnin); iPre++) {  // pre-run without mixed model to get other stuff converged
+		if (miss) {
+			dat.update(muRep, SigIe);
+		}
+		
+		muRep.update(dat, qE, SigIe, muLn, SigIrep);
+		datDevI = dat - muRep;
+		
+		SigIe.update(datDev, qE);
+		qE.update(datDev, SigIe);
+		
+		scaRspI = muRep - mu;
+		
+		sca.update(scaRsp, SigIrep, muSca, SigIsca);
+		muSca.update(sca, SigIsca, SigIpr);
+		
+		muLnI   = mu + sca;
+		repDevI = muRep - muLn;
+		
+		SigIrep.update(repDev);
+		SigIsca.update(sca, muSca);
+		
+		muRspI = muRep - sca;
+		mu.update(muRsp, SigIrep, SigIpr);
+		
+		cout << "o" << flush;
+		
+	}
+	cout << endl;
+	for (int iPre = 0; iPre < floor(0.6*Nbnin); iPre++) {
+		if (miss) {
+			dat.update(muRep, SigIe);
+		}
+		
+		muRep.update(dat, qE, SigIe, muLn, SigIrep);
+		datDevI = dat - muRep;
+		
+		SigIe.update(datDev, qE);
+		qE.update(datDev, SigIe);
+		
+		scaRspI = muRep - mu - gamma;
+		
+		sca.update(scaRsp, SigIrep, muSca, SigIsca);
+		muSca.update(sca, SigIsca, SigIpr);
+		
+		gsI     = gamma + sca;
+		muLnI   = mu + gs;
+		repDevI = muRep - muLn;
+		
+		SigIrep.update(repDev);
+		SigIsca.update(sca, muSca);
+		
+		gmRspI = muRep - mu - sca;
+		gamma.update(gmRsp, SigIrep, qG, SigIa);
+		
+		muRspI = muRep - gs;
+		mu.update(muRsp, SigIrep, SigIpr);
+		
+		SigIa.update(gamma, qG);
+		qG.update(gamma, SigIa);
+		
+		cout << "*" << flush;
+
+	}
+	cout << endl;
+	
+	vector<double> initP(2, 0.5);
+	vector<double> aPr(2);
+	aPr[0] = 1.0;
+	aPr[1] = Nmul - 1;
+	MixP kappa(initP, aPr);
+	
+	RanIndexVS snp2prI(Nsnp, pepOut, kappa);
+	RanIndex &snp2pr = snp2prI;
+	
+	cout << "Initializing SNP regression for model " << model << endl;
+	Grp *snpBetI;
+	if (model == "VS") {
+		snpBetI = new BetaGrpBVSR(repDev, SigIrep, snpIn, Nmul, ldCt, rp2ln, snp2pr, betOut, nThr);
+	}
+	else
+		if (model == "RS"){
+			snpBetI = new BetaGrpFt(repDev, SigIrep, snpIn, Nsnp, Nmul, ldCt, rp2ln, snp2pr, betOut, nThr);
+		}
+	else {
+		snpBetI = new BetaGrpSnp(snpIn, betOut, rp2ln, Nsnp, d, nThr);
+	}
+	
+	Grp &snpBet = *snpBetI;
+	
+	//SigmaI SigIbet(d, 1e-6, 20.0);
+	SigmaI SigIbet(d, 1.0, 20.0);
+	Qgrp qB(Nln*Nmul, nuB);
+	
+	MuGrp snpDevI = repDev;
+	Grp &snpDev   = snpDevI;
+	
+	if (model != "SM") {
+		cout << "Pre-burnin..." << endl;
+		for (int iSt = 0; iSt < 100; iSt++) {
+			if (miss) {
+				dat.update(muRep, SigIe);
+			}
+			
+			muRep.update(dat, qE, SigIe, muLn, SigIrep);
+			datDevI = dat - muRep;
+			
+			SigIe.update(datDev, qE);
+			qE.update(datDev, SigIe);
+			
+			scaRspI = muRep - mu - gamma - snpBet;
+			
+			sca.update(scaRsp, SigIrep, muSca, SigIsca);
+			muSca.update(sca, SigIsca, SigIpr);
+			
+			gsI     = gamma + sca + snpBet;
+			muLnI   = mu + gs;
+			repDevI = muRep - muLn;
+			
+			SigIrep.update(repDev);
+			SigIsca.update(sca, muSca);
+			
+			gmRspI = muRep - mu - sca - snpBet;
+			gamma.update(gmRsp, SigIrep, qG, SigIa);
+			
+			snpDevI = muRep - mu - gamma - sca;
+			snpBet.update(snpDev, SigIrep, SigIbet);
+			kappa.update(snp2pr);
+			
+			muRspI = muRep - gs;
+			mu.update(muRsp, SigIrep, SigIpr);
+			
+			SigIa.update(gamma, qG);
+			qG.update(gamma, SigIa);
+			
+			cout << "#" << flush;
+			
+		}
+		cout<< endl;
+
+	}
+	
+	if (model == "SM") {
+		cout << "Single marker model." << endl;
+		cout << "Starting burnin..." << endl;
+		for (int iBnin = 0; iBnin < floor(0.4*Nbnin); iBnin++) {
+			if (miss) {
+				dat.update(muRep, SigIe);
+			}
+			
+			muRep.update(dat, qE, SigIe, muLn, SigIrep);
+			datDevI = dat - muRep;
+			
+			SigIe.update(datDev, qE);
+			qE.update(datDev, SigIe);
+			
+			scaRspI = muRep - mu - gamma;
+			
+			sca.update(scaRsp, SigIrep, muSca, SigIsca);
+			muSca.update(sca, SigIsca, SigIpr);
+			
+			gsI     = gamma + sca;
+			muLnI   = mu + gs;
+			repDevI = muRep - muLn;
+			
+			SigIrep.update(repDev);
+			SigIsca.update(sca, muSca);
+			
+			gmRspI = muRep - mu - sca;
+			gamma.update(gmRsp, SigIrep, qG, SigIa);
+						
+			muRspI = muRep - gs;
+			mu.update(muRsp, SigIrep, SigIpr);
+			
+			SigIa.update(gamma, qG);
+			qG.update(gamma, SigIa);
+			
+			cout << "+" << flush;
+		}
+		cout << endl;
+		cout << "Burn-in finished, starting the sampling..." << endl;
+		
+		for (int iSam = 0; iSam < Nsamp; iSam++) {
+			if (miss) {
+				dat.update(muRep, SigIe);
+			}
+			
+			muRep.update(dat, qE, SigIe, muLn, SigIrep);
+			datDevI = dat - muRep;
+			
+			SigIe.update(datDev, qE);
+			qE.update(datDev, SigIe);
+			
+			scaRspI = muRep - mu - gamma;
+			
+			sca.update(scaRsp, SigIrep, muSca, SigIsca);
+			muSca.update(sca, SigIsca, SigIpr);
+			
+			gsI     = gamma + sca;
+			muLnI   = mu + gs;
+			repDevI = muRep - muLn;
+			
+			SigIrep.update(repDev);
+			SigIsca.update(sca, muSca);
+			
+			gmRspI = muRep - mu - sca;
+			gamma.update(gmRsp, SigIrep, qG, SigIa);
+			
+			muRspI = muRep - gs - snpBet;
+			mu.update(muRsp, SigIrep, SigIpr);
+			
+			SigIa.update(gamma, qG);
+			qG.update(gamma, SigIa);
+			
+			if ((iSam + 1) % Nthin) {
+				cout << "." << flush;
+			}
+			else {
+				muLn.save(LNout);
+				snpDevI = muRep - mu - gamma - sca;
+				snpBet.update(snpDev, SigIrep);
+				
+				SigIe.save(SgEout);
+				SigIrep.save(SgRout);
+				SigIa.save(SgAout);
+				
+				cout << "|" << flush;
+			}
+		}
+		cout << endl;
+		snpBet.dump();
+	}
+	else {
+		cout << "Multi-marker model." << endl;
+		cout << "Starting burnin..." << endl;
+		for (int iBnin = 0; iBnin < floor(0.4*Nbnin); iBnin++) {
+			if (miss) {
+				dat.update(muRep, SigIe);
+			}
+			
+			muRep.update(dat, qE, SigIe, muLn, SigIrep);
+			datDevI = dat - muRep;
+			
+			SigIe.update(datDev, qE);
+			qE.update(datDev, SigIe);
+			
+			scaRspI = muRep - mu - gamma - snpBet;
+			
+			sca.update(scaRsp, SigIrep, muSca, SigIsca);
+			muSca.update(sca, SigIsca, SigIpr);
+			
+			gsI     = gamma + sca + snpBet;
+			muLnI   = mu + gs;
+			repDevI = muRep - muLn;
+			
+			SigIrep.update(repDev);
+			SigIsca.update(sca, muSca);
+			
+			gmRspI = muRep - mu - sca - snpBet;
+			gamma.update(gmRsp, SigIrep, qG, SigIa);
+			
+			snpDevI = muRep - mu - gamma - sca;
+			if (model == "VS") {
+				snpBet.update(snpDev, SigIrep, SigIbet);
+				SigIbet.update(snpBet);
+				kappa.update(snp2pr);
+			}
+			else{
+				snpBet.update(snpDev, SigIrep, qB, SigIbet);
+				SigIbet.update(snpBet, qB);
+				qB.update(snpBet, SigIbet);
+			}
+			
+			muRspI = muRep - gs - snpBet;
+			mu.update(muRsp, SigIrep, SigIpr);
+			
+			SigIa.update(gamma, qG);
+			qG.update(gamma, SigIa);
+			
+			cout << "+" << flush;
+		}
+		cout << endl;
+		cout << "Burn-in finished, starting the sampling..." << endl;
+		
+		for (int iSam = 0; iSam < Nsamp; iSam++) {
+			if (miss) {
+				dat.update(muRep, SigIe);
+			}
+			
+			muRep.update(dat, qE, SigIe, muLn, SigIrep);
+			datDevI = dat - muRep;
+			
+			SigIe.update(datDev, qE);
+			qE.update(datDev, SigIe);
+			
+			scaRspI = muRep - mu - gamma - snpBet;
+			
+			sca.update(scaRsp, SigIrep, muSca, SigIsca);
+			muSca.update(sca, SigIsca, SigIpr);
+			
+			gsI     = gamma + sca + snpBet;
+			muLnI   = mu + gs;
+			repDevI = muRep - muLn;
+			
+			SigIrep.update(repDev);
+			SigIsca.update(sca, muSca);
+			
+			gmRspI = muRep - mu - sca - snpBet;
+			gamma.update(gmRsp, SigIrep, qG, SigIa);
+			
+			snpDevI = muRep - mu - gamma - sca;
+			if (model == "VS") {
+				snpBet.update(snpDev, SigIrep, SigIbet);
+				SigIbet.update(snpBet);
+				kappa.update(snp2pr);
+			}
+			else{
+				snpBet.update(snpDev, SigIrep, qB, SigIbet);
+				SigIbet.update(snpBet, qB);
+				qB.update(snpBet, SigIbet);
+			}
+			
+			muRspI = muRep - gs - snpBet;
+			mu.update(muRsp, SigIrep, SigIpr);
+			
+			SigIa.update(gamma, qG);
+			qG.update(gamma, SigIa);
+			
+			if ((iSam + 1) % Nthin) {
+				cout << "." << flush;
+			}
+			else {
+				muLn.save(LNout);
+				if (model == "VS") {
+					snpBet.save(snpDev, SigIrep);
+				}
+				else {
+						snpBet.save(SigIrep);
+						snp2pr.save(snpDev, snpBet, SigIrep);
+					}
+				
+				SigIe.save(SgEout);
+				SigIrep.save(SgRout);
+				SigIa.save(SgAout);
+				
+				cout << "|" << flush;
+			}
+		}
+		cout << endl;
+		snpBet.dump();
+		snp2pr.dump();
+	}
+	
+	delete snpBetI;
+	
+}
