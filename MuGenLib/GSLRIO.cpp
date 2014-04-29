@@ -1,6 +1,6 @@
 /*
 *  GSLRIO.cpp
-*  MuGenLib
+*  libMuGen
 *
 *  Created by ajg67 on 11/2/12.
 *  Copyright (c) 2012 SEELE. All rights reserved.
