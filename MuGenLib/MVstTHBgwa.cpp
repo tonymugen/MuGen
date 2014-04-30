@@ -1,28 +1,22 @@
 /*
 *  MVstTHBgwa.cpp
-*  HBqgen
+*  MuGen
 *
 *  Created by ajg67 on 11/8/12.
 *   Copyright (c) 2012 SEELE. All rights reserved.
 *
 *
-*	to compile statically on CAC:
-*	icc -I/home/fs01/ajg67/gslLibs/include -L/home/fs01/ajg67/gslLibs/lib MVstTHBgwa.cpp HBqgen.cpp -o MVstTHBgwa -O3 -lgsl -lz /opt/intel/composer_xe_2011_sp1.6.233/mkl/lib/intel64/libmkl_solver_lp64.a -Wl,--start-group /opt/intel/composer_xe_2011_sp1.6.233/mkl/lib/intel64/libmkl_intel_lp64.a /opt/intel/composer_xe_2011_sp1.6.233/mkl/lib/intel64/libmkl_intel_thread.a /opt/intel/composer_xe_2011_sp1.6.233/mkl/lib/intel64/libmkl_core.a -Wl,--end-group -DHAVE_INLINE -DGSL_RANGE_CHECK_OFF -fopenmp -lpthread -lifcore -static
 *
 */
-#include <omp.h>
-#include <gsl/gsl_matrix.h>
-#include <gsl/gsl_vector.h>
 #include <vector>
 #include <string>
 #include <sstream>
 #include <iostream>
-#include <ctime>
 #include <cmath>
 #include <cctype>
 #include <cstdio>
 
-#include "MuGenLib.h"
+#include <MuGen.h>
 
 using std::vector;
 using std::string;
@@ -33,10 +27,33 @@ using std::flush;
 using std::stringstream;
 using std::remove;
 
+void finishFlNam(string &, const vector<string> &);
+string db2str(const double &);
+
+void finishFlNam(string &start, const vector<string> &add){
+	for (vector<string>::const_iterator stIt = add.begin(); stIt != add.end(); ++stIt) {
+		start += "_";
+		start += *stIt;
+	}
+	start += ".gbin";
+}
+
+string db2str(const double &val){
+	stringstream nuOS;
+	nuOS << val;
+	string vString = nuOS.str();
+	size_t perPs = vString.find('.');
+	if (perPs != string::npos) {
+		//vString.erase(perPs, 1);
+		vString.replace(perPs, 1, "-");
+	}
+	return vString;
+}
+
 int main(int argc, char *argv[]){
 	/*
-		Parsing command line flags
-	*/
+	 *	Parsing command line flags
+	 */
 	bool sOn = false;
 	bool bOn = false;
 	bool tOn = false;
@@ -51,6 +68,7 @@ int main(int argc, char *argv[]){
 	bool mOn = false;
 	bool MOn = false;
 	bool rOn = false;
+	bool dOn = false;
 	
 	// intitialize the flag variables with default values
 	double nuE  = 3.0;
@@ -61,8 +79,9 @@ int main(int argc, char *argv[]){
 	int Nsamp   = 10;
 	int Nthin   = 1;
 	size_t Nsnp = 10000;
-	size_t Nmul = 5;
+	double Nmul = 5.0;
 	int nThr    = 4;
+	size_t d    = 10;
 	string cNum;
 	bool miss  = false;
 	string model("SM"); // default is single marker; other possibilities: VS == variable selection; RS == rank selection; flag -r controls this
@@ -149,13 +168,17 @@ int main(int argc, char *argv[]){
 						miss = true;
 						break;
 						
+					case 'd':
+						dOn = true;
+						break;
+						
 					case 'r':
 						rOn  = true;
 						break;
 						
 					case 'h':
 						cerr << "usage:\n"
-						<< "MVstTHBgwa [-s MCMC_sample_number] [-b burnin_length] [-t thinning_ratio] [-M multiple_of_sample#_to_keep] [-c chain_ID] [-C thread_number] [-m missing_indicator_file_tag] [-n Student_t_nu_for_reps] [-g Student_t_nu_for_PCs] [-S number_of_snps] [-f response_data_file_ID]" << endl;
+						<< "MVstTHBgwa [-s MCMC_sample_number] [-b burnin_length] [-t thinning_ratio] [-M multiple_of_sample#_to_keep] [-c chain_ID] [-C thread_number] [-m missing_indicator_file_tag] [-d phenotype_number] [-n Student_t_nu_for_reps] [-g Student_t_nu_for_PCs] [-S number_of_snps] [-f response_data_file_ID]" << endl;
 						exit(0);
 					default:
 						cerr << "ERROR: unrecognized flag " << pchar[1] << endl;
@@ -182,22 +205,27 @@ int main(int argc, char *argv[]){
 				else
 					if (MOn) {
 						MOn  = false;
-						Nmul = atoi(pchar);
+						Nmul = atof(pchar);
 					}
 				else
 					if (cOn) {
-						cOn = false;
+						cOn  = false;
 						cNum = pchar;
 					}
 				else
 					if (COn) {
-						COn = false;
+						COn  = false;
 						nThr = atoi(pchar);
 					}
 				else
 					if (SOn) {
-						SOn = false;
+						SOn  = false;
 						Nsnp = atoi(pchar);
+					}
+				else
+					if (dOn) {
+						dOn = false;
+						d   = atoi(pchar);
 					}
 				else
 					if (mOn) {
@@ -221,37 +249,27 @@ int main(int argc, char *argv[]){
 						
 						LNout = LNout.substr(0, 2);
 						LNout += pchar;
-						LNout += "_";
 						
 						//GCout = GCout.substr(0, 2);
 						//GCout += pchar;
-						//GCout += "_";
 						
 						SgEout = SgEout.substr(0, 5);
 						SgEout += pchar;
-						SgEout += "_";
 						
 						SgRout = SgRout.substr(0, 7);
 						SgRout += pchar;
-						SgRout += "_";
 						
-						/*
-						SgSout = SgSout.substr(0, 7);
-						SgSout += pchar;
-						SgSout += "_";
-						*/
+						//SgSout = SgSout.substr(0, 7);
+						//SgSout += pchar;
 						
 						SgAout = SgAout.substr(0, 5);
 						SgAout += pchar;
-						SgAout += "_";
 						
 						betOut = betOut.substr(0, 6);
 						betOut += pchar;
-						betOut += "_";
 						
 						pepOut = pepOut.substr(0, 3);
 						pepOut += pchar;
-						pepOut += "_";
 						
 					}
 				else
@@ -288,149 +306,29 @@ int main(int argc, char *argv[]){
 		exit(-1);
 	}
 	
-	stringstream nuOSr;
-	nuOSr << nuE;
-	string rString = nuOSr.str();
-	size_t perPs = rString.find('.');
-	if (perPs != string::npos) {
-		rString.erase(perPs, 1);
+	if (d > 10) {
+		cerr << "ERROR: d = " << d << " is greater than 10." << endl;
+		exit(-1);
 	}
 	
-	stringstream nuOSg;
-	nuOSg << nuG;
-	string gString = nuOSg.str();
-	perPs = gString.find('.');
-	if (perPs != string::npos) {
-		gString.erase(perPs, 1);
-	}
+	vector<string> addOn;
+	addOn.push_back(db2str(nuE));
+	addOn.push_back(db2str(nuG));
+	addOn.push_back(db2str(nuB));
 	
-	stringstream nuOSb;
-	nuOSb << nuB;
-	string bString = nuOSb.str();
-	perPs = bString.find('.');
-	if (perPs != string::npos) {
-		bString.erase(perPs, 1);
-	}
-	
-	LNout += rString;
-	LNout += "_";
-	LNout += gString;
-	LNout += "_";
-	LNout += bString;
 	if (miss) {
-		LNout += "_";
-		LNout += missF;
+		addOn.push_back(missF);
 	}
-	LNout += "_";
-	LNout += model;
-	LNout += "_";
-	LNout += cNum;
-	LNout += ".gbin";
+	addOn.push_back(model);
+	addOn.push_back(cNum);
 	
-	/*
-	GCout += rString;
-	GCout += "_";
-	GCout += gString;
-	if (miss) {
-		GCout += "_";
-		GCout += missF;
-	}
-	GCout += "_";
-	GCout += cNum;
-	GCout += ".gbin";
-	*/
-	 
-	SgRout += rString;
-	SgRout += "_";
-	SgRout += gString;
-	SgRout += "_";
-	SgRout += bString;
-	if (miss) {
-		SgRout += "_";
-		SgRout += missF;
-	}
-	SgRout += "_";
-	SgRout += model;
-	SgRout += "_";
-	SgRout += cNum;
-	SgRout += ".gbin";
+	finishFlNam(LNout, addOn);
+	finishFlNam(SgRout, addOn);
+	finishFlNam(SgEout, addOn);
+	finishFlNam(SgAout, addOn);
+	finishFlNam(betOut, addOn);
+	finishFlNam(pepOut, addOn);
 	
-	SgEout += rString;
-	SgEout += "_";
-	SgEout += gString;
-	SgEout += "_";
-	SgEout += bString;
-	if (miss) {
-		SgEout += "_";
-		SgEout += missF;
-	}
-	SgEout += "_";
-	SgEout += model;
-	SgEout += "_";
-	SgEout += cNum;
-	SgEout += ".gbin";
-	
-	/*
-	SgSout += rString;
-	SgSout += "_";
-	SgSout += gString;
-	if (miss) {
-		SgSout += "_";
-		SgSout += missF;
-	}
-	SgSout += "_";
-	SgSout += model;
-	SgSout += "_";
-	SgSout += cNum;
-	SgSout += ".gbin";
-	*/
-	
-	SgAout += rString;
-	SgAout += "_";
-	SgAout += gString;
-	SgAout += "_";
-	SgAout += bString;
-	if (miss) {
-		SgAout += "_";
-		SgAout += missF;
-	}
-	SgAout += "_";
-	SgAout += model;
-	SgAout += "_";
-	SgAout += cNum;
-	SgAout += ".gbin";
-	
-	betOut += rString;
-	betOut += "_";
-	betOut += gString;
-	betOut += "_";
-	betOut += bString;
-	if (miss) {
-		betOut += "_";
-		betOut += missF;
-	}
-	betOut += "_";
-	betOut += model;
-	betOut += "_";
-	betOut += cNum;
-	betOut += ".gbin";
-	
-	pepOut += rString;
-	pepOut += "_";
-	pepOut += gString;
-	pepOut += "_";
-	pepOut += bString;
-	if (miss) {
-		pepOut += "_";
-		pepOut += missF;
-	}
-	pepOut += "_";
-	pepOut += model;
-	pepOut += "_";
-	pepOut += cNum;
-	pepOut += ".gbin";
-	
-	const size_t d   = 10;
 	const size_t Ntt = 4500;
 	const size_t Nrp = 2250;
 	const size_t Nln = 750;
