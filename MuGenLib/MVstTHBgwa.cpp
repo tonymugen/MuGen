@@ -90,7 +90,7 @@ int main(int argc, char *argv[]){
 	string mMatFnam("simMatNAind.gbin");
 	string mVecFnam("simTotNAind.gbin");
 	string LNout("LN.gbin");
-	//string GCout("GC.gbin");
+	string BVout("BV.gbin");
 	string SgEout("Sig_e.gbin");
 	string SgRout("Sig_rep.gbin");
 	//string SgSout("Sig_sca.gbin");
@@ -250,8 +250,8 @@ int main(int argc, char *argv[]){
 						LNout = LNout.substr(0, 2);
 						LNout += pchar;
 						
-						//GCout = GCout.substr(0, 2);
-						//GCout += pchar;
+						BVout = BVout.substr(0, 2);
+						BVout += pchar;
 						
 						SgEout = SgEout.substr(0, 5);
 						SgEout += pchar;
@@ -323,6 +323,7 @@ int main(int argc, char *argv[]){
 	addOn.push_back(cNum);
 	
 	finishFlNam(LNout, addOn);
+	finishFlNam(BVout, addOn);
 	finishFlNam(SgRout, addOn);
 	finishFlNam(SgEout, addOn);
 	finishFlNam(SgAout, addOn);
@@ -380,6 +381,9 @@ int main(int argc, char *argv[]){
 	
 	MuGrp muScaI(sca, ln2mu, mu2pr);
 	Grp &muSca = muScaI;
+	
+	MuGrp bvI = mu + gamma;
+	Grp &bv   = bvI;
 	
 	MuGrp muLnI = mu + gamma + sca;
 	Grp &muLn   = muLnI;
@@ -618,7 +622,7 @@ int main(int argc, char *argv[]){
 			gmRspI = muRep - mu - sca;
 			gamma.update(gmRsp, SigIrep, qG, SigIa);
 			
-			muRspI = muRep - gs - snpBet;
+			muRspI = muRep - gs;
 			mu.update(muRsp, SigIrep, SigIpr);
 			
 			SigIa.update(gamma, qG);
@@ -629,8 +633,11 @@ int main(int argc, char *argv[]){
 			}
 			else {
 				muLn.save(LNout);
-				snpDevI = muRep - mu - gamma - sca;
-				snpBet.update(snpDev, SigIrep);
+				
+				bvI = mu + gamma;
+				bv.save(BVout);
+				
+				snpBet.update(repDev, SigIrep);
 				
 				SigIe.save(SgEout);
 				SigIrep.save(SgRout);
@@ -683,7 +690,7 @@ int main(int argc, char *argv[]){
 				qB.update(snpBet, SigIbet);
 			}
 			
-			muRspI = muRep - gs - snpBet;
+			muRspI = muRep - gs;
 			mu.update(muRsp, SigIrep, SigIpr);
 			
 			SigIa.update(gamma, qG);
@@ -732,7 +739,7 @@ int main(int argc, char *argv[]){
 				qB.update(snpBet, SigIbet);
 			}
 			
-			muRspI = muRep - gs - snpBet;
+			muRspI = muRep - gs;
 			mu.update(muRsp, SigIrep, SigIpr);
 			
 			SigIa.update(gamma, qG);
@@ -750,6 +757,9 @@ int main(int argc, char *argv[]){
 						snpBet.save(SigIrep);
 						snp2pr.save(snpDev, snpBet, SigIrep);
 					}
+				
+				bvI = mu + gamma + snpBet;
+				bv.save(BVout);
 				
 				SigIe.save(SgEout);
 				SigIrep.save(SgRout);
