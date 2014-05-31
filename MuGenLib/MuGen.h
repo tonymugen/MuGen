@@ -905,10 +905,17 @@ public:
 class BetaGrpSnp : public MuGrp {
 protected:
 	gsl_matrix *_Xmat;
-	gsl_matrix *_fakeFmat;
+	gsl_matrix *_fakeFmat; // is all 0, in case someone uses this class in an addition/subtraction operator
 	
+	gsl_matrix *_Ystore;   // storing the values for predictor until the end, when the mean is used for the SNP regression
+	gsl_matrix *_SIstore;  // the same for the inv-Sig matrix
+	
+	size_t _Npred;
 	int _nThr;
 	double _numSaves;
+	
+	string _inPredFl;
+	
 public:
 	BetaGrpSnp();
 	BetaGrpSnp(const string &predFlNam, const string &outFlNam, const size_t &Ndat, const size_t &Npred, const size_t &d, const int &Nthr);
@@ -931,10 +938,18 @@ protected:
 	vector<vector<double> > _Xmat; // a rugged array that only stores present genotypes
 	gsl_matrix *_fakeFmat;
 	
+	gsl_matrix *_Ystore;   // storing the values for predictor until the end, when the mean is used for the SNP regression
+	gsl_matrix *_SIstore;  // the same for the inv-Sig matrix
+	
+	size_t _Npred;
 	int _nThr;
 	double _numSaves;
+	double _absLab;
+	
+	string _inPredFl;
+	
 public:
-	BetaGrpSnpMiss() : _numSaves(0.0), _nThr(1), MuGrp() {};
+	BetaGrpSnpMiss();
 	BetaGrpSnpMiss(const string &predFlNam, const string &outFlNam, const size_t &Ndat, const size_t &Npred, const size_t &d, const int &Nthr, const double &absLab);
 	BetaGrpSnpMiss(const string &predFlNam, const string &outFlNam, RanIndex &low, const size_t &Npred, const size_t &d, const int &Nthr, const double &absLab);
 	

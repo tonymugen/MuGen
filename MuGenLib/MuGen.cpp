@@ -7933,88 +7933,49 @@ BetaGrpPC & BetaGrpPC::operator=(const BetaGrpPC &bG){
 	BetaGrpSnp methods
  */
 
-BetaGrpSnp::BetaGrpSnp() : _numSaves(0.0), _nThr(1), MuGrp(){
-	_Xmat = gsl_matrix_calloc(1, 1);
+BetaGrpSnp::BetaGrpSnp() : _numSaves(0.0), _nThr(1), _Npred(1), MuGrp(){
+	_Xmat    = gsl_matrix_calloc(1, 1);
+	_Ystore  = gsl_matrix_calloc(1, 1);
+	_SIstore = gsl_matrix_calloc(1, 1);
 }
-BetaGrpSnp::BetaGrpSnp(const string &predFlNam, const string &outFlNam, const size_t &Ndat, const size_t &Npred, const size_t &d, const int &Nthr) : _numSaves(0.0), _nThr(Nthr), MuGrp(){
+BetaGrpSnp::BetaGrpSnp(const string &predFlNam, const string &outFlNam, const size_t &Ndat, const size_t &Npred, const size_t &d, const int &Nthr) : _numSaves(0.0), _nThr(Nthr), _Npred(Npred), _inPredFl(predFlNam), MuGrp(){
 	gsl_matrix_free(_valueMat);
 	
-	_Xmat     = gsl_matrix_alloc(Ndat, Npred);
-	_valueMat = gsl_matrix_calloc(Npred, d + 1);  // the extra column will have Hotelling-type statistic for all the traits
 	_fakeFmat = gsl_matrix_calloc(Ndat, d);       // will be all zero, so we can use it for addition and subtraction without any consequences other than loss of efficiency
+	_Ystore   = gsl_matrix_calloc(Ndat, d);
+	_SIstore  = gsl_matrix_calloc(d, d);
 	
 	_outFlNam = outFlNam;
 	remove(_outFlNam.c_str());
 	
-	_theta.resize(Npred);
-	
-	if (_nThr > 1) {
-		const gsl_rng_type *T = gsl_rng_mt19937;
-		_rV.resize(_nThr);
-		vector<gsl_rng *>::iterator rIt = _rV.begin();
-		++rIt;
-		for (; rIt != _rV.end(); ++rIt) {
-			unsigned long seed = gsl_rng_get(_rV[0]);
-			*rIt = gsl_rng_alloc(T);
-			gsl_rng_set(*rIt, seed);
-		}
-		
-	}
-	
-	FILE *prdIn = fopen(predFlNam.c_str(), "r");
-	gsl_matrix_fread(prdIn, _Xmat);
-	fclose(prdIn);
-	colCenter(_Xmat); // essential to mimic an intercept
-	
-	for (size_t Xj = 0; Xj < Npred; Xj++) {
-		delete _theta[Xj];
-		_theta[Xj] = new MVnormBetaCmp(_Xmat, Xj, _valueMat, Xj);
-	}
-	
+	// the rest of the set-up happens before the results are dumped into a file by the dump() function
 }
-BetaGrpSnp::BetaGrpSnp(const string &predFlNam, const string &outFlNam, RanIndex &low, const size_t &Npred, const size_t &d, const int &Nthr) : _numSaves(0.0), _nThr(Nthr), MuGrp(){
+BetaGrpSnp::BetaGrpSnp(const string &predFlNam, const string &outFlNam, RanIndex &low, const size_t &Npred, const size_t &d, const int &Nthr) : _numSaves(0.0), _nThr(Nthr), _Npred(Npred), _inPredFl(predFlNam), MuGrp(){
 	gsl_matrix_free(_valueMat);
 	
-	_Xmat     = gsl_matrix_alloc(low.getNgrp(), Npred);
-	_valueMat = gsl_matrix_calloc(Npred, d + 1);
 	_fakeFmat = gsl_matrix_calloc(low.getNgrp(), d);       // will be all zero, so we can use it for addition and subtraction without any consequences other than loss of efficiency
 	_lowLevel = &low;
 	
+	_Ystore   = gsl_matrix_calloc(low.getNgrp(), d);
+	_SIstore  = gsl_matrix_calloc(d, d);
+	
 	_outFlNam = outFlNam;
 	remove(_outFlNam.c_str());
 	
-	_theta.resize(Npred);
-	
-	if (_nThr > 1) {
-		const gsl_rng_type *T = gsl_rng_mt19937;
-		_rV.resize(_nThr);
-		vector<gsl_rng *>::iterator rIt = _rV.begin();
-		++rIt;
-		for (; rIt != _rV.end(); ++rIt) {
-			unsigned long seed = gsl_rng_get(_rV[0]);
-			*rIt = gsl_rng_alloc(T);
-			gsl_rng_set(*rIt, seed);
-		}
-		
-	}
-	
-	FILE *prdIn = fopen(predFlNam.c_str(), "r");
-	gsl_matrix_fread(prdIn, _Xmat);
-	fclose(prdIn);
-	colCenter(_Xmat); // essential to mimic an intercept
-	
-	for (size_t Xj = 0; Xj < Npred; Xj++) {
-		delete _theta[Xj];
-		_theta[Xj] = new MVnormBetaCmp(_Xmat, Xj, _valueMat, Xj);
-	}
+	// the rest of the set-up happens before the results are dumped into a file by the dump() function
 	
 }
 
 BetaGrpSnp::BetaGrpSnp(const BetaGrpSnp &mG){
 	gsl_matrix_free(_valueMat);
+	_Ystore  = gsl_matrix_calloc((mG._Ystore)->size1, (mG._Ystore)->size2);
+	_SIstore = gsl_matrix_calloc((mG._SIstore)->size1, (mG._SIstore)->size2);
+	
 	_lowLevel = mG._lowLevel;
 	_upLevel  = mG._upLevel;
 	_nThr     = mG._nThr;
+	_Npred    = mG._Npred;
+	_inPredFl = mG._inPredFl;
 	
 	_Xmat = gsl_matrix_alloc((mG._Xmat)->size1, (mG._Xmat)->size2);
 	gsl_matrix_memcpy(_Xmat, mG._Xmat);
@@ -8043,9 +8004,14 @@ BetaGrpSnp::BetaGrpSnp(const BetaGrpSnp &mG){
 }
 BetaGrpSnp & BetaGrpSnp::operator=(const BetaGrpSnp &mG){
 	gsl_matrix_free(_valueMat);
+	_Ystore  = gsl_matrix_calloc((mG._Ystore)->size1, (mG._Ystore)->size2);
+	_SIstore = gsl_matrix_calloc((mG._SIstore)->size1, (mG._SIstore)->size2);
+	
 	_lowLevel = mG._lowLevel;
 	_upLevel  = mG._upLevel;
 	_nThr     = mG._nThr;
+	_Npred    = mG._Npred;
+	_inPredFl = mG._inPredFl;
 	
 	_Xmat = gsl_matrix_alloc((mG._Xmat)->size1, (mG._Xmat)->size2);
 	gsl_matrix_memcpy(_Xmat, mG._Xmat);
@@ -8078,16 +8044,57 @@ BetaGrpSnp & BetaGrpSnp::operator=(const BetaGrpSnp &mG){
 BetaGrpSnp::~BetaGrpSnp(){
 	gsl_matrix_free(_Xmat);
 	gsl_matrix_free(_fakeFmat);
+	gsl_matrix_free(_Ystore);
+	gsl_matrix_free(_SIstore);
 	
 }
 
 void BetaGrpSnp::dump(){
 	if (_numSaves) {
-		gsl_matrix_scale(_valueMat, 1.0/_numSaves);
+		_Xmat     = gsl_matrix_alloc(_Ystore->size1, _Npred);
+		_valueMat = gsl_matrix_calloc(_Npred, _Ystore->size2 + 1);  // the extra column will have Hotelling-type statistic for all the traits
+		
+		_theta.resize(_Npred);
+		
+		if (_nThr > 1) {
+			const gsl_rng_type *T = gsl_rng_mt19937;
+			_rV.resize(_nThr);
+			vector<gsl_rng *>::iterator rIt = _rV.begin();
+			++rIt;
+			for (; rIt != _rV.end(); ++rIt) {
+				unsigned long seed = gsl_rng_get(_rV[0]);
+				*rIt = gsl_rng_alloc(T);
+				gsl_rng_set(*rIt, seed);
+			}
+			
+		}
+		
+		FILE *prdIn = fopen(_inPredFl.c_str(), "r");
+		gsl_matrix_fread(prdIn, _Xmat);
+		fclose(prdIn);
+		colCenter(_Xmat); // essential to mimic an intercept
+		
+		for (size_t Xj = 0; Xj < _Npred; Xj++) {
+			delete _theta[Xj];
+			_theta[Xj] = new MVnormBetaCmp(_Xmat, Xj, _valueMat, Xj);
+		}
+		
+		gsl_matrix_scale(_Ystore, 1.0/_numSaves);
+		gsl_matrix_scale(_SIstore, 1.0/_numSaves);
+		colCenter(_Ystore);
+		MuGrp datI(_Ystore);
+		Grp &dat = datI;
+		SigmaI Sinv(_SIstore);
+		
+#pragma omp parallel for num_threads(_nThr)
+		for (int jSnp = 0; jSnp < _Npred; jSnp++) { // iterators not supported in older versions of OpenMP; also the iteration variable has to be signed unless you have a newer version of OpenMP
+			_theta[jSnp]->update(dat, Sinv, _rV[omp_get_thread_num()]);
+		}
 		
 		FILE *btOut = fopen(_outFlNam.c_str(), "w");
 		gsl_matrix_fwrite(btOut, _valueMat);
 		fclose(btOut);
+		
 
 	}
 	else {
@@ -8098,23 +8105,12 @@ void BetaGrpSnp::dump(){
 void BetaGrpSnp::update(const Grp &dat, const SigmaI &SigIm){
 	if (_lowLevel) {
 		MuGrp datMnI = dat.mean(*_lowLevel);
-		Grp &datMn   = datMnI;
-		datMn.center();
-		
-#pragma omp parallel for num_threads(_nThr)
-		for (int jSnp = 0; jSnp < _theta.size(); jSnp++) { // iterators not supported in older versions of OpenMP; also the iteration variable has to be signed unless you have a newer version of OpenMP
-			_theta[jSnp]->update(datMn, SigIm, _rV[omp_get_thread_num()]);
-		}
+		gsl_matrix_add(_Ystore, datMnI.fMat());
+		gsl_matrix_add(_SIstore, SigIm.getMat());
 	}
 	else {
-		MuGrp datMnI = dat;
-		Grp &datMn   = datMnI;
-		datMn.center();
-#pragma omp parallel for num_threads(_nThr)
-		for (int jSnp = 0; jSnp < _theta.size(); jSnp++) { // iterators not supported in older versions of OpenMP; also the iteration variable has to be signed unless you have a newer version of OpenMP
-			_theta[jSnp]->update(datMn, SigIm, _rV[omp_get_thread_num()]);
-		}
-
+		gsl_matrix_add(_Ystore, dat.fMat());
+		gsl_matrix_add(_SIstore, SigIm.getMat());
 	}
 	_numSaves += 1.0;
 }
@@ -8122,114 +8118,46 @@ void BetaGrpSnp::update(const Grp &dat, const SigmaI &SigIm){
 /*
 	BetaGrpSnpMiss methods
  */
-BetaGrpSnpMiss::BetaGrpSnpMiss(const string &predFlNam, const string &outFlNam, const size_t &Ndat, const size_t &Npred, const size_t &d, const int &Nthr, const double &absLab) : _numSaves(0.0), _nThr(Nthr), MuGrp(){
-	_theta.resize(Npred);
-	_Xmat.resize(Npred);
-	
+BetaGrpSnpMiss::BetaGrpSnpMiss() : _numSaves(0.0), _nThr(1), _Npred(1), _absLab(-9.0), MuGrp() {
+	_Ystore  = gsl_matrix_calloc(1, 1);
+	_SIstore = gsl_matrix_calloc(1, 1);
+}
+
+BetaGrpSnpMiss::BetaGrpSnpMiss(const string &predFlNam, const string &outFlNam, const size_t &Ndat, const size_t &Npred, const size_t &d, const int &Nthr, const double &absLab) : _numSaves(0.0), _nThr(Nthr), _Npred(Npred), _inPredFl(predFlNam), _absLab(absLab), MuGrp(){
 	gsl_matrix_free(_valueMat);
-	_valueMat = gsl_matrix_calloc(Npred, d + 1);
-	_fakeFmat = gsl_matrix_calloc(Npred, d);     // will be all zero, so we can use it for addition and subtraction without any consequences other than loss of efficiency
+	
+	_Ystore  = gsl_matrix_calloc(Ndat, d);
+	_SIstore = gsl_matrix_calloc(d, d);
+	
+	_fakeFmat = gsl_matrix_calloc(Ndat, d);     // will be all zero, so we can use it for addition and subtraction without any consequences other than loss of efficiency
 	_lowLevel = 0;
 	_outFlNam = outFlNam;
 	remove(_outFlNam.c_str());
 	
-	if (_nThr > 1) {
-		const gsl_rng_type *T = gsl_rng_mt19937;
-		_rV.resize(_nThr);
-		vector<gsl_rng *>::iterator rIt = _rV.begin();
-		++rIt;
-		for (; rIt != _rV.end(); ++rIt) {
-			unsigned long seed = gsl_rng_get(_rV[0]);
-			*rIt = gsl_rng_alloc(T);
-			gsl_rng_set(*rIt, seed);
-		}
-		
-	}
-	
-	gsl_vector *tmpX = gsl_vector_alloc(Npred);
-	FILE *prdIn = fopen(predFlNam.c_str(), "r");
-	vector< vector<size_t> > presInd(Npred);
-	
-	for (size_t XiRw = 0; XiRw < Ndat; XiRw++) { // reading in one row (line of predictor) at a time so that two whole SNP matrix worth of stuff is not in memory at once;  remember that SNPs are saved in row-major
-		gsl_vector_fread(prdIn, tmpX);
-		for (size_t XjCl = 0; XjCl < Npred; XjCl++) {
-			if (gsl_vector_get(tmpX, XjCl) > absLab) { // absLab labels the missing data, has to be smaller than the smallest real value
-				presInd[XjCl].push_back(XiRw);
-				_Xmat[XjCl].push_back(gsl_vector_get(tmpX, XjCl));
-			}
-		}
-	}
-	fclose(prdIn);
-	
-	for (size_t XjCl = 0; XjCl < Npred; XjCl++) {
-		_Xmat[XjCl].resize(_Xmat[XjCl].size()); // just in case there was extra memeory allocated on push_back()
-		double mn = gsl_stats_mean(_Xmat[XjCl].data(), 1, _Xmat[XjCl].size());
-		gsl_vector_view vx = gsl_vector_view_array(_Xmat[XjCl].data(), _Xmat[XjCl].size());
-		gsl_vector_add_constant(&vx.vector, -mn); // center predictor
-		_theta[XjCl] = new MVnormBetaMiss(_Xmat[XjCl], presInd[XjCl], _valueMat, XjCl);
-		
-	}
-
-	gsl_vector_free(tmpX);
 }
-BetaGrpSnpMiss::BetaGrpSnpMiss(const string &predFlNam, const string &outFlNam, RanIndex &low, const size_t &Npred, const size_t &d, const int &Nthr, const double &absLab) : _numSaves(0.0), _nThr(Nthr), MuGrp() {
-	_theta.resize(Npred);
-	_Xmat.resize(Npred);
-	
+BetaGrpSnpMiss::BetaGrpSnpMiss(const string &predFlNam, const string &outFlNam, RanIndex &low, const size_t &Npred, const size_t &d, const int &Nthr, const double &absLab) : _numSaves(0.0), _nThr(Nthr), _Npred(Npred), _inPredFl(predFlNam), _absLab(absLab), MuGrp() {
 	gsl_matrix_free(_valueMat);
-	_valueMat = gsl_matrix_calloc(Npred, d + 1);
-	_fakeFmat = gsl_matrix_calloc(low.getNgrp(), d);  // will be all zero, so we can use it for addition and subtraction without any consequences other than loss of efficiency
+	
+	_Ystore  = gsl_matrix_calloc(low.getNgrp(), d);
+	_SIstore = gsl_matrix_calloc(d, d);
+	
+	_fakeFmat = gsl_matrix_calloc(low.getNgrp(), d);     // will be all zero, so we can use it for addition and subtraction without any consequences other than loss of efficiency
 	_lowLevel = &low;
 	_outFlNam = outFlNam;
 	remove(_outFlNam.c_str());
-	
-	if (_nThr > 1) {
-		const gsl_rng_type *T = gsl_rng_mt19937;
-		_rV.resize(_nThr);
-		vector<gsl_rng *>::iterator rIt = _rV.begin();
-		++rIt;
-		for (; rIt != _rV.end(); ++rIt) {
-			unsigned long seed = gsl_rng_get(_rV[0]);
-			*rIt = gsl_rng_alloc(T);
-			gsl_rng_set(*rIt, seed);
-		}
-		
-	}
-
-	gsl_vector *tmpX = gsl_vector_alloc(Npred);
-	FILE *prdIn = fopen(predFlNam.c_str(), "r");
-	vector< vector<size_t> > presInd(Npred);
-	
-	for (size_t XiRw = 0; XiRw < (*_lowLevel).getNgrp(); XiRw++) { // reading in one row (line of predictor) at a time so that two whole SNP matrix worth of stuff is not in memory at once;  remember that SNPs are saved in row-major
-		gsl_vector_fread(prdIn, tmpX);
-		for (size_t XjCl = 0; XjCl < Npred; XjCl++) {
-			if (gsl_vector_get(tmpX, XjCl) > absLab) { // absLab labels the missing data, has to be smaller than the smallest real value
-				presInd[XjCl].push_back(XiRw);
-				_Xmat[XjCl].push_back(gsl_vector_get(tmpX, XjCl));
-			}
-		}
-	}
-	fclose(prdIn);
-	
-	for (size_t XjCl = 0; XjCl < Npred; XjCl++) {
-		_Xmat[XjCl].resize(_Xmat[XjCl].size()); // just in case there was extra memeory allocated on push_back()
-		double mn = gsl_stats_mean(_Xmat[XjCl].data(), 1, _Xmat[XjCl].size());
-		gsl_vector_view vx = gsl_vector_view_array(_Xmat[XjCl].data(), _Xmat[XjCl].size());
-		gsl_vector_add_constant(&vx.vector, -mn); // center predictor
-		_theta[XjCl] = new MVnormBetaMiss(_Xmat[XjCl], presInd[XjCl], _valueMat, XjCl);
-		
-	}
-	
-	gsl_vector_free(tmpX);
 }
 
 BetaGrpSnpMiss::BetaGrpSnpMiss(const BetaGrpSnpMiss &mG){
 	gsl_matrix_free(_valueMat);
+	_Ystore  = gsl_matrix_calloc((mG._Ystore)->size1, (mG._Ystore)->size2);
+	_SIstore = gsl_matrix_calloc((mG._SIstore)->size1, (mG._SIstore)->size2);
 	
-	_Xmat     = mG._Xmat;
 	_lowLevel = mG._lowLevel;
 	_upLevel  = mG._upLevel;
 	_nThr     = mG._nThr;
+	_Npred    = mG._Npred;
+	_absLab   = mG._absLab;
+	_inPredFl = mG._inPredFl;
 	
 	_valueMat = gsl_matrix_alloc((mG._valueMat)->size1, (mG._valueMat)->size2);
 	gsl_matrix_memcpy(_valueMat, mG._valueMat);
@@ -8255,11 +8183,15 @@ BetaGrpSnpMiss::BetaGrpSnpMiss(const BetaGrpSnpMiss &mG){
 }
 BetaGrpSnpMiss & BetaGrpSnpMiss::operator=(const BetaGrpSnpMiss &mG){
 	gsl_matrix_free(_valueMat);
+	_Ystore  = gsl_matrix_calloc((mG._Ystore)->size1, (mG._Ystore)->size2);
+	_SIstore = gsl_matrix_calloc((mG._SIstore)->size1, (mG._SIstore)->size2);
 	
-	_Xmat     = mG._Xmat;
 	_lowLevel = mG._lowLevel;
 	_upLevel  = mG._upLevel;
 	_nThr     = mG._nThr;
+	_Npred    = mG._Npred;
+	_absLab   = mG._absLab;
+	_inPredFl = mG._inPredFl;
 	
 	_valueMat = gsl_matrix_alloc((mG._valueMat)->size1, (mG._valueMat)->size2);
 	gsl_matrix_memcpy(_valueMat, mG._valueMat);
@@ -8287,11 +8219,67 @@ BetaGrpSnpMiss & BetaGrpSnpMiss::operator=(const BetaGrpSnpMiss &mG){
 
 BetaGrpSnpMiss::~BetaGrpSnpMiss(){
 	gsl_matrix_free(_fakeFmat);
+	gsl_matrix_free(_Ystore);
+	gsl_matrix_free(_SIstore);
 }
 
 void BetaGrpSnpMiss::dump(){
 	if (_numSaves) {
-		gsl_matrix_scale(_valueMat, 1.0/_numSaves);
+		_theta.resize(_Npred);
+		_Xmat.resize(_Npred);
+		
+		_valueMat = gsl_matrix_calloc(_Npred, _Ystore->size2 + 1);
+
+		if (_nThr > 1) {
+			const gsl_rng_type *T = gsl_rng_mt19937;
+			_rV.resize(_nThr);
+			vector<gsl_rng *>::iterator rIt = _rV.begin();
+			++rIt;
+			for (; rIt != _rV.end(); ++rIt) {
+				unsigned long seed = gsl_rng_get(_rV[0]);
+				*rIt = gsl_rng_alloc(T);
+				gsl_rng_set(*rIt, seed);
+			}
+			
+		}
+		
+		gsl_vector *tmpX = gsl_vector_alloc(_Npred);
+		FILE *prdIn = fopen(_inPredFl.c_str(), "r");
+		vector< vector<size_t> > presInd(_Npred);
+		
+		for (size_t XiRw = 0; XiRw < _Ystore->size1; XiRw++) { // reading in one row (line of predictor) at a time so that two whole SNP matrix worth of stuff is not in memory at once;  remember that SNPs are saved in row-major
+			gsl_vector_fread(prdIn, tmpX);
+			for (size_t XjCl = 0; XjCl < _Npred; XjCl++) {
+				if (gsl_vector_get(tmpX, XjCl) > _absLab) { // absLab labels the missing data, has to be smaller than the smallest real value
+					presInd[XjCl].push_back(XiRw);
+					_Xmat[XjCl].push_back(gsl_vector_get(tmpX, XjCl));
+				}
+			}
+		}
+		fclose(prdIn);
+		
+		for (size_t XjCl = 0; XjCl < _Npred; XjCl++) {
+			_Xmat[XjCl].resize(_Xmat[XjCl].size()); // just in case there was extra memeory allocated on push_back()
+			double mn = gsl_stats_mean(_Xmat[XjCl].data(), 1, _Xmat[XjCl].size());
+			gsl_vector_view vx = gsl_vector_view_array(_Xmat[XjCl].data(), _Xmat[XjCl].size());
+			gsl_vector_add_constant(&vx.vector, -mn); // center predictor
+			_theta[XjCl] = new MVnormBetaMiss(_Xmat[XjCl], presInd[XjCl], _valueMat, XjCl);
+			
+		}
+		
+		gsl_vector_free(tmpX);
+
+		gsl_matrix_scale(_Ystore, 1.0/_numSaves);
+		gsl_matrix_scale(_SIstore, 1.0/_numSaves);
+		colCenter(_Ystore);
+		MuGrp datI(_Ystore);
+		Grp &dat = datI;
+		SigmaI Sinv(_SIstore);
+		
+#pragma omp parallel for num_threads(_nThr)
+		for (int jSnp = 0; jSnp < _Npred; jSnp++) { // iterators not supported in older versions of OpenMP; also the iteration variable has to be signed unless you have a newer version of OpenMP
+			_theta[jSnp]->update(dat, Sinv, _rV[omp_get_thread_num()]);
+		}
 		
 		FILE *btOut = fopen(_outFlNam.c_str(), "w");
 		gsl_matrix_fwrite(btOut, _valueMat);
@@ -8306,19 +8294,12 @@ void BetaGrpSnpMiss::dump(){
 void BetaGrpSnpMiss::update(const Grp &dat, const SigmaI &SigIm){
 	if (_lowLevel) {
 		MuGrp datMnI = dat.mean(*_lowLevel);
-		Grp &datMn   = datMnI;
-		
-#pragma omp parallel for num_threads(_nThr)
-		for (int jSnp = 0; jSnp < _theta.size(); jSnp++) { // iterators not supported in older versions of OpenMP; also the iteration variable has to be signed unless you have a newer version of OpenMP
-			_theta[jSnp]->update(datMn, SigIm, _rV[omp_get_thread_num()]);
-		}
+		gsl_matrix_add(_Ystore, datMnI.fMat());
+		gsl_matrix_add(_SIstore, SigIm.getMat());
 	}
 	else {
-#pragma omp parallel for num_threads(_nThr)
-		for (int jSnp = 0; jSnp < _theta.size(); jSnp++) { // iterators not supported in older versions of OpenMP; also the iteration variable has to be signed unless you have a newer version of OpenMP
-			_theta[jSnp]->update(dat, SigIm, _rV[omp_get_thread_num()]);
-		}
-		
+		gsl_matrix_add(_Ystore, dat.fMat());
+		gsl_matrix_add(_SIstore, SigIm.getMat());
 	}
 	_numSaves += 1.0;
 }
