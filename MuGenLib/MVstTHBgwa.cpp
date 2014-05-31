@@ -634,14 +634,14 @@ int main(int argc, char *argv[]){
 			else {
 				muLn.save(LNout);
 				
-				bvI = mu + gamma;
+				bvI = (mu + muSca) + gamma;
 				bv.save(BVout);
 				
 				snpBet.update(repDev, SigIrep);
 				
-				SigIe.save(SgEout);
-				SigIrep.save(SgRout);
-				SigIa.save(SgAout);
+				SigIe.save();
+				SigIrep.save();
+				SigIa.save();
 				
 				cout << "|" << flush;
 			}
@@ -758,12 +758,12 @@ int main(int argc, char *argv[]){
 						snp2pr.save(snpDev, snpBet, SigIrep);
 					}
 				
-				bvI = mu + gamma + snpBet;
+				bvI = (mu + muSca) + gamma + snpBet;
 				bv.save(BVout);
 				
-				SigIe.save(SgEout);
-				SigIrep.save(SgRout);
-				SigIa.save(SgAout);
+				SigIe.save();
+				SigIrep.save();
+				SigIa.save();
 				
 				cout << "|" << flush;
 			}
