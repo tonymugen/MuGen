@@ -634,7 +634,7 @@ int main(int argc, char *argv[]){
 			else {
 				muLn.save(LNout);
 				
-				bvI = (mu + muSca) + gamma;
+				bvI = MuGrp(gamma);
 				bv.save(BVout);
 				
 				snpBet.update(repDev, SigIrep);
@@ -758,7 +758,7 @@ int main(int argc, char *argv[]){
 						snp2pr.save(snpDev, snpBet, SigIrep);
 					}
 				
-				bvI = (mu + muSca) + gamma + snpBet;
+				bvI = gamma + snpBet;
 				bv.save(BVout);
 				
 				SigIe.save();
