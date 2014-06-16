@@ -51,8 +51,10 @@ class MuBlk;
 class BetaBlk;
 class SigmaI;
 class SigmaIblk;
+class SigmaIpex;
 class StTq;
 class Qgrp;
+class QgrpPEX;
 class MixP;
 
 /*
@@ -1096,9 +1098,9 @@ public:
 	virtual void update(const Grp &dat, const Grp &mu, const Qgrp &q);
 	
 	// save function for the stored file name
-	void save(const char *how = "a");
+	virtual void save(const char *how = "a");
 	// save function, taking file name, appending by default
-	void save(const string &fileNam, const char *how = "a");
+	virtual void save(const string &fileNam, const char *how = "a");
 	// PEX save
 	void save(const string &fileNam, const Apex &A, const char *how = "a");
 	// save function, taking file stream name
@@ -1126,7 +1128,7 @@ public:
 	SigmaIblk(const Grp &dat, const string &blkIndFileNam, const double &prDiag, const double &nu0);
 	SigmaIblk(const Grp &dat, const string &blkIndFileNam, const string &outFlNam, const double &prDiag, const double &nu0);
 
-	~SigmaIblk(){};
+	~SigmaIblk() {};
 	
 	// Gaussian
 	void update(const Grp &dat);
@@ -1134,28 +1136,50 @@ public:
 	
 };
 
+class SigmaIpex : public SigmaI {  // class for van Dyk and Meng's PEX for MV Student-t
+protected:
+	double _alpha;  // the PEX parameter
+	
+public:
+	SigmaIpex() : _alpha(1.0), SigmaI() {};
+	SigmaIpex(const size_t &d, const double &invVar, const double &df) : _alpha(1.0), SigmaI(d, invVar, df) {};
+	SigmaIpex(const size_t &d, const double &invVar, const double &df, const string &outFlNam) : _alpha(1.0), SigmaI(d, invVar, df, outFlNam) {};
+	SigmaIpex(const Grp &dat, const double &prDiag, const double &nu0) : _alpha(1.0), SigmaI(dat, prDiag, nu0) {};
+	SigmaIpex(const Grp &dat, const string &outFlNam, const double &prDiag, const double &nu0) : _alpha(1.0), SigmaI(dat, outFlNam, prDiag, nu0) {};
+	
+	~SigmaIpex() {};
+	
+	void update(const Grp &dat, const Qgrp &q);
+	void update(const Grp &dat, const Grp &mu, const Qgrp &q);
+	
+	void save(const char *how = "a");
+	void save(const string &fileNam, const char *how = "a");
+};
+
 class StTq {	// the weigting parameter for Student-t sampling
 private:
 	double _q;
-	double _nu; // Student-t degrees of freedom
+	const double *_nu; // Student-t degrees of freedom; pointer to a value kept in Qgrp, since all members of the group should have the same
 	size_t _locInd;
 public:
 	// constructors
-	StTq() : _nu(3.0), _q(1.0), _locInd(0) {};
-	StTq(const double &nu) : _nu(nu), _q(1.0), _locInd(0) {};
+	StTq() : _nu(0), _q(1.0), _locInd(0) {};
+	StTq(const double &nu) : _q(1.0), _locInd(0) { _nu = &nu; };
 	StTq(const double &nu, const int &d, gsl_rng *r);
 	StTq(const double &q, const double &nu, const int &d, gsl_rng *r);
-	StTq(const double &nu, const size_t &ind) : _nu(nu), _q(1.0), _locInd(ind) {};
+	StTq(const double &nu, const size_t &ind) : _q(1.0), _locInd(ind) { _nu = &nu; };
 	StTq(const double &q, const double &nu, const size_t &ind, const int &d, gsl_rng *r);
 	
 	~StTq() {};
 	
 	double getVal() const {return _q; };
-	double getNu() const {return _nu; };
-	void   setNu(const double nu){_nu = nu; };
+	double getNu() const {return *_nu; };
 	
 	void update(const Grp &dat, const Grp &mu, const SigmaI &SigI, const gsl_rng *r);
 	void update(const Grp &dat, const SigmaI &SigI, const gsl_rng *r);
+	// for the PEX scheme
+	void update(const Grp &dat, const Grp &mu, const SigmaI &SigI, const double &alpha, const gsl_rng *r);
+	void update(const Grp &dat, const SigmaI &SigI, const double &alpha, const gsl_rng *r);
 	
 	// save function, taking file name, appending by default
 	void save(const string &fileNam, const char *how = "a");
@@ -1163,26 +1187,48 @@ public:
 	void save(FILE *fileStr);
 };
 
-class Qgrp {
-private:
+class Qgrp { // group of StTq
+protected:
 	vector<StTq> _qVec;
 	vector<size_t> _presInd; // vector of indexes of samples with no missing phenotypes.  These are the ones we can update q for
+	double _nu;  // degrees of freedom
+	
 	gsl_rng *_r;
 	
 public:
-	Qgrp() {};
+	Qgrp() : _nu(3.0) {};
 	Qgrp(const size_t &N);
 	Qgrp(const size_t &N, const double &nu);
 	Qgrp(const size_t &N, const double &nu, const string &misVecFlNam);
 	
-	~Qgrp() {};
+	virtual ~Qgrp() {};
 	
 	double operator[](const size_t i) const{return _qVec[i].getVal(); };
 	double operator[](const size_t i) {return _qVec[i].getVal(); };
 	
+	virtual double alpha() const {return 1.0; };
+	virtual double alpha() {return 1.0; };
+	
+	virtual void update(const Grp &dat, const Grp &mu, const SigmaI &SigI);
+	virtual void update(const Grp &dat, const SigmaI &SigI);
+	
+};
+
+class QgrpPEX : public Qgrp {  // group of StTq for van Dyk and Meng's PEX
+protected:
+	double _alpha;  // the extra parameter
+	
+public:
+	QgrpPEX() : _alpha(1.0), Qgrp() {};
+	QgrpPEX(const size_t &N) : _alpha(1.0), Qgrp(N) {};
+	QgrpPEX(const size_t &N, const double &nu) : _alpha(1.0), Qgrp(N, nu) {};
+	QgrpPEX(const size_t &N, const double &nu, const string &misVecFlNam) : _alpha(1.0), Qgrp(N, nu, misVecFlNam) {};
+	
+	double alpha() const {return _alpha; };
+	double alpha() {return _alpha; };
+	
 	void update(const Grp &dat, const Grp &mu, const SigmaI &SigI);
 	void update(const Grp &dat, const SigmaI &SigI);
-	
 };
 
 class MixP {
