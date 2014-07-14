@@ -25,6 +25,7 @@ using std::string;
 class MVnorm;
 class MVnormMu;
 class MVnormMuPEX;
+class MVnormBetaPEX;
 class MVnormMuMiss;
 class MVnormBeta;
 class MVnormBetaMiss;
@@ -40,6 +41,7 @@ class Apex;
 class Grp;
 class MuGrp;
 class MuGrpPEX;
+class BetaGrpPEX;
 class MuGrpMiss;
 class BetaGrpSnp;
 class BetaGrpSnpMiss;
@@ -174,12 +176,12 @@ public:
 	virtual void update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, const gsl_rng *r);
 	// 0-mean prior methods
 	virtual void update(const Grp &dat, const SigmaI &SigIm, const SigmaI &SigIp, const gsl_rng *r);
-	void update(const Grp &dat, const SigmaI &SigIm, const double &qPr, const SigmaI &SigIp, const gsl_rng *r);
+	virtual void update(const Grp &dat, const SigmaI &SigIm, const double &qPr, const SigmaI &SigIp, const gsl_rng *r);
 	virtual void update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, const SigmaI &SigIp, const gsl_rng *r);
 	void update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, const double &qPr, const SigmaI &SigIp, const gsl_rng *r);
 	// non-zero mean prior methods
 	virtual void update(const Grp &dat, const SigmaI &SigIm, const Grp &muPr, const SigmaI &SigIp, const gsl_rng *r);
-	void update(const Grp &dat, const SigmaI &SigIm, const Grp &muPr, const double &qPr, const SigmaI &SigIp, const gsl_rng *r);
+	virtual void update(const Grp &dat, const SigmaI &SigIm, const Grp &muPr, const double &qPr, const SigmaI &SigIp, const gsl_rng *r);
 	void update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, const Grp &muPr, const SigmaI &SigIp, const gsl_rng *r);
 	void update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, const Grp &muPr, const double &qPr, const SigmaI &SigIp, const gsl_rng *r);
 	
@@ -202,10 +204,38 @@ public:
 	MVnormMuPEX(const MVnormMuPEX &mu); // copy constructor
 	MVnormMuPEX & operator=(const MVnormMuPEX &mu);
 	
-	~MVnormMuPEX(){};
+	virtual ~MVnormMuPEX() {};
+	
+	virtual void update(const Grp &dat, const SigmaI &SigIm, const SigmaI &SigIp, const gsl_rng *r);
+	virtual void update(const Grp &dat, const SigmaI &SigIm, const double &qPr, const SigmaI &SigIp, const gsl_rng *r);
+	
+	virtual void update(const Grp &dat, const SigmaI &SigIm, const Grp &muPr, const SigmaI &SigIp, const gsl_rng *r);
+	virtual void update(const Grp &dat, const SigmaI &SigIm, const Grp &muPr, const double &qPr, const SigmaI &SigIp, const gsl_rng *r);
+};
+
+class MVnormBetaPEX : public MVnormMuPEX {  // derived method to include regression in the PEX scheme
+protected:
+	gsl_vector_view _X; // vector view of predictor values (typically column of a predictor matrix that is in the encapsulating group class).  The matrix this points to can be modified through this, as when I scale the predictor
+	double _scale;      // Scale -- typically XtX, but not always (special cases dealt with in derived classes)
+	size_t _N;          // length of &_X.vector
+	gsl_matrix_view _fitted;
+	
+public:
+	MVnormBetaPEX() : MVnormMuPEX() {};
+	MVnormBetaPEX(const gsl_matrix *resp, gsl_matrix *pred, const size_t &iCl, vector<double> &eaFt, const gsl_matrix *Sig, const gsl_rng *r, const size_t &up, gsl_matrix *bet, const size_t &iRw, Apex &A, gsl_matrix *tSigIAt);
+	MVnormBetaPEX(const size_t &d, gsl_matrix *pred, const size_t &iCl, vector<double> &eaFt, const size_t &up, gsl_matrix *bet, const size_t &iRw, Apex &A, gsl_matrix *tSigIAt);
+	
+	MVnormBetaPEX(const MVnormBetaPEX &bet);
+	MVnormBetaPEX & operator=(const MVnormBetaPEX &bet);
+	
+	~MVnormBetaPEX() {};
 	
 	void update(const Grp &dat, const SigmaI &SigIm, const SigmaI &SigIp, const gsl_rng *r);
+	void update(const Grp &dat, const SigmaI &SigIm, const double &qPr, const SigmaI &SigIp, const gsl_rng *r);
+	
 	void update(const Grp &dat, const SigmaI &SigIm, const Grp &muPr, const SigmaI &SigIp, const gsl_rng *r);
+	void update(const Grp &dat, const SigmaI &SigIm, const Grp &muPr, const double &qPr, const SigmaI &SigIp, const gsl_rng *r);
+	
 };
 
 class MVnormMuMiss : public MVnormMu { // further modifies MVnormMu to account for missing phenotypes
@@ -348,6 +378,7 @@ protected:
 	gsl_matrix_view _fitted;
 	
 public:
+	
 	MVnormBetaFt(): MVnormBeta() {};
 	MVnormBetaFt(gsl_vector *b, const gsl_vector *sd, gsl_matrix *pred, const size_t &iCl, gsl_matrix *allFt, const size_t &begRw, const gsl_rng *r) : MVnormBeta(b, sd, pred, iCl, r) {_fitted = gsl_matrix_submatrix(allFt, begRw, 0, pred->size1, _d); };
 	MVnormBetaFt(gsl_vector *b, const gsl_matrix *Sig, gsl_matrix *pred, const size_t &iCl, gsl_matrix *allFt, const size_t &begRw, const gsl_rng *r) : MVnormBeta(b, Sig, pred, iCl, r) {_fitted = gsl_matrix_submatrix(allFt, begRw, 0, pred->size1, _d); };
@@ -536,8 +567,9 @@ public:
 
 };
 /*
-	random index class that allows for mixture models.  Can be used as a deterministic index if there is deterministic initiation and no updating
+ *	random index class that allows for mixture models.  Can be used as a deterministic index if there is deterministic initiation and no updating
  */
+
 class RanIndex {
 protected:
 	vector< vector<size_t> > _idx; // rugged 2D array that relates the upper-level elements to the indexes of the lower levels
@@ -580,7 +612,7 @@ public:
 };
 
 /*
-	Index class that keeps track of the variable selection process.
+ *	Index class that keeps track of the variable selection process.
  */
 class RanIndexVS : public RanIndex {  //  is a friend of BetaGrpBVSR
 	
@@ -623,7 +655,7 @@ public:
 };
 
 /*
-	Parameter-expansion variable for 0-mean MVnormMu
+ *	Parameter-expansion variable for 0-mean MVnormMu
  */
 
 class Apex {
@@ -663,7 +695,7 @@ class Grp {
 protected:
 	vector<MVnorm *> _theta;
 	gsl_matrix *_valueMat; // the individual _theta members point to rows of this and modify it on initialization and during updates
-	RanIndex *_lowLevel;   // points to the level below.  For Betas will correspond to the _fittedValues; if unset will be 0
+	RanIndex *_lowLevel;   // points to the level below; if unset will be 0
 	RanIndex *_upLevel;    // points to the level above; if unset will be 0
 	vector<gsl_rng *> _rV; // vector of RNGs; mostly will be length 1, but occasionally length == num_thread()
 	
@@ -795,7 +827,10 @@ public:
 	const MuGrp mean(RanIndex &grp, const Qgrp &q) const;
 	
 	void update(const Grp &dat, const SigmaI &SigIm, const SigmaI &SigIp);
+	void update(const Grp &dat, const SigmaI &SigIm, const Qgrp &qPr, const SigmaI &SigIp);
+	
 	void update(const Grp &dat, const SigmaI &SigIm, const Grp &muPr, const SigmaI &SigIp);
+	void update(const Grp &dat, const SigmaI &SigIm, const Grp &muPr, const Qgrp &qPr, const SigmaI &SigIp);
 };
 
 class MuGrpMiss : public MuGrp {
@@ -820,7 +855,7 @@ public:
 
 class BetaGrpFt : public Grp {
 protected:
-	vector<vector<double> > _fittedEach; // each member of the outer vector stores the element-specific fitted matrix as vector in the row-major format, to be accessed as a matrix_view of an array
+	vector< vector<double> > _fittedEach; // each member of the outer vector stores the element-specific fitted matrix as vector in the row-major format, to be accessed as a matrix_view of an array
 	gsl_matrix *_fittedAll;
 	gsl_matrix *_valueSum; // sum of all the saved estimates; allocated only if needed (under the condition that _numSaves != 0.0)
 	gsl_matrix *_Xmat;
@@ -862,7 +897,7 @@ public:
 	BetaGrpFt(const BetaGrpFt &mG); // copy constructor
 	BetaGrpFt & operator=(const BetaGrpFt &mG);
 	
-	const gsl_matrix *fMat() const{return _fittedAll; };
+	virtual const gsl_matrix *fMat() const{return _fittedAll; };
 	void save(const SigmaI &SigI);
 	void dump();
 	
@@ -872,17 +907,66 @@ public:
 	void update(const Grp &dat, const SigmaI &SigIm);
 	void update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm);
 	// 0-mean prior
-	void update(const Grp &dat, const SigmaI &SigIm, const SigmaI &SigIp);
+	virtual void update(const Grp &dat, const SigmaI &SigIm, const SigmaI &SigIp);
 	void update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, const SigmaI &SigIp);
-	void update(const Grp &dat, const SigmaI &SigIm, const Qgrp &qPr, const SigmaI &SigIp);
+	virtual void update(const Grp &dat, const SigmaI &SigIm, const Qgrp &qPr, const SigmaI &SigIp);
 	void update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, const Qgrp &qPr, const SigmaI &SigIp);
 	// non-0-mean prior
-	void update(const Grp &dat, const SigmaI &SigIm, const Grp &muPr, const SigmaI &SigIp);
+	virtual void update(const Grp &dat, const SigmaI &SigIm, const Grp &muPr, const SigmaI &SigIp);
 	void update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, const Grp &muPr, const SigmaI &SigIp);
-	void update(const Grp &dat, const SigmaI &SigIm, const Grp &muPr, const Qgrp &qPr, const SigmaI &SigIp);
+	virtual void update(const Grp &dat, const SigmaI &SigIm, const Grp &muPr, const Qgrp &qPr, const SigmaI &SigIp);
 	void update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, const Grp &muPr, const Qgrp &qPr, const SigmaI &SigIp);
 	
 };
+
+class BetaGrpPEX : public BetaGrpFt {
+protected:
+	gsl_matrix *_tSigIAt;   // t(SigIm%*%t(_A)) that is in common among all individual MVnormMuPEX's
+	Apex _A;
+	vector<vector<double> > _ftA;
+	gsl_matrix *_fittedAllAdj;  // this is the X%*%Zeta%*%A, the regular scale matrix.  The _fittedAll is the "raw" matrix, as is the _valueMat (we don't need the adjusted _valueMat)
+	
+	void _finishConstruct(const double &Spr);
+	void _finishFitted();
+	void _updateAfitted();
+	
+public:
+	BetaGrpPEX() : BetaGrpFt() {};
+	BetaGrpPEX(const Grp &rsp, const string &predFlNam, const size_t &Npred, const double &Spr, const int &nThr) : BetaGrpFt(rsp, predFlNam, Npred, nThr) {_finishConstruct(Spr); };
+	BetaGrpPEX(const Grp &rsp, const string &predFlNam, const size_t &Npred, const double &Spr, RanIndex &up, const int &nThr) : BetaGrpFt(rsp, predFlNam, Npred, up, nThr) {_finishConstruct(Spr); };
+	BetaGrpPEX(const Grp &rsp, const string &predFlNam, const size_t &Npred, const double &Spr, RanIndex &low, RanIndex &up, const int &nThr) : BetaGrpFt(rsp, predFlNam, Npred, low, up, nThr) {_finishConstruct(Spr); };
+	BetaGrpPEX(const Grp &rsp, const string &predFlNam, const size_t &Npred, const double &Spr, const string &outFlNam, const int &nThr) : BetaGrpFt(rsp, predFlNam, Npred, outFlNam, nThr) {_finishConstruct(Spr); };
+	BetaGrpPEX(const Grp &rsp, const string &predFlNam, const size_t &Npred, const double &Spr, RanIndex &up, const string &outFlNam, const int &nThr) : BetaGrpFt(rsp, predFlNam, Npred, up, outFlNam, nThr) {_finishConstruct(Spr); };
+	BetaGrpPEX(const Grp &rsp, const string &predFlNam, const size_t &Npred, const double &Spr, RanIndex &low, RanIndex &up, const string &outFlNam, const int &nThr) : BetaGrpFt(rsp, predFlNam, Npred, low, up, outFlNam, nThr) {_finishConstruct(Spr); };
+	
+	// with missing predictor values (labeled by absLab)
+	BetaGrpPEX(const Grp &rsp, const string &predFlNam, const size_t &Npred, const double &Spr, const double &absLab, const int &nThr) : BetaGrpFt(rsp, predFlNam, Npred, absLab, nThr) {_finishConstruct(Spr); };
+	BetaGrpPEX(const Grp &rsp, const string &predFlNam, const size_t &Npred, const double &Spr, const double &absLab, RanIndex &up, const int &nThr) : BetaGrpFt(rsp, predFlNam, Npred, absLab, up, nThr) {_finishConstruct(Spr); };
+	BetaGrpPEX(const Grp &rsp, const string &predFlNam, const size_t &Npred, const double &Spr, const double &absLab, RanIndex &low, RanIndex &up, const int &nThr) : BetaGrpFt(rsp, predFlNam, Npred, absLab, low, up, nThr) {_finishConstruct(Spr); };
+	BetaGrpPEX(const Grp &rsp, const string &predFlNam, const size_t &Npred, const double &Spr, const double &absLab, const string &outFlNam, const int &nThr) : BetaGrpFt(rsp, predFlNam, Npred, absLab, outFlNam, nThr) {_finishConstruct(Spr); };
+	BetaGrpPEX(const Grp &rsp, const string &predFlNam, const size_t &Npred, const double &Spr, const double &absLab, RanIndex &up, const string &outFlNam, const int &nThr) : BetaGrpFt(rsp, predFlNam, Npred, absLab, up, outFlNam, nThr) {_finishConstruct(Spr); };
+	BetaGrpPEX(const Grp &rsp, const string &predFlNam, const size_t &Npred, const double &Spr, const double &absLab, RanIndex &low, RanIndex &up, const string &outFlNam, const int &nThr) : BetaGrpFt(rsp, predFlNam, Npred, absLab, low, up, outFlNam, nThr) {_finishConstruct(Spr); };
+	
+	// pre-screening of predictors based on initial rank.  Unlike BVSR, there is no update of the selected set
+	BetaGrpPEX(const Grp &rsp, const SigmaI &SigI, const string &predFlNam, const size_t &Npred, const double &Spr, const double &Nmul, const double &rSqMax, RanIndex &up, const string &outFlNam, const int &nThr) : BetaGrpFt(rsp, SigI, predFlNam, Npred, Nmul, rSqMax, up, outFlNam, nThr) {_finishConstruct(Spr); };
+	BetaGrpPEX(const Grp &rsp, const SigmaI &SigI, const string &predFlNam, const size_t &Npred, const double &Spr, const double &Nmul, const double &rSqMax, RanIndex &low, RanIndex &up, const string &outFlNam, const int &nThr) : BetaGrpFt(rsp, SigI, predFlNam, Npred, Nmul, rSqMax, low, up, outFlNam, nThr) {_finishConstruct(Spr); };
+	BetaGrpPEX(const Grp &rsp, const SigmaI &SigI, const string &predFlNam, const size_t &Npred, const double &Spr, const double &Nmul, const double &rSqMax, const double &absLab, RanIndex &up, const string &outFlNam, const int &nThr) : BetaGrpFt(rsp, SigI, predFlNam, Npred, Nmul, rSqMax, absLab, up, outFlNam, nThr) {_finishConstruct(Spr); };
+	BetaGrpPEX(const Grp &rsp, const SigmaI &SigI, const string &predFlNam, const size_t &Npred, const double &Spr, const double &Nmul, const double &rSqMax, const double &absLab, RanIndex &low, RanIndex &up, const string &outFlNam, const int &nThr) : BetaGrpFt(rsp, SigI, predFlNam, Npred, Nmul, rSqMax, absLab, low, up, outFlNam, nThr) {_finishConstruct(Spr); };
+	
+	~BetaGrpPEX();
+	
+	const gsl_matrix *fMat() const{return _fittedAllAdj; };
+	
+	void save();
+	void save(const string &outFlNam);
+	
+	void update(const Grp &dat, const SigmaI &SigIm, const SigmaI &SigIp);
+	void update(const Grp &dat, const SigmaI &SigIm, const Qgrp &qPr, const SigmaI &SigIp);
+	
+	void update(const Grp &dat, const SigmaI &SigIm, const Grp &muPr, const SigmaI &SigIp);
+	void update(const Grp &dat, const SigmaI &SigIm, const Grp &muPr, const Qgrp &qPr, const SigmaI &SigIp);
+};
+
 
 class BetaGrpPC : public BetaGrpFt {
 protected:
