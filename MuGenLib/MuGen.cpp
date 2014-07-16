@@ -5059,7 +5059,7 @@ const MuGrp Grp::mean(RanIndex &grp, const Qgrp &q) const{
 
 
 /*
-	MuGrp methods
+ *	MuGrp methods
  */
 
 MuGrp::MuGrp(RanIndex &low, const size_t &d) : Grp(){
@@ -5496,7 +5496,7 @@ void MuGrp::update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, const Grp
 }
 
 /*
-	MuGrpPEX methods
+ *	MuGrpPEX methods
  */
 
 MuGrpPEX::MuGrpPEX() : _outSigFlNam("MuPEXsig.gbin"), MuGrp(){
@@ -8055,8 +8055,6 @@ BetaGrpSnp::BetaGrpSnp() : _numSaves(0.0), _nThr(1), _Npred(1), MuGrp(){
 	_SIstore = gsl_matrix_calloc(1, 1);
 }
 BetaGrpSnp::BetaGrpSnp(const string &predFlNam, const string &outFlNam, const size_t &Ndat, const size_t &Npred, const size_t &d, const int &Nthr) : _numSaves(0.0), _nThr(Nthr), _Npred(Npred), _inPredFl(predFlNam), MuGrp(){
-	gsl_matrix_free(_valueMat);
-	
 	_fakeFmat = gsl_matrix_calloc(Ndat, d);       // will be all zero, so we can use it for addition and subtraction without any consequences other than loss of efficiency
 	_Ystore   = gsl_matrix_calloc(Ndat, d);
 	_SIstore  = gsl_matrix_calloc(d, d);
@@ -8067,7 +8065,6 @@ BetaGrpSnp::BetaGrpSnp(const string &predFlNam, const string &outFlNam, const si
 	// the rest of the set-up happens before the results are dumped into a file by the dump() function
 }
 BetaGrpSnp::BetaGrpSnp(const string &predFlNam, const string &outFlNam, RanIndex &low, const size_t &Npred, const size_t &d, const int &Nthr) : _numSaves(0.0), _nThr(Nthr), _Npred(Npred), _inPredFl(predFlNam), MuGrp(){
-	gsl_matrix_free(_valueMat);
 	
 	_fakeFmat = gsl_matrix_calloc(low.getNgrp(), d);       // will be all zero, so we can use it for addition and subtraction without any consequences other than loss of efficiency
 	_lowLevel = &low;
@@ -8158,7 +8155,9 @@ BetaGrpSnp & BetaGrpSnp::operator=(const BetaGrpSnp &mG){
 }
 
 BetaGrpSnp::~BetaGrpSnp(){
-	gsl_matrix_free(_Xmat);
+	if (_numSaves) {
+		gsl_matrix_free(_Xmat);
+	}
 	gsl_matrix_free(_fakeFmat);
 	gsl_matrix_free(_Ystore);
 	gsl_matrix_free(_SIstore);
@@ -8167,8 +8166,10 @@ BetaGrpSnp::~BetaGrpSnp(){
 
 void BetaGrpSnp::dump(){
 	if (_numSaves) {
+		gsl_matrix_free(_valueMat);
+		
 		_Xmat     = gsl_matrix_alloc(_Ystore->size1, _Npred);
-		_valueMat = gsl_matrix_calloc(_Npred, _Ystore->size2 + 1);  // the extra column will have Hotelling-type statistic for all the traits
+		_valueMat = gsl_matrix_calloc(_Npred, _Ystore->size2 + 1);  // the extra column will have the Hotelling-type statistic for all the traits
 		
 		_theta.resize(_Npred);
 		
@@ -8240,8 +8241,6 @@ BetaGrpSnpMiss::BetaGrpSnpMiss() : _numSaves(0.0), _nThr(1), _Npred(1), _absLab(
 }
 
 BetaGrpSnpMiss::BetaGrpSnpMiss(const string &predFlNam, const string &outFlNam, const size_t &Ndat, const size_t &Npred, const size_t &d, const int &Nthr, const double &absLab) : _numSaves(0.0), _nThr(Nthr), _Npred(Npred), _inPredFl(predFlNam), _absLab(absLab), MuGrp(){
-	gsl_matrix_free(_valueMat);
-	
 	_Ystore  = gsl_matrix_calloc(Ndat, d);
 	_SIstore = gsl_matrix_calloc(d, d);
 	
@@ -8252,8 +8251,6 @@ BetaGrpSnpMiss::BetaGrpSnpMiss(const string &predFlNam, const string &outFlNam, 
 	
 }
 BetaGrpSnpMiss::BetaGrpSnpMiss(const string &predFlNam, const string &outFlNam, RanIndex &low, const size_t &Npred, const size_t &d, const int &Nthr, const double &absLab) : _numSaves(0.0), _nThr(Nthr), _Npred(Npred), _inPredFl(predFlNam), _absLab(absLab), MuGrp() {
-	gsl_matrix_free(_valueMat);
-	
 	_Ystore  = gsl_matrix_calloc(low.getNgrp(), d);
 	_SIstore = gsl_matrix_calloc(d, d);
 	
@@ -8344,6 +8341,7 @@ void BetaGrpSnpMiss::dump(){
 		_theta.resize(_Npred);
 		_Xmat.resize(_Npred);
 		
+		gsl_matrix_free(_valueMat);
 		_valueMat = gsl_matrix_calloc(_Npred, _Ystore->size2 + 1);
 
 		if (_nThr > 1) {
