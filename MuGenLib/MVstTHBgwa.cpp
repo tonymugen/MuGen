@@ -364,7 +364,7 @@ int main(int argc, char *argv[]){
 	MuGrp datDevI = dat - muRep;
 	Grp &datDev   = datDevI;
 	
-	BetaGrpPC gammaI(muRep, string("MESAevec.gbin"), string("MESAeval.gbin"), Npc, rp2ln, gm2pr, nThr);
+	BetaGrpPCpex gammaI(muRep, string("MESAevec.gbin"), string("MESAeval.gbin"), Npc, 1e-6, rp2ln, gm2pr, nThr);
 	Grp &gamma = gammaI;
 	
 	MuGrp muRspI = muRep - gamma;
@@ -376,11 +376,11 @@ int main(int argc, char *argv[]){
 	MuGrp scaRspI = muRep - mu - gamma;
 	Grp &scaRsp   = scaRspI;
 	
-	MuGrpPEX scaI(scaRsp, rp2ln, ln2mu, 0.000001, nThr);
-	Grp &sca   = scaI;
+	MuGrpPEX scaI(scaRsp, rp2ln, ln2mu, 1e-6, nThr);
+	Grp &sca = scaI;
 	
-	MuGrp muScaI(sca, ln2mu, mu2pr);
-	Grp &muSca = muScaI;
+	MuGrp muGmI(gamma, gm2pr, mu2pr);
+	Grp &muGm = muGmI;
 	
 	MuGrp bvI = mu + gamma;
 	Grp &bv   = bvI;
@@ -427,14 +427,13 @@ int main(int argc, char *argv[]){
 		
 		scaRspI = muRep - mu;
 		
-		sca.update(scaRsp, SigIrep, muSca, SigIsca);
-		muSca.update(sca, SigIsca, SigIpr);
+		sca.update(scaRsp, SigIrep, SigIsca);
 		
 		muLnI   = mu + sca;
 		repDevI = muRep - muLn;
 		
 		SigIrep.update(repDev);
-		SigIsca.update(sca, muSca);
+		SigIsca.update(sca);
 		
 		muRspI = muRep - sca;
 		mu.update(muRsp, SigIrep, SigIpr);
@@ -456,24 +455,24 @@ int main(int argc, char *argv[]){
 		
 		scaRspI = muRep - mu - gamma;
 		
-		sca.update(scaRsp, SigIrep, muSca, SigIsca);
-		muSca.update(sca, SigIsca, SigIpr);
+		sca.update(scaRsp, SigIrep, SigIsca);
 		
 		gsI     = gamma + sca;
 		muLnI   = mu + gs;
 		repDevI = muRep - muLn;
 		
 		SigIrep.update(repDev);
-		SigIsca.update(sca, muSca);
+		SigIsca.update(sca);
 		
 		gmRspI = muRep - mu - sca;
-		gamma.update(gmRsp, SigIrep, qG, SigIa);
+		gamma.update(gmRsp, SigIrep, muGm, qG, SigIa);
+		muGm.update(gamma, SigIa, qG, SigIpr);
 		
 		muRspI = muRep - gs;
 		mu.update(muRsp, SigIrep, SigIpr);
 		
-		SigIa.update(gamma, qG);
-		qG.update(gamma, SigIa);
+		SigIa.update(gamma, muGm, qG);
+		qG.update(gamma, muGm, SigIa);
 		
 		cout << "*" << flush;
 
@@ -526,18 +525,18 @@ int main(int argc, char *argv[]){
 			
 			scaRspI = muRep - mu - gamma - snpBet;
 			
-			sca.update(scaRsp, SigIrep, muSca, SigIsca);
-			muSca.update(sca, SigIsca, SigIpr);
+			sca.update(scaRsp, SigIrep, SigIsca);
 			
 			gsI     = gamma + sca + snpBet;
 			muLnI   = mu + gs;
 			repDevI = muRep - muLn;
 			
 			SigIrep.update(repDev);
-			SigIsca.update(sca, muSca);
+			SigIsca.update(sca);
 			
 			gmRspI = muRep - mu - sca - snpBet;
-			gamma.update(gmRsp, SigIrep, qG, SigIa);
+			gamma.update(gmRsp, SigIrep, muGm, qG, SigIa);
+			muGm.update(gamma, SigIa, qG, SigIpr);
 			
 			snpDevI = muRep - mu - gamma - sca;
 			snpBet.update(snpDev, SigIrep, SigIbet);
@@ -546,13 +545,13 @@ int main(int argc, char *argv[]){
 			muRspI = muRep - gs;
 			mu.update(muRsp, SigIrep, SigIpr);
 			
-			SigIa.update(gamma, qG);
-			qG.update(gamma, SigIa);
+			SigIa.update(gamma, muGm, qG);
+			qG.update(gamma, muGm, SigIa);
 			
 			cout << "#" << flush;
 			
 		}
-		cout<< endl;
+		cout << endl;
 
 	}
 	
@@ -572,24 +571,24 @@ int main(int argc, char *argv[]){
 			
 			scaRspI = muRep - mu - gamma;
 			
-			sca.update(scaRsp, SigIrep, muSca, SigIsca);
-			muSca.update(sca, SigIsca, SigIpr);
+			sca.update(scaRsp, SigIrep, SigIsca);
 			
 			gsI     = gamma + sca;
 			muLnI   = mu + gs;
 			repDevI = muRep - muLn;
 			
 			SigIrep.update(repDev);
-			SigIsca.update(sca, muSca);
+			SigIsca.update(sca);
 			
 			gmRspI = muRep - mu - sca;
-			gamma.update(gmRsp, SigIrep, qG, SigIa);
+			gamma.update(gmRsp, SigIrep, muGm, qG, SigIa);
+			muGm.update(gamma, SigIa, qG, SigIpr);
 						
 			muRspI = muRep - gs;
 			mu.update(muRsp, SigIrep, SigIpr);
 			
-			SigIa.update(gamma, qG);
-			qG.update(gamma, SigIa);
+			SigIa.update(gamma, muGm, qG);
+			qG.update(gamma, muGm, SigIa);
 			
 			cout << "+" << flush;
 		}
@@ -609,24 +608,24 @@ int main(int argc, char *argv[]){
 			
 			scaRspI = muRep - mu - gamma;
 			
-			sca.update(scaRsp, SigIrep, muSca, SigIsca);
-			muSca.update(sca, SigIsca, SigIpr);
+			sca.update(scaRsp, SigIrep, SigIsca);
 			
 			gsI     = gamma + sca;
 			muLnI   = mu + gs;
 			repDevI = muRep - muLn;
 			
 			SigIrep.update(repDev);
-			SigIsca.update(sca, muSca);
+			SigIsca.update(sca);
 			
 			gmRspI = muRep - mu - sca;
-			gamma.update(gmRsp, SigIrep, qG, SigIa);
+			gamma.update(gmRsp, SigIrep, muGm, qG, SigIa);
+			muGm.update(gamma, SigIa, qG, SigIpr);
 			
 			muRspI = muRep - gs;
 			mu.update(muRsp, SigIrep, SigIpr);
 			
-			SigIa.update(gamma, qG);
-			qG.update(gamma, SigIa);
+			SigIa.update(gamma, muGm, qG);
+			qG.update(gamma, muGm, SigIa);
 			
 			if ((iSam + 1) % Nthin) {
 				cout << "." << flush;
@@ -634,14 +633,13 @@ int main(int argc, char *argv[]){
 			else {
 				muLn.save(LNout);
 				
-				bvI = MuGrp(gamma);
+				bvI = mu + gamma;
 				bv.save(BVout);
 				
 				snpBet.update(repDev, SigIrep);
 				
 				SigIe.save();
 				SigIrep.save();
-				SigIa.save();
 				
 				cout << "|" << flush;
 			}
@@ -665,18 +663,18 @@ int main(int argc, char *argv[]){
 			
 			scaRspI = muRep - mu - gamma - snpBet;
 			
-			sca.update(scaRsp, SigIrep, muSca, SigIsca);
-			muSca.update(sca, SigIsca, SigIpr);
+			sca.update(scaRsp, SigIrep, SigIsca);
 			
 			gsI     = gamma + sca + snpBet;
 			muLnI   = mu + gs;
 			repDevI = muRep - muLn;
 			
 			SigIrep.update(repDev);
-			SigIsca.update(sca, muSca);
+			SigIsca.update(sca);
 			
 			gmRspI = muRep - mu - sca - snpBet;
-			gamma.update(gmRsp, SigIrep, qG, SigIa);
+			gamma.update(gmRsp, SigIrep, muGm, qG, SigIa);
+			muGm.update(gamma, SigIa, qG, SigIpr);
 			
 			snpDevI = muRep - mu - gamma - sca;
 			if (model == "VS") {
@@ -693,8 +691,8 @@ int main(int argc, char *argv[]){
 			muRspI = muRep - gs;
 			mu.update(muRsp, SigIrep, SigIpr);
 			
-			SigIa.update(gamma, qG);
-			qG.update(gamma, SigIa);
+			SigIa.update(gamma, muGm, qG);
+			qG.update(gamma, muGm, SigIa);
 			
 			cout << "+" << flush;
 		}
@@ -714,18 +712,18 @@ int main(int argc, char *argv[]){
 			
 			scaRspI = muRep - mu - gamma - snpBet;
 			
-			sca.update(scaRsp, SigIrep, muSca, SigIsca);
-			muSca.update(sca, SigIsca, SigIpr);
+			sca.update(scaRsp, SigIrep, SigIsca);
 			
 			gsI     = gamma + sca + snpBet;
 			muLnI   = mu + gs;
 			repDevI = muRep - muLn;
 			
 			SigIrep.update(repDev);
-			SigIsca.update(sca, muSca);
+			SigIsca.update(sca);
 			
 			gmRspI = muRep - mu - sca - snpBet;
-			gamma.update(gmRsp, SigIrep, qG, SigIa);
+			gamma.update(gmRsp, SigIrep, muGm, qG, SigIa);
+			muGm.update(gamma, SigIa, qG, SigIpr);
 			
 			snpDevI = muRep - mu - gamma - sca;
 			if (model == "VS") {
@@ -742,8 +740,8 @@ int main(int argc, char *argv[]){
 			muRspI = muRep - gs;
 			mu.update(muRsp, SigIrep, SigIpr);
 			
-			SigIa.update(gamma, qG);
-			qG.update(gamma, SigIa);
+			SigIa.update(gamma, muGm, qG);
+			qG.update(gamma, muGm, SigIa);
 			
 			if ((iSam + 1) % Nthin) {
 				cout << "." << flush;
@@ -763,7 +761,6 @@ int main(int argc, char *argv[]){
 				
 				SigIe.save();
 				SigIrep.save();
-				SigIa.save();
 				
 				cout << "|" << flush;
 			}
