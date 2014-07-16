@@ -30,7 +30,6 @@ class MVnormMuMiss;
 class MVnormBeta;
 class MVnormBetaMiss;
 class MVnormBetaFt;
-class MVnormBetaPC;
 class MVnormBetaSc;
 class MVnormMuBlk;
 class MVnormBetaBlk;
@@ -48,6 +47,7 @@ class BetaGrpSnpMiss;
 class BetaGrpFt;
 class BetaGrpSc;
 class BetaGrpPC;
+class BetaGrpPCpex;
 class BetaGrpBVSR;
 class MuBlk;
 class BetaBlk;
@@ -416,53 +416,6 @@ public:
 	// Student-t model, 0-mean Student-t prior
 	void update(const Grp &resp, const Qgrp &q, const SigmaI &SigIb, const double &qPr, const SigmaI &SigIp, const gsl_rng *r);
 	
-	// Gaussian model, Gaussian prior
-	void update(const Grp &resp, const SigmaI &SigIb, const Grp &muPr, const SigmaI &SigIp, const gsl_rng *r);
-	// Gaussian model, Student-t prior
-	void update(const Grp &resp, const SigmaI &SigIb, const Grp &muPr, const double &qPr, const SigmaI &SigIp, const gsl_rng *r);
-	// Student-t model, Gaussian prior
-	void update(const Grp &resp, const Qgrp &q, const SigmaI &SigIb, const Grp &muPr, const SigmaI &SigIp, const gsl_rng *r);
-	// Student-t model, Student-t prior
-	void update(const Grp &resp, const Qgrp &q, const SigmaI &SigIb, const Grp &muPr, const double &qPr, const SigmaI &SigIp, const gsl_rng *r);
-	
-};
-
-class MVnormBetaPC : public MVnormBetaFt {
-protected:
-	double _lam; // the eigenvalue
-	
-public:
-	MVnormBetaPC() : MVnormBetaFt() {};
-	MVnormBetaPC(gsl_vector *b, const gsl_vector *sd, gsl_matrix *pred, const size_t &iCl, gsl_matrix *allFt, const size_t &begRw, const gsl_rng *r, const double &lm) : MVnormBetaFt(b, sd, pred, iCl, allFt, begRw, r) { _lam = lm; };
-	MVnormBetaPC(gsl_vector *b, const gsl_matrix *Sig, gsl_matrix *pred, const size_t &iCl, gsl_matrix *allFt, const size_t &begRw, const gsl_rng *r, const double &lm) : MVnormBetaFt(b, Sig, pred, iCl, allFt, begRw, r) { _lam = lm; };
-	MVnormBetaPC(const gsl_matrix *resp, gsl_matrix *pred, const size_t &iCl, gsl_matrix *allFt, const size_t &begRw, const gsl_matrix *Sig, const gsl_rng *r, gsl_matrix *bet, const size_t &iRw, const double &lm) : MVnormBetaFt(resp, pred, iCl, allFt, begRw, Sig, r, bet, iRw) { _lam = lm; };
-	MVnormBetaPC(const Grp &resp, gsl_matrix *pred, const size_t &iCl, gsl_matrix *allFt, const size_t &begRw, const gsl_matrix *Sig, const gsl_rng *r, gsl_matrix *bet, const size_t &iRw, const double &lm) : MVnormBetaFt(resp, pred, iCl, allFt, begRw, Sig, r, bet, iRw) { _lam = lm; };
-	MVnormBetaPC(const Grp &resp, gsl_matrix *pred, const size_t &iCl, vector<double> &eaFt, const gsl_matrix *Sig, const gsl_rng *r, gsl_matrix *bet, const size_t &iRw, const double &lm) : MVnormBetaFt(resp, pred, iCl, eaFt, Sig, r, bet, iRw) { _lam = lm; };
-	MVnormBetaPC(const gsl_matrix *resp, gsl_matrix *pred, const size_t &iCl, vector<double> &eaFt, const gsl_matrix *Sig, const gsl_rng *r, gsl_matrix *bet, const size_t &iRw, const double &lm) : MVnormBetaFt(resp, pred, iCl, eaFt, Sig, r, bet, iRw) { _lam = lm; };
-	
-	MVnormBetaPC(gsl_vector *b, const gsl_vector *sd, gsl_matrix *pred, const size_t &iCl, gsl_matrix *allFt, const size_t &begRw, const gsl_rng *r, const size_t &up, const double &lm) : MVnormBetaFt(b, sd, pred, iCl, allFt, begRw, r, up) { _lam = lm; };
-	MVnormBetaPC(gsl_vector *b, const gsl_matrix *Sig, gsl_matrix *pred, const size_t &iCl, gsl_matrix *allFt, const size_t &begRw, const gsl_rng *r, const size_t &up, const double &lm) : MVnormBetaFt(b, Sig, pred, iCl, allFt, begRw, r, up) { _lam = lm; };
-	MVnormBetaPC(const gsl_matrix *resp, gsl_matrix *pred, const size_t &iCl, gsl_matrix *allFt, const size_t &begRw, const gsl_matrix *Sig, const gsl_rng *r, const size_t &up, gsl_matrix *bet, const size_t &iRw, const double &lm) : MVnormBetaFt(resp, pred, iCl, allFt, begRw, Sig, r, up, bet, iRw) { _lam = lm; };
-	MVnormBetaPC(const Grp &resp, gsl_matrix *pred, const size_t &iCl, gsl_matrix *allFt, const size_t &begRw, const gsl_matrix *Sig, const gsl_rng *r, const size_t &up, gsl_matrix *bet, const size_t &iRw, const double &lm) : MVnormBetaFt(resp, pred, iCl, allFt, begRw, Sig, r, up, bet, iRw) { _lam = lm; };
-	MVnormBetaPC(const Grp &resp, gsl_matrix *pred, const size_t &iCl, vector<double> &eaFt, const gsl_matrix *Sig, const gsl_rng *r, const size_t &up, gsl_matrix *bet, const size_t &iRw, const double &lm) : MVnormBetaFt(resp, pred, iCl, eaFt, Sig, r, up, bet, iRw) { _lam = lm; };
-	MVnormBetaPC(const gsl_matrix *resp, gsl_matrix *pred, const size_t &iCl, vector<double> &eaFt, const gsl_matrix *Sig, const gsl_rng *r, const size_t &up, gsl_matrix *bet, const size_t &iRw, const double &lm) : MVnormBetaFt(resp, pred, iCl, eaFt, Sig, r, up, bet, iRw) { _lam = lm; };
-	
-	MVnormBetaPC(const MVnormBetaPC &); // copy constructor
-	MVnormBetaPC & operator=(const MVnormBetaPC &);
-	
-	~MVnormBetaPC() {}; 	// destructor
-	
-	// 0-mean prior
-	// Gaussian model, Gaussian prior
-	void update(const Grp &resp, const SigmaI &SigIb, const SigmaI &SigIp, const gsl_rng *r);
-	// Gaussian model, Student-t prior
-	void update(const Grp &resp, const SigmaI &SigIb, const double &qPr, const SigmaI &SigIp, const gsl_rng *r);
-	// Student-t model, Gaussian prior
-	void update(const Grp &resp, const Qgrp &q, const SigmaI &SigIb, const SigmaI &SigIp, const gsl_rng *r);
-	// Student-t model, Student-t prior
-	void update(const Grp &resp, const Qgrp &q, const SigmaI &SigIb, const double &qPr, const SigmaI &SigIp, const gsl_rng *r);
-	
-	// non-0-mean prior
 	// Gaussian model, Gaussian prior
 	void update(const Grp &resp, const SigmaI &SigIb, const Grp &muPr, const SigmaI &SigIp, const gsl_rng *r);
 	// Gaussian model, Student-t prior
@@ -919,7 +872,7 @@ public:
 	
 };
 
-class BetaGrpPEX : public BetaGrpFt {
+class BetaGrpPEX : virtual public BetaGrpFt {
 protected:
 	gsl_matrix *_tSigIAt;   // t(SigIm%*%t(_A)) that is in common among all individual MVnormMuPEX's
 	Apex _A;
@@ -930,6 +883,7 @@ protected:
 	void _finishFitted();
 	void _updateAfitted();
 	
+	BetaGrpPEX(const double &Spr) {_finishConstruct(Spr); }; // only used by BetaGrpPCpex
 public:
 	BetaGrpPEX() : BetaGrpFt() {};
 	BetaGrpPEX(const Grp &rsp, const string &predFlNam, const size_t &Npred, const double &Spr, const int &nThr) : BetaGrpFt(rsp, predFlNam, Npred, nThr) {_finishConstruct(Spr); };
@@ -953,39 +907,58 @@ public:
 	BetaGrpPEX(const Grp &rsp, const SigmaI &SigI, const string &predFlNam, const size_t &Npred, const double &Spr, const double &Nmul, const double &rSqMax, const double &absLab, RanIndex &up, const string &outFlNam, const int &nThr) : BetaGrpFt(rsp, SigI, predFlNam, Npred, Nmul, rSqMax, absLab, up, outFlNam, nThr) {_finishConstruct(Spr); };
 	BetaGrpPEX(const Grp &rsp, const SigmaI &SigI, const string &predFlNam, const size_t &Npred, const double &Spr, const double &Nmul, const double &rSqMax, const double &absLab, RanIndex &low, RanIndex &up, const string &outFlNam, const int &nThr) : BetaGrpFt(rsp, SigI, predFlNam, Npred, Nmul, rSqMax, absLab, low, up, outFlNam, nThr) {_finishConstruct(Spr); };
 	
-	~BetaGrpPEX();
+	virtual ~BetaGrpPEX();
 	
-	const gsl_matrix *fMat() const{return _fittedAllAdj; };
+	virtual const gsl_matrix *fMat() const{return _fittedAllAdj; };
 	
 	void save();
 	void save(const string &outFlNam);
 	
-	void update(const Grp &dat, const SigmaI &SigIm, const SigmaI &SigIp);
-	void update(const Grp &dat, const SigmaI &SigIm, const Qgrp &qPr, const SigmaI &SigIp);
+	virtual void update(const Grp &dat, const SigmaI &SigIm, const SigmaI &SigIp);
+	virtual void update(const Grp &dat, const SigmaI &SigIm, const Qgrp &qPr, const SigmaI &SigIp);
 	
-	void update(const Grp &dat, const SigmaI &SigIm, const Grp &muPr, const SigmaI &SigIp);
-	void update(const Grp &dat, const SigmaI &SigIm, const Grp &muPr, const Qgrp &qPr, const SigmaI &SigIp);
+	virtual void update(const Grp &dat, const SigmaI &SigIm, const Grp &muPr, const SigmaI &SigIp);
+	virtual void update(const Grp &dat, const SigmaI &SigIm, const Grp &muPr, const Qgrp &qPr, const SigmaI &SigIp);
 };
 
 
-class BetaGrpPC : public BetaGrpFt {
+class BetaGrpPC : virtual public BetaGrpFt {
 protected:
 	
 public:
 	BetaGrpPC() : BetaGrpFt() {};
-	BetaGrpPC(const Grp &rsp, const string &predFlNam, const string &evFlNam, const size_t &Npred, const int &nThr);
 	BetaGrpPC(const Grp &rsp, const string &predFlNam, const string &evFlNam, const size_t &Npred, RanIndex &up, const int &nThr);
 	BetaGrpPC(const Grp &rsp, const string &predFlNam, const string &evFlNam, const size_t &Npred, RanIndex &low, RanIndex &up, const int &nThr);
-	BetaGrpPC(const Grp &rsp, const string &predFlNam, const string &evFlNam, const size_t &Npred, const string &outFlNam, const int &nThr);
 	BetaGrpPC(const Grp &rsp, const string &predFlNam, const string &evFlNam, const size_t &Npred, RanIndex &up, const string &outFlNam, const int &nThr);
 	BetaGrpPC(const Grp &rsp, const string &predFlNam, const string &evFlNam, const size_t &Npred, RanIndex &low, RanIndex &up, const string &outFlNam, const int &nThr);
 	
-	~BetaGrpPC() {};
+	virtual ~BetaGrpPC() {};
 	
 	BetaGrpPC(const BetaGrpPC &mG); // copy constructor
 	BetaGrpPC & operator=(const BetaGrpPC &mG);
 	
-	//update methods taken care of by BetaGrpFt because the constructor makes pointers to individual MVnormBetaPC
+	//update methods taken care of by BetaGrpFt
+};
+
+class BetaGrpPCpex : public BetaGrpPC, public BetaGrpPEX {
+protected:
+	
+public:
+	BetaGrpPCpex(){};
+	BetaGrpPCpex(const Grp &rsp, const string &predFlNam, const string &evFlNam, const size_t &Npred, const double &Spr, RanIndex &up, const int &nThr) : BetaGrpFt(), BetaGrpPC(rsp, predFlNam, evFlNam, Npred, up, nThr), BetaGrpPEX(Spr) {};
+	BetaGrpPCpex(const Grp &rsp, const string &predFlNam, const string &evFlNam, const size_t &Npred, const double &Spr, RanIndex &low, RanIndex &up, const int &nThr) : BetaGrpFt(), BetaGrpPC(rsp, predFlNam, evFlNam, Npred, low, up, nThr), BetaGrpPEX(Spr) {};
+	BetaGrpPCpex(const Grp &rsp, const string &predFlNam, const string &evFlNam, const size_t &Npred, const double &Spr, RanIndex &up, const string &outFlNam, const int &nThr) : BetaGrpFt(), BetaGrpPC(rsp, predFlNam, evFlNam, Npred, up, outFlNam, nThr), BetaGrpPEX(Spr) {};
+	BetaGrpPCpex(const Grp &rsp, const string &predFlNam, const string &evFlNam, const size_t &Npred, const double &Spr, RanIndex &low, RanIndex &up, const string &outFlNam, const int &nThr) : BetaGrpFt(), BetaGrpPC(rsp, predFlNam, evFlNam, Npred, low, up, outFlNam, nThr), BetaGrpPEX(Spr) {};
+	
+	~BetaGrpPCpex() {};
+	
+	const gsl_matrix *fMat() const{return _fittedAllAdj; };
+	
+	void update(const Grp &dat, const SigmaI &SigIm, const SigmaI &SigIp) { BetaGrpPEX::update(dat, SigIm, SigIp); };
+	void update(const Grp &dat, const SigmaI &SigIm, const Qgrp &qPr, const SigmaI &SigIp) { BetaGrpPEX::update(dat, SigIm, qPr, SigIp); };
+	
+	void update(const Grp &dat, const SigmaI &SigIm, const Grp &muPr, const SigmaI &SigIp) { BetaGrpPEX::update(dat, SigIm, muPr, SigIp); };
+	void update(const Grp &dat, const SigmaI &SigIm, const Grp &muPr, const Qgrp &qPr, const SigmaI &SigIp) { BetaGrpPEX::update(dat, SigIm, muPr, qPr, SigIp); };
 };
 
 class BetaGrpSnp : public MuGrp {

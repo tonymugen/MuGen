@@ -2526,317 +2526,7 @@ void MVnormBetaFt::update(const Grp &resp, const Qgrp &q, const SigmaI &SigIb, c
 }
 
 /*
-	MVnormBetaPC methods
- */
-
-MVnormBetaPC::MVnormBetaPC(const MVnormBetaPC &b){
-	_d      = b._d;
-	_N      = b._N;
-	_scale  = b._scale;
-	_vec    = b._vec;
-	_X      = b._X;
-	_fitted = b._fitted;
-	
-	_upLevel = b._upLevel;
-	_lam     = b._lam;
-}
-
-MVnormBetaPC & MVnormBetaPC::operator=(const MVnormBetaPC &b){
-	_d      = b._d;
-	_N      = b._N;
-	_scale  = b._scale;
-	_vec    = b._vec;
-	_X      = b._X;
-	_fitted = b._fitted;
-	
-	_upLevel = b._upLevel;
-	_lam     = b._lam;
-	
-	return *this;
-}
-
-/*
-	update() methods
- */
-
-void MVnormBetaPC::update(const Grp &resp, const SigmaI &SigIb, const SigmaI &SigIp, const gsl_rng *r){
-	gsl_matrix *rsd    = gsl_matrix_alloc(_N, _d);
-	gsl_matrix *SigSum = gsl_matrix_alloc(_d, _d);
-	gsl_vector *tmpV   = gsl_vector_alloc(_d);
-	gsl_vector *bH     = gsl_vector_alloc(_d);
-	
-	gsl_matrix_memcpy(rsd, resp.dMat());
-	gsl_matrix_sub(rsd, &_fitted.matrix);
-	
-	gsl_matrix_memcpy(SigSum, SigIp.getMat());
-	gsl_matrix_scale(SigSum, 1.0/(_lam * _scale));   // because (V^tV*SigIb + 1/_lam * SigIp) == (SigIb + 1/(_lam * V^tV)SigIp) * (VtV) and this formulation saves creating another dxd matrix
-	gsl_matrix_add(SigSum, SigIb.getMat());
-	gsl_matrix_scale(SigSum, _scale);
-	gsl_linalg_cholesky_decomp(SigSum);
-	gsl_linalg_cholesky_invert(SigSum);
-	
-	gsl_blas_dgemv(CblasTrans, 1.0, rsd, &_X.vector, 0.0, bH);
-	gsl_blas_dsymv(CblasLower, 1.0, SigIb.getMat(), bH, 0.0, tmpV);
-	gsl_blas_dsymv(CblasLower, 1.0, SigSum, tmpV, 0.0, bH);
-	
-	gsl_linalg_cholesky_decomp(SigSum);
-	MVgauss(bH, SigSum, _d, r, &_vec.vector);
-	
-	gsl_matrix_free(rsd);
-	gsl_matrix_free(SigSum);
-	gsl_vector_free(tmpV);
-	gsl_vector_free(bH);
-}
-
-void MVnormBetaPC::update(const Grp &resp, const SigmaI &SigIb, const double &qPr, const SigmaI &SigIp, const gsl_rng *r){
-	gsl_matrix *rsd    = gsl_matrix_alloc(_N, _d);
-	gsl_matrix *SigSum = gsl_matrix_alloc(_d, _d);
-	gsl_vector *tmpV   = gsl_vector_alloc(_d);
-	gsl_vector *bH     = gsl_vector_alloc(_d);
-	
-	gsl_matrix_memcpy(rsd, resp.dMat());
-	gsl_matrix_sub(rsd, &_fitted.matrix);
-	
-	gsl_matrix_memcpy(SigSum, SigIp.getMat());
-	gsl_matrix_scale(SigSum, qPr/(_lam * _scale));
-	gsl_matrix_add(SigSum, SigIb.getMat());
-	gsl_matrix_scale(SigSum, _scale);
-	gsl_linalg_cholesky_decomp(SigSum);
-	gsl_linalg_cholesky_invert(SigSum);
-	
-	gsl_blas_dgemv(CblasTrans, 1.0, rsd, &_X.vector, 0.0, bH);
-	gsl_blas_dsymv(CblasLower, 1.0, SigIb.getMat(), bH, 0.0, tmpV);
-	gsl_blas_dsymv(CblasLower, 1.0, SigSum, tmpV, 0.0, bH);
-	
-	gsl_linalg_cholesky_decomp(SigSum);
-	MVgauss(bH, SigSum, _d, r, &_vec.vector);
-	
-	gsl_matrix_free(rsd);
-	gsl_matrix_free(SigSum);
-	gsl_vector_free(tmpV);
-	gsl_vector_free(bH);
-}
-
-void MVnormBetaPC::update(const Grp &resp, const SigmaI &SigIb, const Grp &muPr, const SigmaI &SigIp, const gsl_rng *r){
-	gsl_matrix *rsd    = gsl_matrix_alloc(_N, _d);
-	gsl_matrix *SigSum = gsl_matrix_alloc(_d, _d);
-	gsl_vector *tmpV   = gsl_vector_alloc(_d);
-	gsl_vector *bH     = gsl_vector_alloc(_d);
-	
-	gsl_matrix_memcpy(rsd, resp.dMat());
-	gsl_matrix_sub(rsd, &_fitted.matrix);
-	
-	gsl_matrix_memcpy(SigSum, SigIp.getMat());
-	gsl_matrix_scale(SigSum, 1.0/(_lam * _scale));
-	gsl_matrix_add(SigSum, SigIb.getMat());
-	gsl_matrix_scale(SigSum, _scale);
-	gsl_linalg_cholesky_decomp(SigSum);
-	gsl_linalg_cholesky_invert(SigSum);
-	
-	gsl_blas_dgemv(CblasTrans, 1.0, rsd, &_X.vector, 0.0, bH);
-	gsl_blas_dsymv(CblasLower, 1.0, SigIb.getMat(), bH, 0.0, tmpV);
-	gsl_blas_dsymv(CblasLower, 1.0/_lam, SigIp.getMat(), muPr[*_upLevel]->getVec(), 1.0, tmpV);
-	
-	gsl_blas_dsymv(CblasLower, 1.0, SigSum, tmpV, 0.0, bH);
-	
-	gsl_linalg_cholesky_decomp(SigSum);
-	MVgauss(bH, SigSum, _d, r, &_vec.vector);
-	
-	gsl_matrix_free(rsd);
-	gsl_matrix_free(SigSum);
-	gsl_vector_free(tmpV);
-	gsl_vector_free(bH);
-}
-void MVnormBetaPC::update(const Grp &resp, const SigmaI &SigIb, const Grp &muPr, const double &qPr, const SigmaI &SigIp, const gsl_rng *r){
-	gsl_matrix *rsd    = gsl_matrix_alloc(_N, _d);
-	gsl_matrix *SigSum = gsl_matrix_alloc(_d, _d);
-	gsl_vector *tmpV   = gsl_vector_alloc(_d);
-	gsl_vector *bH     = gsl_vector_alloc(_d);
-	double sc          = qPr/(_lam * _scale);
-	
-	gsl_matrix_memcpy(rsd, resp.dMat());
-	gsl_matrix_sub(rsd, &_fitted.matrix);
-	
-	gsl_matrix_memcpy(SigSum, SigIp.getMat());
-	gsl_matrix_scale(SigSum, sc);
-	gsl_matrix_add(SigSum, SigIb.getMat());
-	gsl_matrix_scale(SigSum, _scale);
-	gsl_linalg_cholesky_decomp(SigSum);
-	gsl_linalg_cholesky_invert(SigSum);
-	
-	gsl_blas_dgemv(CblasTrans, 1.0, rsd, &_X.vector, 0.0, bH);
-	gsl_blas_dsymv(CblasLower, 1.0, SigIb.getMat(), bH, 0.0, tmpV);
-	gsl_blas_dsymv(CblasLower, sc, SigIp.getMat(), muPr[*_upLevel]->getVec(), 1.0, tmpV);
-	
-	gsl_blas_dsymv(CblasLower, 1.0, SigSum, tmpV, 0.0, bH);
-	
-	gsl_linalg_cholesky_decomp(SigSum);
-	MVgauss(bH, SigSum, _d, r, &_vec.vector);
-	
-	gsl_matrix_free(rsd);
-	gsl_matrix_free(SigSum);
-	gsl_vector_free(tmpV);
-	gsl_vector_free(bH);
-}
-
-void MVnormBetaPC::update(const Grp &resp, const Qgrp &q, const SigmaI &SigIb, const SigmaI &SigIp, const gsl_rng *r){
-	gsl_matrix *rsd    = gsl_matrix_alloc(_N, _d);
-	gsl_matrix *SigSum = gsl_matrix_alloc(_d, _d);
-	gsl_vector *XQ     = gsl_vector_alloc(_N);
-	gsl_vector *tmpV   = gsl_vector_alloc(_d);
-	gsl_vector *bH     = gsl_vector_alloc(_d);
-	double xQx = 0.0;
-	
-	for (int iDat = 0; iDat < _N; iDat++) {
-		gsl_vector_set(XQ, iDat, q[iDat]*gsl_vector_get(&_X.vector, iDat));
-	}
-	gsl_matrix_memcpy(rsd, resp.dMat());
-	gsl_matrix_sub(rsd, &_fitted.matrix);
-	
-	gsl_blas_ddot(XQ, &_X.vector, &xQx);
-	
-	gsl_matrix_memcpy(SigSum, SigIp.getMat());
-	gsl_matrix_scale(SigSum, 1.0/(_lam * xQx));
-	gsl_matrix_memcpy(SigSum, SigIb.getMat());
-	gsl_matrix_scale(SigSum, xQx);
-	gsl_linalg_cholesky_decomp(SigSum);
-	gsl_linalg_cholesky_invert(SigSum);
-	
-	gsl_blas_dgemv(CblasTrans, 1.0, rsd, XQ, 0.0, bH);
-	gsl_blas_dsymv(CblasLower, 1.0, SigIb.getMat(), bH, 0.0, tmpV);
-	gsl_blas_dsymv(CblasLower, 1.0, SigSum, tmpV, 0.0, bH);
-	
-	gsl_linalg_cholesky_decomp(SigSum);
-	MVgauss(bH, SigSum, _d, r, &_vec.vector);
-	
-	gsl_matrix_free(rsd);
-	gsl_matrix_free(SigSum);
-	gsl_vector_free(XQ);
-	gsl_vector_free(tmpV);
-	gsl_vector_free(bH);
-}
-
-void MVnormBetaPC::update(const Grp &resp, const Qgrp &q, const SigmaI &SigIb, const double &qPr, const SigmaI &SigIp, const gsl_rng *r){
-	gsl_matrix *rsd    = gsl_matrix_alloc(_N, _d);
-	gsl_matrix *SigSum = gsl_matrix_alloc(_d, _d);
-	gsl_vector *XQ     = gsl_vector_alloc(_N);
-	gsl_vector *tmpV   = gsl_vector_alloc(_d);
-	gsl_vector *bH     = gsl_vector_alloc(_d);
-	double xQx = 0.0;
-	
-	for (int iDat = 0; iDat < _N; iDat++) {
-		gsl_vector_set(XQ, iDat, q[iDat]*gsl_vector_get(&_X.vector, iDat));
-	}
-	gsl_matrix_memcpy(rsd, resp.dMat());
-	gsl_matrix_sub(rsd, &_fitted.matrix);
-	
-	gsl_blas_ddot(XQ, &_X.vector, &xQx);
-	
-	gsl_matrix_memcpy(SigSum, SigIp.getMat());
-	gsl_matrix_scale(SigSum, qPr/(_lam * xQx));
-	gsl_matrix_memcpy(SigSum, SigIb.getMat());
-	gsl_matrix_scale(SigSum, xQx);
-	gsl_linalg_cholesky_decomp(SigSum);
-	gsl_linalg_cholesky_invert(SigSum);
-	
-	gsl_blas_dgemv(CblasTrans, 1.0, rsd, XQ, 0.0, bH);
-	gsl_blas_dsymv(CblasLower, 1.0, SigIb.getMat(), bH, 0.0, tmpV);
-	gsl_blas_dsymv(CblasLower, 1.0, SigSum, tmpV, 0.0, bH);
-	
-	gsl_linalg_cholesky_decomp(SigSum);
-	MVgauss(bH, SigSum, _d, r, &_vec.vector);
-	
-	gsl_matrix_free(rsd);
-	gsl_matrix_free(SigSum);
-	gsl_vector_free(XQ);
-	gsl_vector_free(tmpV);
-	gsl_vector_free(bH);
-}
-
-void MVnormBetaPC::update(const Grp &resp, const Qgrp &q, const SigmaI &SigIb, const Grp &muPr, const SigmaI &SigIp, const gsl_rng *r){
-	gsl_matrix *rsd    = gsl_matrix_alloc(_N, _d);
-	gsl_matrix *SigSum = gsl_matrix_alloc(_d, _d);
-	gsl_vector *XQ     = gsl_vector_alloc(_N);
-	gsl_vector *tmpV   = gsl_vector_alloc(_d);
-	gsl_vector *bH     = gsl_vector_alloc(_d);
-	double xQx = 0.0;
-	
-	for (int iDat = 0; iDat < _N; iDat++) {
-		gsl_vector_set(XQ, iDat, q[iDat]*gsl_vector_get(&_X.vector, iDat));
-	}
-	gsl_matrix_memcpy(rsd, resp.dMat());
-	gsl_matrix_sub(rsd, &_fitted.matrix);
-	
-	gsl_blas_ddot(XQ, &_X.vector, &xQx);
-	
-	gsl_matrix_memcpy(SigSum, SigIp.getMat());
-	gsl_matrix_scale(SigSum, 1.0/(_lam * xQx));
-	gsl_matrix_memcpy(SigSum, SigIb.getMat());
-	gsl_matrix_scale(SigSum, xQx);
-	gsl_linalg_cholesky_decomp(SigSum);
-	gsl_linalg_cholesky_invert(SigSum);
-	
-	gsl_blas_dgemv(CblasTrans, 1.0, rsd, XQ, 0.0, bH);
-	gsl_blas_dsymv(CblasLower, 1.0, SigIb.getMat(), bH, 0.0, tmpV);
-	gsl_blas_dsymv(CblasLower, 1.0, SigIp.getMat(), muPr[*_upLevel]->getVec(), 1.0, tmpV);
-	
-	gsl_blas_dsymv(CblasLower, 1.0, SigSum, tmpV, 0.0, bH);
-	
-	gsl_linalg_cholesky_decomp(SigSum);
-	MVgauss(bH, SigSum, _d, r, &_vec.vector);
-	
-	gsl_matrix_free(rsd);
-	gsl_matrix_free(SigSum);
-	gsl_vector_free(XQ);
-	gsl_vector_free(tmpV);
-	gsl_vector_free(bH);
-}
-void MVnormBetaPC::update(const Grp &resp, const Qgrp &q, const SigmaI &SigIb, const Grp &muPr, const double &qPr, const SigmaI &SigIp, const gsl_rng *r){
-	gsl_matrix *rsd    = gsl_matrix_alloc(_N, _d);
-	gsl_matrix *SigSum = gsl_matrix_alloc(_d, _d);
-	gsl_matrix *SigPr  = gsl_matrix_alloc(_d, _d);
-	gsl_vector *XQ     = gsl_vector_alloc(_N);
-	gsl_vector *tmpV   = gsl_vector_alloc(_d);
-	gsl_vector *bH     = gsl_vector_alloc(_d);
-	double xQx = 0.0;
-	double sc  = qPr/_lam;
-	
-	for (int iDat = 0; iDat < _N; iDat++) {
-		gsl_vector_set(XQ, iDat, q[iDat]*gsl_vector_get(&_X.vector, iDat));
-	}
-	gsl_matrix_memcpy(rsd, resp.dMat());
-	gsl_matrix_sub(rsd, &_fitted.matrix);
-	
-	gsl_blas_ddot(XQ, &_X.vector, &xQx);
-	
-	gsl_matrix_memcpy(SigSum, SigIb.getMat());
-	gsl_matrix_scale(SigSum, xQx);
-	gsl_matrix_memcpy(SigPr, SigIp.getMat());
-	gsl_matrix_scale(SigPr, sc);
-	gsl_matrix_add(SigSum, SigPr);
-	gsl_linalg_cholesky_decomp(SigSum);
-	gsl_linalg_cholesky_invert(SigSum);
-	
-	gsl_blas_dgemv(CblasTrans, 1.0, rsd, XQ, 0.0, bH);
-	gsl_blas_dsymv(CblasLower, 1.0, SigIb.getMat(), bH, 0.0, tmpV);
-	gsl_blas_dsymv(CblasLower, 1.0, SigPr, muPr[*_upLevel]->getVec(), 1.0, tmpV);
-	
-	gsl_vector_add(tmpV, bH);
-	gsl_blas_dsymv(CblasLower, 1.0, SigSum, tmpV, 0.0, bH);
-	
-	gsl_linalg_cholesky_decomp(SigSum);
-	MVgauss(bH, SigSum, _d, r, &_vec.vector);
-	
-	gsl_matrix_free(rsd);
-	gsl_matrix_free(SigSum);
-	gsl_matrix_free(SigPr);
-	gsl_vector_free(XQ);
-	gsl_vector_free(tmpV);
-	gsl_vector_free(bH);
-}
-
-/*
-	MVnormBlk methods
+ *	MVnormBlk methods
  */
 
 MVnormMuBlk::MVnormMuBlk(gsl_matrix *mn, const size_t &iRw, const vector<size_t> &blkStart, const size_t &up) : MVnorm(mn, iRw){
@@ -8033,60 +7723,6 @@ void BetaGrpPEX::update(const Grp &dat, const SigmaI &SigIm, const Grp &muPr, co
  */
 
 
-BetaGrpPC::BetaGrpPC(const Grp &rsp, const string &predFlNam, const string &evFlNam, const size_t &Npred, const int &nThr){
-	gsl_matrix_free(_fittedAll);
-	gsl_matrix_free(_Xmat);
-	_fittedEach.resize(Npred);
-	_fittedAll  = gsl_matrix_calloc(rsp.Ndata(), rsp.phenD());
-	_nThr       = nThr;
-	_Xmat       = gsl_matrix_alloc(rsp.Ndata(), Npred);
-	gsl_matrix_free(_valueMat);
-	_valueMat   = gsl_matrix_alloc(Npred, rsp.phenD());
-	_lowLevel   = 0;
-	_upLevel    = 0;
-	
-	if (_nThr > 1) {
-		const gsl_rng_type *T = gsl_rng_mt19937;
-		_rV.resize(_nThr);
-		vector<gsl_rng *>::iterator rIt = _rV.begin();
-		++rIt;
-		for (; rIt != _rV.end(); ++rIt) {
-			unsigned long seed = gsl_rng_get(_rV[0]);
-			*rIt = gsl_rng_alloc(T);
-			gsl_rng_set(*rIt, seed);
-		}
-		
-	}
-	
-	gsl_matrix *Sig  = gsl_matrix_alloc(rsp.phenD(), rsp.phenD());
-	gsl_matrix_set_identity(Sig);
-	gsl_vector *ev = gsl_vector_alloc(Npred);
-	
-	_theta.resize(Npred);
-	
-	FILE *prdIn = fopen(predFlNam.c_str(), "r");
-	gsl_matrix_fread(prdIn, _Xmat);
-	fclose(prdIn);
-	// no centering, since eigenvectors are centered by definition
-	
-	FILE *evIn = fopen(evFlNam.c_str(), "r");
-	gsl_vector_fread(evIn, ev);
-	fclose(evIn);
-	
-	gsl_matrix *yCtr = gsl_matrix_alloc(rsp.dMat()->size1, rsp.dMat()->size2);
-	colCenter(rsp.dMat(), yCtr);
-	for (size_t Xj = 0; Xj < Npred; Xj++) {
-		_fittedEach[Xj].resize(rsp.Ndata()*rsp.phenD());
-		_theta[Xj] = new MVnormBetaPC(yCtr, _Xmat, Xj, _fittedEach[Xj], Sig, _rV[0], _valueMat, Xj, gsl_vector_get(ev, Xj));
-	}
-	
-	_updateFitted();
-	
-	gsl_matrix_free(Sig);
-	gsl_matrix_free(yCtr);
-	gsl_vector_free(ev);
-}
-
 BetaGrpPC::BetaGrpPC(const Grp &rsp, const string &predFlNam, const string &evFlNam, const size_t &Npred, RanIndex &up, const int &nThr){
 	gsl_matrix_free(_fittedAll);
 	gsl_matrix_free(_Xmat);
@@ -8127,11 +7763,16 @@ BetaGrpPC::BetaGrpPC(const Grp &rsp, const string &predFlNam, const string &evFl
 	gsl_vector_fread(evIn, ev);
 	fclose(evIn);
 	
+	for (size_t IpcCol = 0; IpcCol < ev->size; IpcCol++) { // scale the columns of the PC vector matrix by square root of eigenvalues
+		gsl_vector_view pcCol = gsl_matrix_column(_Xmat, IpcCol);
+		gsl_vector_scale(&pcCol.vector, sqrt(gsl_vector_get(ev, IpcCol)));
+	}
+	
 	gsl_matrix *yCtr = gsl_matrix_alloc(rsp.dMat()->size1, rsp.dMat()->size2);
 	colCenter(rsp.dMat(), yCtr);
 	for (size_t Xj = 0; Xj < Npred; Xj++) {
 		_fittedEach[Xj].resize(rsp.Ndata()*rsp.phenD());
-		_theta[Xj] = new MVnormBetaPC(yCtr, _Xmat, Xj, _fittedEach[Xj], Sig, _rV[0], _upLevel->priorInd(Xj), _valueMat, Xj, gsl_vector_get(ev, Xj));
+		_theta[Xj] = new MVnormBetaFt(yCtr, _Xmat, Xj, _fittedEach[Xj], Sig, _rV[0], _upLevel->priorInd(Xj), _valueMat, Xj);
 	}
 	
 	_updateFitted();
@@ -8181,75 +7822,24 @@ BetaGrpPC::BetaGrpPC(const Grp &rsp, const string &predFlNam, const string &evFl
 	gsl_vector_fread(evIn, ev);
 	fclose(evIn);
 	
+	for (size_t IpcCol = 0; IpcCol < ev->size; IpcCol++) { // scale the columns of the PC vector matrix by square root of eigenvalues
+		gsl_vector_view pcCol = gsl_matrix_column(_Xmat, IpcCol);
+		gsl_vector_scale(&pcCol.vector, sqrt(gsl_vector_get(ev, IpcCol)));
+	}
+	
 	gsl_matrix *y = gsl_matrix_alloc(_Xmat->size1, rsp.dMat()->size2);
 	MuGrp yMn = rsp.mean(*_lowLevel);
 	colCenter(yMn.dMat(), y);
 	
 	for (size_t Xj = 0; Xj < Npred; Xj++) {
 		_fittedEach[Xj].resize(low.getNgrp()*rsp.phenD());
-		_theta[Xj] = new MVnormBetaPC(y, _Xmat, Xj, _fittedEach[Xj], Sig, _rV[0], _upLevel->priorInd(Xj), _valueMat, Xj, gsl_vector_get(ev, Xj));
+		_theta[Xj] = new MVnormBetaFt(y, _Xmat, Xj, _fittedEach[Xj], Sig, _rV[0], _upLevel->priorInd(Xj), _valueMat, Xj);
 	}
 	
 	_updateFitted();
 	
 	gsl_matrix_free(Sig);
 	gsl_matrix_free(y);
-	gsl_vector_free(ev);
-}
-
-BetaGrpPC::BetaGrpPC(const Grp &rsp, const string &predFlNam, const string &evFlNam, const size_t &Npred, const string &outFlNam, const int &nThr){
-	gsl_matrix_free(_fittedAll);
-	gsl_matrix_free(_Xmat);
-	_fittedEach.resize(Npred);
-	_fittedAll  = gsl_matrix_calloc(rsp.Ndata(), rsp.phenD());
-	_nThr       = nThr;
-	_Xmat       = gsl_matrix_alloc(rsp.Ndata(), Npred);
-	gsl_matrix_free(_valueMat);
-	_valueMat   = gsl_matrix_alloc(Npred, rsp.phenD());
-	_lowLevel   = 0;
-	_upLevel    = 0;
-	_outFlNam   = outFlNam;
-	remove(_outFlNam.c_str());
-	
-	if (_nThr > 1) {
-		const gsl_rng_type *T = gsl_rng_mt19937;
-		_rV.resize(_nThr);
-		vector<gsl_rng *>::iterator rIt = _rV.begin();
-		++rIt;
-		for (; rIt != _rV.end(); ++rIt) {
-			unsigned long seed = gsl_rng_get(_rV[0]);
-			*rIt = gsl_rng_alloc(T);
-			gsl_rng_set(*rIt, seed);
-		}
-		
-	}
-	
-	gsl_matrix *Sig  = gsl_matrix_alloc(rsp.phenD(), rsp.phenD());
-	gsl_matrix_set_identity(Sig);
-	gsl_vector *ev = gsl_vector_alloc(Npred);
-	
-	_theta.resize(Npred);
-	
-	FILE *prdIn = fopen(predFlNam.c_str(), "r");
-	gsl_matrix_fread(prdIn, _Xmat);
-	fclose(prdIn);
-	// no centering, since eigenvectors are centered by definition
-	
-	FILE *evIn = fopen(evFlNam.c_str(), "r");
-	gsl_vector_fread(evIn, ev);
-	fclose(evIn);
-	
-	gsl_matrix *yCtr = gsl_matrix_alloc(rsp.dMat()->size1, rsp.dMat()->size2);
-	colCenter(rsp.dMat(), yCtr);
-	for (size_t Xj = 0; Xj < Npred; Xj++) {
-		_fittedEach[Xj].resize(rsp.Ndata()*rsp.phenD());
-		_theta[Xj] = new MVnormBetaPC(yCtr, _Xmat, Xj, _fittedEach[Xj], Sig, _rV[0], _valueMat, Xj, gsl_vector_get(ev, Xj));
-	}
-	
-	_updateFitted();
-	
-	gsl_matrix_free(Sig);
-	gsl_matrix_free(yCtr);
 	gsl_vector_free(ev);
 }
 
@@ -8295,11 +7885,16 @@ BetaGrpPC::BetaGrpPC(const Grp &rsp, const string &predFlNam, const string &evFl
 	gsl_vector_fread(evIn, ev);
 	fclose(evIn);
 	
+	for (size_t IpcCol = 0; IpcCol < ev->size; IpcCol++) { // scale the columns of the PC vector matrix by square root of eigenvalues
+		gsl_vector_view pcCol = gsl_matrix_column(_Xmat, IpcCol);
+		gsl_vector_scale(&pcCol.vector, sqrt(gsl_vector_get(ev, IpcCol)));
+	}
+	
 	gsl_matrix *yCtr = gsl_matrix_alloc(rsp.dMat()->size1, rsp.dMat()->size2);
 	colCenter(rsp.dMat(), yCtr);
 	for (size_t Xj = 0; Xj < Npred; Xj++) {
 		_fittedEach[Xj].resize(rsp.Ndata()*rsp.phenD());
-		_theta[Xj] = new MVnormBetaPC(yCtr, _Xmat, Xj, _fittedEach[Xj], Sig, _rV[0], _upLevel->priorInd(Xj), _valueMat, Xj, gsl_vector_get(ev, Xj));
+		_theta[Xj] = new MVnormBetaFt(yCtr, _Xmat, Xj, _fittedEach[Xj], Sig, _rV[0], _upLevel->priorInd(Xj), _valueMat, Xj);
 	}
 	
 	_updateFitted();
@@ -8351,13 +7946,18 @@ BetaGrpPC::BetaGrpPC(const Grp &rsp, const string &predFlNam, const string &evFl
 	gsl_vector_fread(evIn, ev);
 	fclose(evIn);
 	
+	for (size_t IpcCol = 0; IpcCol < ev->size; IpcCol++) { // scale the columns of the PC vector matrix by square root of eigenvalues
+		gsl_vector_view pcCol = gsl_matrix_column(_Xmat, IpcCol);
+		gsl_vector_scale(&pcCol.vector, sqrt(gsl_vector_get(ev, IpcCol)));
+	}
+	
 	gsl_matrix *y = gsl_matrix_alloc(_Xmat->size1, rsp.dMat()->size2);
 	MuGrp yMn = rsp.mean(*_lowLevel);
 	colCenter(yMn.dMat(), y);
 	
 	for (size_t Xj = 0; Xj < Npred; Xj++) {
 		_fittedEach[Xj].resize(low.getNgrp()*rsp.phenD());
-		_theta[Xj] = new MVnormBetaPC(y, _Xmat, Xj, _fittedEach[Xj], Sig, _rV[0], _upLevel->priorInd(Xj), _valueMat, Xj, gsl_vector_get(ev, Xj));
+		_theta[Xj] = new MVnormBetaFt(y, _Xmat, Xj, _fittedEach[Xj], Sig, _rV[0], _upLevel->priorInd(Xj), _valueMat, Xj);
 	}
 	
 	_updateFitted();
@@ -8445,9 +8045,8 @@ BetaGrpPC & BetaGrpPC::operator=(const BetaGrpPC &bG){
 	return *this;
 }
 
-
 /*
-	BetaGrpSnp methods
+ *	BetaGrpSnp methods
  */
 
 BetaGrpSnp::BetaGrpSnp() : _numSaves(0.0), _nThr(1), _Npred(1), MuGrp(){
