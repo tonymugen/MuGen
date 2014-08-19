@@ -47,27 +47,19 @@ using std::remove;
 	IMPORTANT: Once started using CblasLower (required for MVgauss), have to use it everywhere.  Otherwise, matrix estimates diverge
 */
 
-void MVgauss(const gsl_vector *mn, const gsl_matrix *SigChl, const int d, const gsl_rng *r, gsl_vector *samp){
-	for (int iV = 0; iV < d; iV++) {
+void MVgauss(const gsl_vector *mn, const gsl_matrix *SigChl, const gsl_rng *r, gsl_vector *samp){
+	for (size_t iV = 0; iV < mn->size; iV++) {
 		gsl_vector_set(samp, iV, gsl_ran_gaussian_ziggurat(r, 1.0));
 	}
 	gsl_blas_dtrmv(CblasLower, CblasNoTrans, CblasNonUnit, SigChl, samp);
 	gsl_vector_add(samp, mn);
 }
 
-void MVgauss(const gsl_vector *mn, const gsl_matrix *SigChl, const size_t d, const gsl_rng *r, gsl_vector *samp){
-	for (int iV = 0; iV < d; iV++) {
-		gsl_vector_set(samp, iV, gsl_ran_gaussian_ziggurat(r, 1.0));
-	}
-	gsl_blas_dtrmv(CblasLower, CblasNoTrans, CblasNonUnit, SigChl, samp);
-	gsl_vector_add(samp, mn);
-}
-
-void Wishart(const gsl_matrix *SigC, const int &d, const int &df, const gsl_rng *r, gsl_matrix *SigIout){
-	gsl_matrix *tmp = gsl_matrix_calloc(d, d);
-	for (int rwI = 0; rwI < d; rwI++){
+void Wishart(const gsl_matrix *SigC, const int &df, const gsl_rng *r, gsl_matrix *SigIout){
+	gsl_matrix *tmp = gsl_matrix_calloc(SigC->size1, SigC->size2);
+	for (size_t rwI = 0; rwI < SigC->size1; rwI++){
 		gsl_matrix_set(tmp, rwI, rwI, sqrt(gsl_ran_chisq(r, df - rwI)));
-		for (int clI = 0; clI < rwI - 1; clI++){
+		for (size_t clI = 0; clI < rwI - 1; clI++){
 			gsl_matrix_set(tmp, rwI, clI, gsl_ran_gaussian_ziggurat(r, 1.0));
 		}
 	}
@@ -77,11 +69,11 @@ void Wishart(const gsl_matrix *SigC, const int &d, const int &df, const gsl_rng 
 	gsl_matrix_free(tmp);
 }
 
-void Wishart(const gsl_matrix *SigC, const size_t &d, const size_t &df, const gsl_rng *r, gsl_matrix *SigIout){
-	gsl_matrix *tmp = gsl_matrix_calloc(d, d);
-	for (int rwI = 0; rwI < d; rwI++){
+void Wishart(const gsl_matrix *SigC, const size_t &df, const gsl_rng *r, gsl_matrix *SigIout){
+	gsl_matrix *tmp = gsl_matrix_calloc(SigC->size1, SigC->size2);
+	for (size_t rwI = 0; rwI < SigC->size1; rwI++){
 		gsl_matrix_set(tmp, rwI, rwI, sqrt(gsl_ran_chisq(r, df - rwI)));
-		for (int clI = 0; clI < rwI - 1; clI++){
+		for (size_t clI = 0; clI < rwI - 1; clI++){
 			gsl_matrix_set(tmp, rwI, clI, gsl_ran_gaussian_ziggurat(r, 1.0));
 		}
 	}
@@ -306,7 +298,7 @@ MVnorm::MVnorm(gsl_vector *mn, const gsl_matrix *Sig, const gsl_rng *r){
 	gsl_vector *tmp = gsl_vector_alloc(_d);
 	gsl_vector_memcpy(tmp, mn);
 	
-	MVgauss(tmp, chl, _d, r, &_vec.vector);
+	MVgauss(tmp, chl, r, &_vec.vector);
 	gsl_matrix_free(chl);
 	gsl_vector_free(tmp);
 }
@@ -337,7 +329,7 @@ MVnorm::MVnorm(gsl_matrix *mn, const size_t &iRw, const gsl_matrix *Sig, const g
 	gsl_matrix_memcpy(chl, Sig);
 	gsl_linalg_cholesky_decomp(chl);
 	
-	MVgauss(tmp, chl, _d, r, &_vec.vector);
+	MVgauss(tmp, chl, r, &_vec.vector);
 	
 	gsl_matrix_free(chl);
 	gsl_vector_free(tmp);
@@ -602,7 +594,7 @@ void MVnormMu::update(const Grp &dat, const SigmaI &SigIm, const gsl_rng *r){
 	gsl_linalg_cholesky_invert(SigSum);
 	gsl_linalg_cholesky_decomp(SigSum);
 	
-	MVgauss(smVec, SigSum, _d, r, &_vec.vector);
+	MVgauss(smVec, SigSum, r, &_vec.vector);
 	
 	gsl_vector_free(smVec);
 	gsl_matrix_free(SigSum);
@@ -626,7 +618,7 @@ void MVnormMu::update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, const 
 	gsl_linalg_cholesky_invert(SigSum);
 	gsl_linalg_cholesky_decomp(SigSum);
 	
-	MVgauss(smVec, SigSum, _d, r, &_vec.vector);
+	MVgauss(smVec, SigSum, r, &_vec.vector);
 	
 	gsl_vector_free(smVec);
 	gsl_matrix_free(SigSum);
@@ -653,7 +645,7 @@ void MVnormMu::update(const Grp &dat, const SigmaI &SigIm, const SigmaI &SigIp, 
 	gsl_blas_dsymv(CblasLower, 1.0, SigSum, tmpV, 0.0, smVec);
 	
 	gsl_linalg_cholesky_decomp(SigSum);
-	MVgauss(smVec, SigSum, _d, r, &_vec.vector);
+	MVgauss(smVec, SigSum, r, &_vec.vector);
 	
 	gsl_vector_free(tmpV);
 	gsl_vector_free(smVec);
@@ -683,7 +675,7 @@ void MVnormMu::update(const Grp &dat, const SigmaI &SigIm, const double &qPr, co
 	gsl_blas_dsymv(CblasLower, 1.0, SigSum, tmpV, 0.0, smVec);
 	
 	gsl_linalg_cholesky_decomp(SigSum);
-	MVgauss(smVec, SigSum, _d, r, &_vec.vector);
+	MVgauss(smVec, SigSum, r, &_vec.vector);
 	
 	gsl_vector_free(tmpV);
 	gsl_vector_free(smVec);
@@ -715,7 +707,7 @@ void MVnormMu::update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, const 
 	gsl_blas_dsymv(CblasLower, 1.0, SigSum, tmpV, 0.0, smVec);
 	
 	gsl_linalg_cholesky_decomp(SigSum);
-	MVgauss(smVec, SigSum, _d, r, &_vec.vector);
+	MVgauss(smVec, SigSum, r, &_vec.vector);
 	
 	gsl_vector_free(tmpV);
 	gsl_vector_free(smVec);
@@ -749,7 +741,7 @@ void MVnormMu::update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, const 
 	gsl_blas_dsymv(CblasLower, 1.0, SigSum, tmpV, 0.0, smVec);
 	
 	gsl_linalg_cholesky_decomp(SigSum);
-	MVgauss(smVec, SigSum, _d, r, &_vec.vector);
+	MVgauss(smVec, SigSum, r, &_vec.vector);
 	
 	gsl_vector_free(tmpV);
 	gsl_vector_free(smVec);
@@ -779,7 +771,7 @@ void MVnormMu::update(const Grp &dat, const SigmaI &SigIm, const Grp &muPr, cons
 	gsl_blas_dsymv(CblasLower, 1.0, SigSum, tmpV, 0.0, smVec);
 	
 	gsl_linalg_cholesky_decomp(SigSum);
-	MVgauss(smVec, SigSum, _d, r, &_vec.vector);
+	MVgauss(smVec, SigSum, r, &_vec.vector);
 	
 	gsl_vector_free(tmpV);
 	gsl_vector_free(smVec);
@@ -810,7 +802,7 @@ void MVnormMu::update(const Grp &dat, const SigmaI &SigIm, const Grp &muPr, cons
 	gsl_blas_dsymv(CblasLower, 1.0, SigSum, tmpV, 0.0, smVec);
 	
 	gsl_linalg_cholesky_decomp(SigSum);
-	MVgauss(smVec, SigSum, _d, r, &_vec.vector);
+	MVgauss(smVec, SigSum, r, &_vec.vector);
 	
 	gsl_vector_free(tmpV);
 	gsl_vector_free(smVec);
@@ -843,7 +835,7 @@ void MVnormMu::update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, const 
 	gsl_blas_dsymv(CblasLower, 1.0, SigSum, tmpV, 0.0, smVec);
 	
 	gsl_linalg_cholesky_decomp(SigSum);
-	MVgauss(smVec, SigSum, _d, r, &_vec.vector);
+	MVgauss(smVec, SigSum, r, &_vec.vector);
 	
 	gsl_vector_free(tmpV);
 	gsl_vector_free(smVec);
@@ -878,7 +870,7 @@ void MVnormMu::update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, const 
 	gsl_blas_dsymv(CblasLower, 1.0, SigSum, tmpV, 0.0, smVec);
 	
 	gsl_linalg_cholesky_decomp(SigSum);
-	MVgauss(smVec, SigSum, _d, r, &_vec.vector);
+	MVgauss(smVec, SigSum, r, &_vec.vector);
 	
 	gsl_vector_free(tmpV);
 	gsl_vector_free(smVec);
@@ -940,7 +932,7 @@ void MVnormMuPEX::update(const Grp &dat, const SigmaI &SigIm, const SigmaI &SigI
 	gsl_blas_dsymv(CblasLower, 1.0, SigSum, tmpV, 0.0, smVec);
 	
 	gsl_linalg_cholesky_decomp(SigSum);
-	MVgauss(smVec, SigSum, _d, r, &_vec.vector);
+	MVgauss(smVec, SigSum, r, &_vec.vector);
 	
 	gsl_vector_free(tmpV);
 	gsl_vector_free(smVec);
@@ -971,7 +963,7 @@ void MVnormMuPEX::update(const Grp &dat, const SigmaI &SigIm, const double &qPr,
 	gsl_blas_dsymv(CblasLower, 1.0, SigSum, tmpV, 0.0, smVec);
 	
 	gsl_linalg_cholesky_decomp(SigSum);
-	MVgauss(smVec, SigSum, _d, r, &_vec.vector);
+	MVgauss(smVec, SigSum, r, &_vec.vector);
 	
 	gsl_vector_free(tmpV);
 	gsl_vector_free(smVec);
@@ -1001,7 +993,7 @@ void MVnormMuPEX::update(const Grp &dat, const SigmaI &SigIm, const Grp &muPr, c
 	gsl_blas_dsymv(CblasLower, 1.0, SigSum, tmpV, 0.0, smVec);
 	
 	gsl_linalg_cholesky_decomp(SigSum);
-	MVgauss(smVec, SigSum, _d, r, &_vec.vector);
+	MVgauss(smVec, SigSum, r, &_vec.vector);
 	
 	gsl_vector_free(tmpV);
 	gsl_vector_free(smVec);
@@ -1033,7 +1025,7 @@ void MVnormMuPEX::update(const Grp &dat, const SigmaI &SigIm, const Grp &muPr, c
 	gsl_blas_dsymv(CblasLower, 1.0, SigSum, tmpV, 0.0, smVec);
 	
 	gsl_linalg_cholesky_decomp(SigSum);
-	MVgauss(smVec, SigSum, _d, r, &_vec.vector);
+	MVgauss(smVec, SigSum, r, &_vec.vector);
 	
 	gsl_vector_free(tmpV);
 	gsl_vector_free(smVec);
@@ -1076,7 +1068,7 @@ MVnormBetaPEX::MVnormBetaPEX(const gsl_matrix *resp, gsl_matrix *pred, const siz
 	gsl_matrix_scale(chl, 1.0/_scale);
 	gsl_linalg_cholesky_decomp(chl);
 	
-	MVgauss(bH, chl, _d, r, &_vec.vector);
+	MVgauss(bH, chl, r, &_vec.vector);
 	
 	gsl_vector_free(bH);
 	gsl_matrix_free(chl);
@@ -1144,7 +1136,7 @@ void MVnormBetaPEX::update(const Grp &dat, const SigmaI &SigIm, const SigmaI &Si
 	gsl_blas_dsymv(CblasLower, 1.0, SigSum, tmpV, 0.0, bH);
 	
 	gsl_linalg_cholesky_decomp(SigSum);
-	MVgauss(bH, SigSum, _d, r, &_vec.vector);
+	MVgauss(bH, SigSum, r, &_vec.vector);
 	
 	gsl_matrix_free(rsd);
 	gsl_matrix_free(SigSum);
@@ -1173,7 +1165,7 @@ void MVnormBetaPEX::update(const Grp &dat, const SigmaI &SigIm, const double &qP
 	gsl_blas_dsymv(CblasLower, 1.0, SigSum, tmpV, 0.0, bH);
 	
 	gsl_linalg_cholesky_decomp(SigSum);
-	MVgauss(bH, SigSum, _d, r, &_vec.vector);
+	MVgauss(bH, SigSum, r, &_vec.vector);
 	
 	gsl_matrix_free(rsd);
 	gsl_matrix_free(SigSum);
@@ -1203,7 +1195,7 @@ void MVnormBetaPEX::update(const Grp &dat, const SigmaI &SigIm, const Grp &muPr,
 	gsl_blas_dsymv(CblasLower, 1.0, SigSum, tmpV, 0.0, bH);
 	
 	gsl_linalg_cholesky_decomp(SigSum);
-	MVgauss(bH, SigSum, _d, r, &_vec.vector);
+	MVgauss(bH, SigSum, r, &_vec.vector);
 	
 	gsl_matrix_free(rsd);
 	gsl_matrix_free(SigSum);
@@ -1234,7 +1226,7 @@ void MVnormBetaPEX::update(const Grp &dat, const SigmaI &SigIm, const Grp &muPr,
 	gsl_blas_dsymv(CblasLower, 1.0, SigSum, tmpV, 0.0, bH);
 	
 	gsl_linalg_cholesky_decomp(SigSum);
-	MVgauss(bH, SigSum, _d, r, &_vec.vector);
+	MVgauss(bH, SigSum, r, &_vec.vector);
 	
 	gsl_matrix_free(rsd);
 	gsl_matrix_free(SigSum);
@@ -1294,7 +1286,7 @@ void MVnormMuMiss::update(const Grp &mu, const SigmaI &SigIm, const gsl_rng *r){
 		gsl_linalg_cholesky_decomp(Sig);
 		gsl_linalg_cholesky_invert(Sig);
 		gsl_linalg_cholesky_decomp(Sig);
-		MVgauss(mu[*_upLevel]->getVec(), Sig, _d, r, &_vec.vector);
+		MVgauss(mu[*_upLevel]->getVec(), Sig, r, &_vec.vector);
 		
 		gsl_matrix_free(Sig);
 	}
@@ -1358,7 +1350,7 @@ void MVnormMuMiss::update(const Grp &mu, const SigmaI &SigIm, const gsl_rng *r){
 		gsl_blas_dsymv(CblasLower, 1.0, SigKnwn, xKnwn, 0.0, muKnwn); // V = Sig_{22}^{-1}(a - mu2)
 		gsl_blas_dgemv(CblasNoTrans, 1.0, Sig12, muKnwn, 1.0, muUnkn); // mu1 + Sig12 %*% V
 		
-		MVgauss(muUnkn, SigUnkn, _misPhenInd.size(), r, xUnkn);
+		MVgauss(muUnkn, SigUnkn, r, xUnkn);
 		
 		for (int iM = 0; iM < _misPhenInd.size(); iM++) {
 			gsl_vector_set(&_vec.vector, _misPhenInd[iM], gsl_vector_get(xUnkn, iM));
@@ -1384,7 +1376,7 @@ void MVnormMuMiss::update(const Grp &mu, const SigmaI &SigIm, const SigmaI &SigI
 		gsl_linalg_cholesky_decomp(Sig);
 		gsl_linalg_cholesky_invert(Sig);
 		gsl_linalg_cholesky_decomp(Sig);
-		MVgauss(mu[*_upLevel]->getVec(), Sig, _d, r, &_vec.vector);
+		MVgauss(mu[*_upLevel]->getVec(), Sig, r, &_vec.vector);
 		
 		gsl_matrix_free(Sig);
 	}
@@ -1457,7 +1449,7 @@ void MVnormMuMiss::update(const Grp &mu, const SigmaI &SigIm, const SigmaI &SigI
 		
 		gsl_linalg_cholesky_decomp(SigIunkn);
 		
-		MVgauss(muUnkn, SigIunkn, _misPhenInd.size(), r, xUnkn);
+		MVgauss(muUnkn, SigIunkn, r, xUnkn);
 		
 		for (int iM = 0; iM < _misPhenInd.size(); iM++) {
 			gsl_vector_set(&_vec.vector, _misPhenInd[iM], gsl_vector_get(xUnkn, iM));
@@ -1538,7 +1530,7 @@ MVnormBeta::MVnormBeta(const gsl_matrix *resp, gsl_matrix *pred, const size_t &i
 	gsl_matrix_scale(chl, 1.0/_scale);
 	gsl_linalg_cholesky_decomp(chl);
 	
-	MVgauss(bH, chl, _d, r, &_vec.vector);
+	MVgauss(bH, chl, r, &_vec.vector);
 	
 	gsl_vector_free(bH);
 	gsl_matrix_free(chl);
@@ -1571,7 +1563,7 @@ MVnormBeta::MVnormBeta(const Grp &resp, gsl_matrix *pred, const size_t &iCl, con
 	gsl_matrix_scale(chl, 1.0/_scale);
 	gsl_linalg_cholesky_decomp(chl);
 	
-	MVgauss(bH, chl, _d, r, &_vec.vector);
+	MVgauss(bH, chl, r, &_vec.vector);
 	
 	gsl_vector_free(bH);
 	gsl_matrix_free(chl);
@@ -1631,7 +1623,7 @@ MVnormBeta::MVnormBeta(const gsl_matrix *resp, gsl_matrix *pred, const size_t &i
 	gsl_matrix_scale(chl, 1.0/_scale);
 	gsl_linalg_cholesky_decomp(chl);
 	
-	MVgauss(bH, chl, _d, r, &_vec.vector);
+	MVgauss(bH, chl, r, &_vec.vector);
 	
 	gsl_vector_free(bH);
 	gsl_matrix_free(chl);
@@ -1664,7 +1656,7 @@ MVnormBeta::MVnormBeta(const Grp &resp, gsl_matrix *pred, const size_t &iCl, con
 	gsl_matrix_scale(chl, 1.0/_scale);
 	gsl_linalg_cholesky_decomp(chl);
 	
-	MVgauss(bH, chl, _d, r, &_vec.vector);
+	MVgauss(bH, chl, r, &_vec.vector);
 	
 	gsl_vector_free(bH);
 	gsl_matrix_free(chl);
@@ -1723,7 +1715,7 @@ void MVnormBeta::update(const gsl_matrix *resp, const SigmaI &SigIb, const gsl_r
 	
 	gsl_blas_dgemv(CblasTrans, 1.0/_scale, resp, &_X.vector, 0.0, tmpV);
 	
-	MVgauss(tmpV, SigSum, _d, r, &_vec.vector);
+	MVgauss(tmpV, SigSum, r, &_vec.vector);
 	
 	gsl_matrix_free(SigSum);
 	gsl_vector_free(tmpV);
@@ -1742,7 +1734,7 @@ void MVnormBeta::update(const Grp &mu, const SigmaI &SigIb, const gsl_rng *r){
 	
 	gsl_blas_dgemv(CblasTrans, 1.0/_scale, mu.dMat(), &_X.vector, 0.0, tmpV);
 	
-	MVgauss(tmpV, SigSum, _d, r, &_vec.vector);
+	MVgauss(tmpV, SigSum, r, &_vec.vector);
 	
 	gsl_matrix_free(SigSum);
 	gsl_vector_free(tmpV);
@@ -1768,7 +1760,7 @@ void MVnormBeta::update(const Grp &dat, const Qgrp &q, const SigmaI &SigIb, cons
 	gsl_matrix_scale(Sig, xQx);
 	gsl_linalg_cholesky_decomp(Sig);
 	
-	MVgauss(tmp, Sig, _d, r, &_vec.vector);
+	MVgauss(tmp, Sig, r, &_vec.vector);
 	
 	gsl_matrix_free(Sig);
 	gsl_vector_free(XQ);
@@ -1791,7 +1783,7 @@ void MVnormBeta::update(const Grp &dat, const SigmaI &SigIb, const SigmaI &SigIp
 	gsl_blas_dsymv(CblasLower, 1.0, SigSum, tmpV, 0.0, bH);
 	
 	gsl_linalg_cholesky_decomp(SigSum);
-	MVgauss(bH, SigSum, _d, r, &_vec.vector);
+	MVgauss(bH, SigSum, r, &_vec.vector);
 	
 	gsl_matrix_free(SigSum);
 	gsl_vector_free(tmpV);
@@ -1816,7 +1808,7 @@ void MVnormBeta::update(const Grp &dat, const SigmaI &SigIb, const double &qPr, 
 	gsl_blas_dsymv(CblasLower, 1.0, SigSum, tmpV, 0.0, bH);
 	
 	gsl_linalg_cholesky_decomp(SigSum);
-	MVgauss(bH, SigSum, _d, r, &_vec.vector);
+	MVgauss(bH, SigSum, r, &_vec.vector);
 	
 	gsl_matrix_free(SigSum);
 	gsl_matrix_free(SigPr);
@@ -1847,7 +1839,7 @@ void MVnormBeta::update(const Grp &dat, const Qgrp &q, const SigmaI &SigIb, cons
 	gsl_blas_dsymv(CblasLower, 1.0, SigSum, tmpV, 0.0, bH);
 	
 	gsl_linalg_cholesky_decomp(SigSum);
-	MVgauss(bH, SigSum, _d, r, &_vec.vector);
+	MVgauss(bH, SigSum, r, &_vec.vector);
 	
 	gsl_matrix_free(SigSum);
 	gsl_vector_free(XQ);
@@ -1881,7 +1873,7 @@ void MVnormBeta::update(const Grp &dat, const Qgrp &q, const SigmaI &SigIb, cons
 	gsl_blas_dsymv(CblasLower, 1.0, SigSum, tmpV, 0.0, bH);
 	
 	gsl_linalg_cholesky_decomp(SigSum);
-	MVgauss(bH, SigSum, _d, r, &_vec.vector);
+	MVgauss(bH, SigSum, r, &_vec.vector);
 	
 	gsl_matrix_free(SigSum);
 	gsl_matrix_free(SigPr);
@@ -1908,7 +1900,7 @@ void MVnormBeta::update(const Grp &dat, const SigmaI &SigIb, const Grp &muPr, co
 	gsl_blas_dsymv(CblasLower, 1.0, SigSum, tmpV, 0.0, bH);
 	
 	gsl_linalg_cholesky_decomp(SigSum);
-	MVgauss(bH, SigSum, _d, r, &_vec.vector);
+	MVgauss(bH, SigSum, r, &_vec.vector);
 	
 	gsl_matrix_free(SigSum);
 	gsl_vector_free(tmpV);
@@ -1935,7 +1927,7 @@ void MVnormBeta::update(const Grp &dat, const SigmaI &SigIb, const Grp &muPr, co
 	gsl_blas_dsymv(CblasLower, 1.0, SigSum, tmpV, 0.0, bH);
 	
 	gsl_linalg_cholesky_decomp(SigSum);
-	MVgauss(bH, SigSum, _d, r, &_vec.vector);
+	MVgauss(bH, SigSum, r, &_vec.vector);
 	
 	gsl_matrix_free(SigSum);
 	gsl_matrix_free(SigPr);
@@ -1968,7 +1960,7 @@ void MVnormBeta::update(const Grp &dat, const Qgrp &q, const SigmaI &SigIb, cons
 	gsl_blas_dsymv(CblasLower, 1.0, SigSum, tmpV, 0.0, bH);
 	
 	gsl_linalg_cholesky_decomp(SigSum);
-	MVgauss(bH, SigSum, _d, r, &_vec.vector);
+	MVgauss(bH, SigSum, r, &_vec.vector);
 	
 	gsl_matrix_free(SigSum);
 	gsl_vector_free(XQ);
@@ -2004,7 +1996,7 @@ void MVnormBeta::update(const Grp &dat, const Qgrp &q, const SigmaI &SigIb, cons
 	gsl_blas_dsymv(CblasLower, 1.0, SigSum, tmpV, 0.0, bH);
 	
 	gsl_linalg_cholesky_decomp(SigSum);
-	MVgauss(bH, SigSum, _d, r, &_vec.vector);
+	MVgauss(bH, SigSum, r, &_vec.vector);
 	
 	gsl_matrix_free(SigSum);
 	gsl_matrix_free(SigPr);
@@ -2208,7 +2200,7 @@ void MVnormBetaFt::update(const Grp &resp, const SigmaI &SigIb, const gsl_rng *r
 	gsl_matrix_scale(Sig, 1.0/_scale);
 	gsl_linalg_cholesky_decomp(Sig);
 	
-	MVgauss(tmp, Sig, _d, r, &_vec.vector);
+	MVgauss(tmp, Sig, r, &_vec.vector);
 	
 	gsl_matrix_free(rsd);
 	gsl_matrix_free(Sig);
@@ -2239,7 +2231,7 @@ void MVnormBetaFt::update(const Grp &resp, const Qgrp &q, const SigmaI &SigIb, c
 	gsl_matrix_scale(Sig, xQx);
 	gsl_linalg_cholesky_decomp(Sig);
 	
-	MVgauss(tmp, Sig, _d, r, &_vec.vector);
+	MVgauss(tmp, Sig, r, &_vec.vector);
 	
 	gsl_matrix_free(rsd);
 	gsl_matrix_free(Sig);
@@ -2267,7 +2259,7 @@ void MVnormBetaFt::update(const Grp &resp, const SigmaI &SigIb, const SigmaI &Si
 	gsl_blas_dsymv(CblasLower, 1.0, SigSum, tmpV, 0.0, bH);
 	
 	gsl_linalg_cholesky_decomp(SigSum);
-	MVgauss(bH, SigSum, _d, r, &_vec.vector);
+	MVgauss(bH, SigSum, r, &_vec.vector);
 	
 	gsl_matrix_free(rsd);
 	gsl_matrix_free(SigSum);
@@ -2298,7 +2290,7 @@ void MVnormBetaFt::update(const Grp &resp, const SigmaI &SigIb, const double &qP
 	gsl_blas_dsymv(CblasLower, 1.0, SigSum, tmpV, 0.0, bH);
 	
 	gsl_linalg_cholesky_decomp(SigSum);
-	MVgauss(bH, SigSum, _d, r, &_vec.vector);
+	MVgauss(bH, SigSum, r, &_vec.vector);
 	
 	gsl_matrix_free(rsd);
 	gsl_matrix_free(SigSum);
@@ -2329,7 +2321,7 @@ void MVnormBetaFt::update(const Grp &resp, const SigmaI &SigIb, const Grp &muPr,
 	gsl_blas_dsymv(CblasLower, 1.0, SigSum, tmpV, 0.0, bH);
 	
 	gsl_linalg_cholesky_decomp(SigSum);
-	MVgauss(bH, SigSum, _d, r, &_vec.vector);
+	MVgauss(bH, SigSum, r, &_vec.vector);
 	
 	gsl_matrix_free(rsd);
 	gsl_matrix_free(SigSum);
@@ -2361,7 +2353,7 @@ void MVnormBetaFt::update(const Grp &resp, const SigmaI &SigIb, const Grp &muPr,
 	gsl_blas_dsymv(CblasLower, 1.0, SigSum, tmpV, 0.0, bH);
 	
 	gsl_linalg_cholesky_decomp(SigSum);
-	MVgauss(bH, SigSum, _d, r, &_vec.vector);
+	MVgauss(bH, SigSum, r, &_vec.vector);
 	
 	gsl_matrix_free(rsd);
 	gsl_matrix_free(SigSum);
@@ -2397,7 +2389,7 @@ void MVnormBetaFt::update(const Grp &resp, const Qgrp &q, const SigmaI &SigIb, c
 	gsl_blas_dsymv(CblasLower, 1.0, SigSum, tmpV, 0.0, bH);
 	
 	gsl_linalg_cholesky_decomp(SigSum);
-	MVgauss(bH, SigSum, _d, r, &_vec.vector);
+	MVgauss(bH, SigSum, r, &_vec.vector);
 	
 	gsl_matrix_free(rsd);
 	gsl_matrix_free(SigSum);
@@ -2436,7 +2428,7 @@ void MVnormBetaFt::update(const Grp &resp, const Qgrp &q, const SigmaI &SigIb, c
 	gsl_blas_dsymv(CblasLower, 1.0, SigSum, tmpV, 0.0, bH);
 	
 	gsl_linalg_cholesky_decomp(SigSum);
-	MVgauss(bH, SigSum, _d, r, &_vec.vector);
+	MVgauss(bH, SigSum, r, &_vec.vector);
 	
 	gsl_matrix_free(rsd);
 	gsl_matrix_free(SigSum);
@@ -2475,7 +2467,7 @@ void MVnormBetaFt::update(const Grp &resp, const Qgrp &q, const SigmaI &SigIb, c
 	gsl_blas_dsymv(CblasLower, 1.0, SigSum, tmpV, 0.0, bH);
 	
 	gsl_linalg_cholesky_decomp(SigSum);
-	MVgauss(bH, SigSum, _d, r, &_vec.vector);
+	MVgauss(bH, SigSum, r, &_vec.vector);
 	
 	gsl_matrix_free(rsd);
 	gsl_matrix_free(SigSum);
@@ -2515,7 +2507,7 @@ void MVnormBetaFt::update(const Grp &resp, const Qgrp &q, const SigmaI &SigIb, c
 	gsl_blas_dsymv(CblasLower, 1.0, SigSum, tmpV, 0.0, bH);
 	
 	gsl_linalg_cholesky_decomp(SigSum);
-	MVgauss(bH, SigSum, _d, r, &_vec.vector);
+	MVgauss(bH, SigSum, r, &_vec.vector);
 	
 	gsl_matrix_free(rsd);
 	gsl_matrix_free(SigSum);
@@ -2578,7 +2570,7 @@ void MVnormMuBlk::update(const Grp &dat, const SigmaI &SigIm, const gsl_rng *r){
 		gsl_linalg_cholesky_invert(SigSum);
 		gsl_linalg_cholesky_decomp(SigSum);
 		
-		MVgauss(smVec, SigSum, _eachVec[iElm].vector.size, r, &(_eachVec[iElm]).vector);
+		MVgauss(smVec, SigSum, r, &(_eachVec[iElm]).vector);
 		
 		gsl_vector_free(smVec);
 		gsl_matrix_free(SigSum);
@@ -2607,7 +2599,7 @@ void MVnormMuBlk::update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, con
 		gsl_linalg_cholesky_invert(SigSum);
 		gsl_linalg_cholesky_decomp(SigSum);
 		
-		MVgauss(smVec, SigSum, _eachVec[iElm].vector.size, r, &(_eachVec[iElm]).vector);
+		MVgauss(smVec, SigSum, r, &(_eachVec[iElm]).vector);
 		
 		gsl_vector_free(smVec);
 		gsl_matrix_free(SigSum);
@@ -2641,7 +2633,7 @@ void MVnormMuBlk::update(const Grp &dat, const SigmaI &SigIm, const SigmaI &SigI
 		gsl_blas_dsymv(CblasLower, 1.0, SigSum, tmpV, 0.0, smVec);
 		
 		gsl_linalg_cholesky_decomp(SigSum);
-		MVgauss(smVec, SigSum, _eachVec[iElm].vector.size, r, &(_eachVec[iElm]).vector);
+		MVgauss(smVec, SigSum, r, &(_eachVec[iElm]).vector);
 		
 		gsl_vector_free(tmpV);
 		gsl_vector_free(smVec);
@@ -2679,7 +2671,7 @@ void MVnormMuBlk::update(const Grp &dat, const SigmaI &SigIm, const double &qPr,
 		gsl_blas_dsymv(CblasLower, 1.0, SigSum, tmpV, 0.0, smVec);
 		
 		gsl_linalg_cholesky_decomp(SigSum);
-		MVgauss(smVec, SigSum, _eachVec[iElm].vector.size, r, &(_eachVec[iElm]).vector);
+		MVgauss(smVec, SigSum, r, &(_eachVec[iElm]).vector);
 		
 		gsl_vector_free(tmpV);
 		gsl_vector_free(smVec);
@@ -2718,7 +2710,7 @@ void MVnormMuBlk::update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, con
 		gsl_blas_dsymv(CblasLower, 1.0, SigSum, tmpV, 0.0, smVec);
 		
 		gsl_linalg_cholesky_decomp(SigSum);
-		MVgauss(smVec, SigSum, _eachVec[iElm].vector.size, r, &(_eachVec[iElm]).vector);
+		MVgauss(smVec, SigSum, r, &(_eachVec[iElm]).vector);
 		
 		gsl_vector_free(tmpV);
 		gsl_vector_free(smVec);
@@ -2759,7 +2751,7 @@ void MVnormMuBlk::update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, con
 		gsl_blas_dsymv(CblasLower, 1.0, SigSum, tmpV, 0.0, smVec);
 		
 		gsl_linalg_cholesky_decomp(SigSum);
-		MVgauss(smVec, SigSum, _eachVec[iElm].vector.size, r, &(_eachVec[iElm]).vector);
+		MVgauss(smVec, SigSum, r, &(_eachVec[iElm]).vector);
 		
 		gsl_vector_free(tmpV);
 		gsl_vector_free(smVec);
@@ -2797,7 +2789,7 @@ void MVnormMuBlk::update(const Grp &dat, const SigmaI &SigIm, const Grp &muPr, c
 		gsl_blas_dsymv(CblasLower, 1.0, SigSum, tmpV, 0.0, smVec);
 		
 		gsl_linalg_cholesky_decomp(SigSum);
-		MVgauss(smVec, SigSum, _eachVec[iElm].vector.size, r, &(_eachVec[iElm]).vector);
+		MVgauss(smVec, SigSum, r, &(_eachVec[iElm]).vector);
 		
 		gsl_vector_free(tmpV);
 		gsl_vector_free(smVec);
@@ -2835,7 +2827,7 @@ void MVnormMuBlk::update(const Grp &dat, const SigmaI &SigIm, const Grp &muPr, c
 		gsl_blas_dsymv(CblasLower, 1.0, SigSum, tmpV, 0.0, smVec);
 		
 		gsl_linalg_cholesky_decomp(SigSum);
-		MVgauss(smVec, SigSum, _eachVec[iElm].vector.size, r, &(_eachVec[iElm]).vector);
+		MVgauss(smVec, SigSum, r, &(_eachVec[iElm]).vector);
 		
 		gsl_vector_free(tmpV);
 		gsl_vector_free(smVec);
@@ -2876,7 +2868,7 @@ void MVnormMuBlk::update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, con
 		gsl_blas_dsymv(CblasLower, 1.0, SigSum, tmpV, 0.0, smVec);
 		
 		gsl_linalg_cholesky_decomp(SigSum);
-		MVgauss(smVec, SigSum, _eachVec[iElm].vector.size, r, &(_eachVec[iElm]).vector);
+		MVgauss(smVec, SigSum, r, &(_eachVec[iElm]).vector);
 		
 		gsl_vector_free(tmpV);
 		gsl_vector_free(smVec);
@@ -2918,7 +2910,7 @@ void MVnormMuBlk::update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, con
 		gsl_blas_dsymv(CblasLower, 1.0, SigSum, tmpV, 0.0, smVec);
 		
 		gsl_linalg_cholesky_decomp(SigSum);
-		MVgauss(smVec, SigSum, _eachVec[iElm].vector.size, r, &(_eachVec[iElm]).vector);
+		MVgauss(smVec, SigSum, r, &(_eachVec[iElm]).vector);
 		
 		gsl_vector_free(tmpV);
 		gsl_vector_free(smVec);
@@ -2976,7 +2968,7 @@ MVnormBetaBlk::MVnormBetaBlk(const Grp &resp, gsl_matrix *pred, const vector<siz
 		gsl_matrix_scale(chl, 1.0/_scale[iEl]);
 		gsl_linalg_cholesky_decomp(chl);
 		
-		MVgauss(bH, chl, _eachVec[iEl].vector.size, r, &(_eachVec[iEl]).vector);
+		MVgauss(bH, chl, r, &(_eachVec[iEl]).vector);
 		
 		gsl_vector_free(bH);
 		gsl_matrix_free(chl);
@@ -3028,7 +3020,7 @@ MVnormBetaBlk::MVnormBetaBlk(const Grp &resp, gsl_matrix *pred, const vector<siz
 		gsl_matrix_scale(chl, 1.0/_scale[iEl]);
 		gsl_linalg_cholesky_decomp(chl);
 		
-		MVgauss(bH, chl, _eachVec[iEl].vector.size, r, &(_eachVec[iEl]).vector);
+		MVgauss(bH, chl, r, &(_eachVec[iEl]).vector);
 		
 		gsl_vector_free(bH);
 		gsl_matrix_free(chl);
@@ -3080,7 +3072,7 @@ MVnormBetaBlk::MVnormBetaBlk(const gsl_matrix *resp, gsl_matrix *pred, const vec
 		gsl_matrix_scale(chl, 1.0/_scale[iEl]);
 		gsl_linalg_cholesky_decomp(chl);
 		
-		MVgauss(bH, chl, _eachVec[iEl].vector.size, r, &(_eachVec[iEl]).vector);
+		MVgauss(bH, chl, r, &(_eachVec[iEl]).vector);
 		
 		gsl_vector_free(bH);
 		gsl_matrix_free(chl);
@@ -3132,7 +3124,7 @@ MVnormBetaBlk::MVnormBetaBlk(const gsl_matrix *resp, gsl_matrix *pred, const vec
 		gsl_matrix_scale(chl, 1.0/_scale[iEl]);
 		gsl_linalg_cholesky_decomp(chl);
 		
-		MVgauss(bH, chl, _eachVec[iEl].vector.size, r, &(_eachVec[iEl]).vector);
+		MVgauss(bH, chl, r, &(_eachVec[iEl]).vector);
 		
 		gsl_vector_free(bH);
 		gsl_matrix_free(chl);
@@ -3155,7 +3147,7 @@ void MVnormBetaBlk::update(const Grp &dat, const SigmaI &SigIb, const gsl_rng *r
 		
 		gsl_blas_dgemv(CblasTrans, 1.0/_scale[iElm], &respSub.matrix, &(_X[iElm]).vector, 0.0, tmpV);
 		
-		MVgauss(tmpV, SigSum, _eachVec[iElm].vector.size, r, &(_eachVec[iElm]).vector);
+		MVgauss(tmpV, SigSum, r, &(_eachVec[iElm]).vector);
 		
 		gsl_matrix_free(SigSum);
 		gsl_vector_free(tmpV);
@@ -3186,7 +3178,7 @@ void MVnormBetaBlk::update(const Grp &dat, const Qgrp &q, const SigmaI &SigIb, c
 		gsl_matrix_scale(SigSum, xQx);
 		gsl_linalg_cholesky_decomp(SigSum);
 		
-		MVgauss(tmpV, SigSum, _eachVec[iElm].vector.size, r, &(_eachVec[iElm]).vector);
+		MVgauss(tmpV, SigSum, r, &(_eachVec[iElm]).vector);
 		
 		gsl_matrix_free(SigSum);
 		gsl_vector_free(XQ);
@@ -3215,7 +3207,7 @@ void MVnormBetaBlk::update(const Grp &dat, const SigmaI &SigIb, const SigmaI &Si
 		gsl_blas_dsymv(CblasLower, 1.0, SigSum, tmpV, 0.0, bH);
 		
 		gsl_linalg_cholesky_decomp(SigSum);
-		MVgauss(bH, SigSum, _eachVec[iElm].vector.size, r, &(_eachVec[iElm]).vector);
+		MVgauss(bH, SigSum, r, &(_eachVec[iElm]).vector);
 		
 		gsl_matrix_free(SigSum);
 		gsl_vector_free(tmpV);
@@ -3246,7 +3238,7 @@ void MVnormBetaBlk::update(const Grp &dat, const SigmaI &SigIb, const double &qP
 		gsl_blas_dsymv(CblasLower, 1.0, SigSum, tmpV, 0.0, bH);
 		
 		gsl_linalg_cholesky_decomp(SigSum);
-		MVgauss(bH, SigSum, _eachVec[iElm].vector.size, r, &(_eachVec[iElm]).vector);
+		MVgauss(bH, SigSum, r, &(_eachVec[iElm]).vector);
 		
 		gsl_matrix_free(SigSum);
 		gsl_matrix_free(SigPr);
@@ -3283,7 +3275,7 @@ void MVnormBetaBlk::update(const Grp &dat, const Qgrp &q, const SigmaI &SigIb, c
 		gsl_blas_dsymv(CblasLower, 1.0, SigSum, tmpV, 0.0, bH);
 		
 		gsl_linalg_cholesky_decomp(SigSum);
-		MVgauss(bH, SigSum, _eachVec[iElm].vector.size, r, &(_eachVec[iElm]).vector);
+		MVgauss(bH, SigSum, r, &(_eachVec[iElm]).vector);
 		
 		gsl_matrix_free(SigSum);
 		gsl_vector_free(XQ);
@@ -3323,7 +3315,7 @@ void MVnormBetaBlk::update(const Grp &dat, const Qgrp &q, const SigmaI &SigIb, c
 		gsl_blas_dsymv(CblasLower, 1.0, SigSum, tmpV, 0.0, bH);
 		
 		gsl_linalg_cholesky_decomp(SigSum);
-		MVgauss(bH, SigSum, _eachVec[iElm].vector.size, r, &(_eachVec[iElm]).vector);
+		MVgauss(bH, SigSum, r, &(_eachVec[iElm]).vector);
 		
 		gsl_matrix_free(SigSum);
 		gsl_matrix_free(SigPr);
@@ -3357,7 +3349,7 @@ void MVnormBetaBlk::update(const Grp &dat, const SigmaI &SigIb, const Grp &muPr,
 		gsl_blas_dsymv(CblasLower, 1.0, SigSum, tmpV, 0.0, bH);
 		
 		gsl_linalg_cholesky_decomp(SigSum);
-		MVgauss(bH, SigSum, _eachVec[iElm].vector.size, r, &(_eachVec[iElm]).vector);
+		MVgauss(bH, SigSum, r, &(_eachVec[iElm]).vector);
 		
 		gsl_matrix_free(SigSum);
 		gsl_vector_free(tmpV);
@@ -3391,7 +3383,7 @@ void MVnormBetaBlk::update(const Grp &dat, const SigmaI &SigIb, const Grp &muPr,
 		gsl_blas_dsymv(CblasLower, 1.0, SigSum, tmpV, 0.0, bH);
 		
 		gsl_linalg_cholesky_decomp(SigSum);
-		MVgauss(bH, SigSum, _eachVec[iElm].vector.size, r, &(_eachVec[iElm]).vector);
+		MVgauss(bH, SigSum, r, &(_eachVec[iElm]).vector);
 		
 		gsl_matrix_free(SigSum);
 		gsl_matrix_free(SigPr);
@@ -3431,7 +3423,7 @@ void MVnormBetaBlk::update(const Grp &dat, const Qgrp &q, const SigmaI &SigIb, c
 		gsl_blas_dsymv(CblasLower, 1.0, SigSum, tmpV, 0.0, bH);
 		
 		gsl_linalg_cholesky_decomp(SigSum);
-		MVgauss(bH, SigSum, _eachVec[iElm].vector.size, r, &(_eachVec[iElm]).vector);
+		MVgauss(bH, SigSum, r, &(_eachVec[iElm]).vector);
 		
 		gsl_matrix_free(SigSum);
 		gsl_vector_free(XQ);
@@ -3474,7 +3466,7 @@ void MVnormBetaBlk::update(const Grp &dat, const Qgrp &q, const SigmaI &SigIb, c
 		gsl_blas_dsymv(CblasLower, 1.0, SigSum, tmpV, 0.0, bH);
 		
 		gsl_linalg_cholesky_decomp(SigSum);
-		MVgauss(bH, SigSum, _eachVec[iElm].vector.size, r, &(_eachVec[iElm]).vector);
+		MVgauss(bH, SigSum, r, &(_eachVec[iElm]).vector);
 		
 		gsl_matrix_free(SigSum);
 		gsl_matrix_free(SigPr);
@@ -3508,7 +3500,7 @@ void MVnormBetaFtBlk::update(const Grp &dat, const SigmaI &SigIb, const gsl_rng 
 		
 		gsl_blas_dgemv(CblasTrans, 1.0/_scale[iElm], &respSub.matrix, &(_X[iElm]).vector, 0.0, tmpV);
 		
-		MVgauss(tmpV, SigSum, _eachVec[iElm].vector.size, r, &(_eachVec[iElm]).vector);
+		MVgauss(tmpV, SigSum, r, &(_eachVec[iElm]).vector);
 		
 		gsl_matrix_free(SigSum);
 		gsl_vector_free(tmpV);
@@ -3544,7 +3536,7 @@ void MVnormBetaFtBlk::update(const Grp &dat, const Qgrp &q, const SigmaI &SigIb,
 		gsl_matrix_scale(SigSum, xQx);
 		gsl_linalg_cholesky_decomp(SigSum);
 		
-		MVgauss(tmpV, SigSum, _eachVec[iElm].vector.size, r, &(_eachVec[iElm]).vector);
+		MVgauss(tmpV, SigSum, r, &(_eachVec[iElm]).vector);
 		
 		gsl_matrix_free(SigSum);
 		gsl_vector_free(XQ);
@@ -3578,7 +3570,7 @@ void MVnormBetaFtBlk::update(const Grp &dat, const SigmaI &SigIb, const SigmaI &
 		gsl_blas_dsymv(CblasLower, 1.0, SigSum, tmpV, 0.0, bH);
 		
 		gsl_linalg_cholesky_decomp(SigSum);
-		MVgauss(bH, SigSum, _eachVec[iElm].vector.size, r, &(_eachVec[iElm]).vector);
+		MVgauss(bH, SigSum, r, &(_eachVec[iElm]).vector);
 		
 		gsl_matrix_free(SigSum);
 		gsl_vector_free(tmpV);
@@ -3614,7 +3606,7 @@ void MVnormBetaFtBlk::update(const Grp &dat, const SigmaI &SigIb, const double &
 		gsl_blas_dsymv(CblasLower, 1.0, SigSum, tmpV, 0.0, bH);
 		
 		gsl_linalg_cholesky_decomp(SigSum);
-		MVgauss(bH, SigSum, _eachVec[iElm].vector.size, r, &(_eachVec[iElm]).vector);
+		MVgauss(bH, SigSum, r, &(_eachVec[iElm]).vector);
 		
 		gsl_matrix_free(SigSum);
 		gsl_matrix_free(SigPr);
@@ -3656,7 +3648,7 @@ void MVnormBetaFtBlk::update(const Grp &dat, const Qgrp &q, const SigmaI &SigIb,
 		gsl_blas_dsymv(CblasLower, 1.0, SigSum, tmpV, 0.0, bH);
 		
 		gsl_linalg_cholesky_decomp(SigSum);
-		MVgauss(bH, SigSum, _eachVec[iElm].vector.size, r, &(_eachVec[iElm]).vector);
+		MVgauss(bH, SigSum, r, &(_eachVec[iElm]).vector);
 		
 		gsl_matrix_free(SigSum);
 		gsl_vector_free(XQ);
@@ -3701,7 +3693,7 @@ void MVnormBetaFtBlk::update(const Grp &dat, const Qgrp &q, const SigmaI &SigIb,
 		gsl_blas_dsymv(CblasLower, 1.0, SigSum, tmpV, 0.0, bH);
 		
 		gsl_linalg_cholesky_decomp(SigSum);
-		MVgauss(bH, SigSum, _eachVec[iElm].vector.size, r, &(_eachVec[iElm]).vector);
+		MVgauss(bH, SigSum, r, &(_eachVec[iElm]).vector);
 		
 		gsl_matrix_free(SigSum);
 		gsl_matrix_free(SigPr);
@@ -3740,7 +3732,7 @@ void MVnormBetaFtBlk::update(const Grp &dat, const SigmaI &SigIb, const Grp &muP
 		gsl_blas_dsymv(CblasLower, 1.0, SigSum, tmpV, 0.0, bH);
 		
 		gsl_linalg_cholesky_decomp(SigSum);
-		MVgauss(bH, SigSum, _eachVec[iElm].vector.size, r, &(_eachVec[iElm]).vector);
+		MVgauss(bH, SigSum, r, &(_eachVec[iElm]).vector);
 		
 		gsl_matrix_free(SigSum);
 		gsl_vector_free(tmpV);
@@ -3779,7 +3771,7 @@ void MVnormBetaFtBlk::update(const Grp &dat, const SigmaI &SigIb, const Grp &muP
 		gsl_blas_dsymv(CblasLower, 1.0, SigSum, tmpV, 0.0, bH);
 		
 		gsl_linalg_cholesky_decomp(SigSum);
-		MVgauss(bH, SigSum, _eachVec[iElm].vector.size, r, &(_eachVec[iElm]).vector);
+		MVgauss(bH, SigSum, r, &(_eachVec[iElm]).vector);
 		
 		gsl_matrix_free(SigSum);
 		gsl_matrix_free(SigPr);
@@ -3824,7 +3816,7 @@ void MVnormBetaFtBlk::update(const Grp &dat, const Qgrp &q, const SigmaI &SigIb,
 		gsl_blas_dsymv(CblasLower, 1.0, SigSum, tmpV, 0.0, bH);
 		
 		gsl_linalg_cholesky_decomp(SigSum);
-		MVgauss(bH, SigSum, _eachVec[iElm].vector.size, r, &(_eachVec[iElm]).vector);
+		MVgauss(bH, SigSum, r, &(_eachVec[iElm]).vector);
 		
 		gsl_matrix_free(SigSum);
 		gsl_vector_free(XQ);
@@ -3872,7 +3864,7 @@ void MVnormBetaFtBlk::update(const Grp &dat, const Qgrp &q, const SigmaI &SigIb,
 		gsl_blas_dsymv(CblasLower, 1.0, SigSum, tmpV, 0.0, bH);
 		
 		gsl_linalg_cholesky_decomp(SigSum);
-		MVgauss(bH, SigSum, _eachVec[iElm].vector.size, r, &(_eachVec[iElm]).vector);
+		MVgauss(bH, SigSum, r, &(_eachVec[iElm]).vector);
 		
 		gsl_matrix_free(SigSum);
 		gsl_matrix_free(SigPr);
@@ -4713,7 +4705,7 @@ void Apex::update(const Grp &y, const gsl_matrix *xi, const SigmaI &SigIm){
 		gsl_blas_dsymv(CblasLower, 1.0, SigSum, &Arw.vector, 0.0, tmp);
 		
 		gsl_linalg_cholesky_decomp(SigSum);
-		MVgauss(tmp, SigSum, SigSum->size1, _r, &Arw.vector);
+		MVgauss(tmp, SigSum, _r, &Arw.vector);
 		
 	}
 	
@@ -4760,7 +4752,7 @@ void Apex::update(const Grp &y, const gsl_matrix *xi, const SigmaI &SigIm, const
 		gsl_blas_dsymv(CblasLower, 1.0, SigSum, &Arw.vector, 0.0, tmp);
 		
 		gsl_linalg_cholesky_decomp(SigSum);
-		MVgauss(tmp, SigSum, SigSum->size1, _r, &Arw.vector);
+		MVgauss(tmp, SigSum, _r, &Arw.vector);
 		
 	}
 	
@@ -10321,7 +10313,7 @@ SigmaI::SigmaI(const gsl_matrix *S, const size_t d, const size_t &df, const doub
 	gsl_linalg_cholesky_decomp(tmp);
 	gsl_linalg_cholesky_invert(tmp);
 	gsl_linalg_cholesky_decomp(tmp);
-	Wishart(tmp, d, df, _r, _mat);
+	Wishart(tmp, df, _r, _mat);
 	gsl_matrix_free(tmp);
 	_LamSc = gsl_matrix_alloc(_d, _d);
 	gsl_matrix_set_identity(_LamSc);
@@ -10342,7 +10334,7 @@ SigmaI::SigmaI(const gsl_matrix *S, const size_t d, const size_t &df, const gsl_
 	gsl_linalg_cholesky_decomp(tmp);
 	gsl_linalg_cholesky_invert(tmp);
 	gsl_linalg_cholesky_decomp(tmp);
-	Wishart(tmp, d, df, _r, _mat);
+	Wishart(tmp, df, _r, _mat);
 	gsl_matrix_free(tmp);
 	_LamSc = gsl_matrix_alloc(_d, _d);
 	gsl_matrix_memcpy(_LamSc, LamPr);
@@ -10372,7 +10364,7 @@ SigmaI::SigmaI(const Grp &dat, const double &prDiag, const double &nu0) : _d(dat
 	gsl_linalg_cholesky_invert(S);
 	gsl_linalg_cholesky_decomp(S);
 	
-	Wishart(S, _d, dat.Ndata(), _r, _mat);
+	Wishart(S, dat.Ndata(), _r, _mat);
 	
 	gsl_matrix_free(S);
 }
@@ -10397,7 +10389,7 @@ SigmaI::SigmaI(const Grp &dat, const string &outFlNam, const double &prDiag, con
 	gsl_linalg_cholesky_invert(S);
 	gsl_linalg_cholesky_decomp(S);
 	
-	Wishart(S, _d, dat.Ndata(), _r, _mat);
+	Wishart(S, dat.Ndata(), _r, _mat);
 	
 	gsl_matrix_free(S);
 }
@@ -10453,7 +10445,7 @@ void SigmaI::update(const Grp &dat){
 	gsl_linalg_cholesky_invert(S);
 	gsl_linalg_cholesky_decomp(S);
 	
-	Wishart(S, _d, dat.Ndata() - 1.0 + _n0, _r, _mat);
+	Wishart(S, static_cast<size_t>(dat.Ndata() - 1.0 + _n0), _r, _mat);
 	
 	gsl_matrix_free(S);
 }
@@ -10476,7 +10468,7 @@ void SigmaI::update(const Grp &dat, const Grp &mu){ // have to make sure that da
 	gsl_linalg_cholesky_invert(S);
 	gsl_linalg_cholesky_decomp(S);
 	
-	Wishart(S, _d, dat.Ndata() - 1.0 + _n0, _r, _mat);
+	Wishart(S, static_cast<size_t>(dat.Ndata() - 1.0 + _n0), _r, _mat);
 	
 	gsl_matrix_free(S);
 	gsl_matrix_free(rsd);
@@ -10500,7 +10492,7 @@ void SigmaI::update(const Grp &dat, const Qgrp &q){
 	gsl_linalg_cholesky_invert(S);
 	gsl_linalg_cholesky_decomp(S);
 	
-	Wishart(S, _d, dat.dMat()->size1 - 1.0 + _n0, _r, _mat);
+	Wishart(S, static_cast<size_t>(dat.dMat()->size1 - 1.0 + _n0), _r, _mat);
 	
 	gsl_matrix_free(S);
 	gsl_matrix_free(tmpDat);
@@ -10525,7 +10517,7 @@ void SigmaI::update(const Grp &dat, const Grp &mu, const Qgrp &q){
 	gsl_linalg_cholesky_invert(S);
 	gsl_linalg_cholesky_decomp(S);
 	
-	Wishart(S, _d, dat.Ndata() - 1.0 + _n0, _r, _mat);
+	Wishart(S, static_cast<size_t>(dat.Ndata() - 1.0 + _n0), _r, _mat);
 	
 	gsl_matrix_free(S);
 	gsl_matrix_free(rsd);
@@ -10778,7 +10770,7 @@ SigmaIblk::SigmaIblk(const Grp &dat, const string &blkIndFileNam, const double &
 		gsl_linalg_cholesky_invert(S);
 		gsl_linalg_cholesky_decomp(S);
 		
-		Wishart(S, (_eachBlk[iBlk].matrix).size1, cDat->size1, _r, &_eachBlk[iBlk].matrix);
+		Wishart(S, cDat->size1, _r, &_eachBlk[iBlk].matrix);
 		gsl_matrix_free(S);
 
 	}
@@ -10854,7 +10846,7 @@ SigmaIblk::SigmaIblk(const Grp &dat, const string &blkIndFileNam, const string &
 		gsl_linalg_cholesky_invert(S);
 		gsl_linalg_cholesky_decomp(S);
 		
-		Wishart(S, (_eachBlk[iBlk].matrix).size2, cDat->size1, _r, &_eachBlk[iBlk].matrix);
+		Wishart(S, cDat->size1, _r, &_eachBlk[iBlk].matrix);
 		gsl_matrix_free(S);
 		
 	}
@@ -10876,7 +10868,7 @@ void SigmaIblk::update(const Grp &dat){
 		gsl_linalg_cholesky_invert(S);
 		gsl_linalg_cholesky_decomp(S);
 		
-		Wishart(S, (_eachBlk[iBlk].matrix).size2, dat.dMat()->size1, _r, &_eachBlk[iBlk].matrix);
+		Wishart(S, dat.dMat()->size1, _r, &_eachBlk[iBlk].matrix);
 		gsl_matrix_free(S);
 		
 	}
@@ -10903,7 +10895,7 @@ void SigmaIblk::update(const Grp &dat, const Grp &mu){
 		gsl_linalg_cholesky_invert(S);
 		gsl_linalg_cholesky_decomp(S);
 		
-		Wishart(S, (_eachBlk[iBlk].matrix).size2, rsd->size1, _r, &_eachBlk[iBlk].matrix);
+		Wishart(S, rsd->size1, _r, &_eachBlk[iBlk].matrix);
 		gsl_matrix_free(S);
 		
 	}

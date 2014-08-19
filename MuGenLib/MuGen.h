@@ -6,9 +6,22 @@
 *  Copyright (c) 2012 SEELE. All rights reserved.
 *
 *  Classes for Hierarchical Bayesian quantitative-genetic models.  Using gsl_vector and gsl_matrix as internal storage types.
-*  MVnormMu and MVnormBeta have overloaded update() methods to accomodate MV Student-t  and Gaussian models
+*
 *
 */
+
+/// C++ classes for Hierarchical Bayesian Multi-trait quantitative-genetic models.
+/** \file
+ * \author Anthony Greenberg
+ * \copyright GNU public license
+ * \version 0.9.0
+ * 
+ * MuGen is a library that implements a comprehensive approach to Bayesian inference of multi-trait models for quantitative genetics.  It enables genome-wide association 
+ * studies and genome-enabled prediction, allows for complicated and unbalanced experimental designs, outlier observations, and missing data.  Internal implementation is
+ * multithreaded and uses GNU Scientific Library and BLAS for computation.  These computational details are hidden behind the interface which is designed for users familiar 
+ * with basic C++ programming.
+ *
+ */
 
 #ifndef LIBMUGEN_H
 #define LIBMUGEN_H
@@ -59,18 +72,62 @@ class Qgrp;
 class QgrpPEX;
 class MixP;
 
-/*
-	various distribution functions
-*/
-void MVgauss(const gsl_vector*, const gsl_matrix*, const int, const gsl_rng*, gsl_vector*);
-void Wishart(const gsl_matrix*, const int&, const int&, const gsl_rng*, gsl_matrix*);
-void MVgauss(const gsl_vector*, const gsl_matrix*, const size_t, const gsl_rng*, gsl_vector*);
-void Wishart(const gsl_matrix*, const size_t&, const size_t&, const gsl_rng*, gsl_matrix*);
-size_t rtgeom(const double &, const size_t &, const gsl_rng *);
+/** \defgroup sampFun Various distribution functions
+ *
+ * Sampling functions for distributions not already in GSL
+ *
+ * \warning These are internal functions that are invoked from within classes. Because they need to be as efficient as possible, no range-checking is performed (especially if GSL range checking is turned off at compilation).  They rely on the user to keep track of dimensions.
+ *
+ *
+ * @{
+ */
 
-/*
-	auxiliary functions for the sampler
-*/
+/** \brief Multivariate Gaussian sampling function
+ * 
+ * This function gives a sample from the MV Gaussian distribution with a given mean and covariance matrix
+ *
+ * \param[in] gsl_vector* pointer to a vector of means
+ * \param[in] gsl_matrix* pointer to a matrix with the Cholesky-decomposed covariance matrix
+ * \param[in] gsl_rng* pointer to a pseudo-random number generator (PNG)
+ * \param[out] gsl_vector* pointer to a destination vector for the sample
+ *
+ */
+void MVgauss(const gsl_vector*, const gsl_matrix*, const gsl_rng*, gsl_vector*);
+
+/** \defgroup Overloaded Wishart sampling functions
+ *
+ * These functions give samples from the Wishart distribution, the only difference between them is the type of the degrees of freedom paramter
+ *
+ * \param[in] gsl_matrix* pointer to a matrix with the Cholesky-transformed covariance matrix parameter
+ * \param[in] int/size_t& degrees of freedom parameter
+ * \param[in] gsl_rng* pointer to a PNG
+ * \param[out] gsl_matrix* pointer to a matrix with the sample
+ * 
+ * @{
+ */
+void Wishart(const gsl_matrix*, const int&, const gsl_rng*, gsl_matrix*);
+void Wishart(const gsl_matrix*, const size_t&, const gsl_rng*, gsl_matrix*);
+/** @} */
+
+/** \brief Truncated geometric distribution
+ *
+ * Sampling from the truncated geometric distribution, returning a size_t type index value
+ *
+ * \param[in] double& probability of success
+ * \param[in] size_t& maximum value
+ * \param[in] gsl_rng* pointer to a PNG
+ *
+ */
+size_t rtgeom(const double&, const size_t&, const gsl_rng*);
+/** @} */
+
+/** \defgroup auxFun Auxiliary functions
+ *	 
+ * Various functions that are needed internally
+ *
+ * @{
+ */
+
 void rspRsd(const MVnormMu *rsp, const MVnormMu *ftd, const int &N, const int &d, gsl_matrix *rsd);
 double plsOne(const gsl_matrix *resp, const gsl_vector *pred, const vector<int> &pres, const int &d, const gsl_rng *r);
 void colCenter(gsl_matrix *inplace);
@@ -79,7 +136,7 @@ void colCenter(gsl_matrix *inplace, const double &absLab); // when there are mis
 void colCenter(const gsl_matrix *source, gsl_matrix *res, const double &absLab);
 void printMat(const gsl_matrix *);
 unsigned long long rdtsc();
-
+/** @} */
 
 class MVnorm {
 protected:
