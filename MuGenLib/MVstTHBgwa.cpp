@@ -69,19 +69,21 @@ int main(int argc, char *argv[]){
 	bool MOn = false;
 	bool rOn = false;
 	bool dOn = false;
+	bool aOn = false;
 	
 	// intitialize the flag variables with default values
-	double nuE  = 3.0;
-	double nuG  = 3.0;
-	double nuB  = 3.0;
-	double ldCt = 0.75;
-	int Nbnin   = 10;
-	int Nsamp   = 10;
-	int Nthin   = 1;
-	size_t Nsnp = 10000;
-	double Nmul = 5.0;
-	int nThr    = 4;
-	size_t d    = 10;
+	double nuE   = 3.0;
+	double nuG   = 3.0;
+	double nuB   = 3.0;
+	double ldCt  = 0.75;
+	double prABF = 0.0;
+	int Nbnin    = 10;
+	int Nsamp    = 10;
+	int Nthin    = 1;
+	size_t Nsnp  = 10000;
+	double Nmul  = 5.0;
+	int nThr     = 4;
+	size_t d     = 10;
 	string cNum;
 	bool miss  = false;
 	string model("SM"); // default is single marker; other possibilities: VS == variable selection; RS == rank selection; flag -r controls this
@@ -172,6 +174,10 @@ int main(int argc, char *argv[]){
 						dOn = true;
 						break;
 						
+					case 'a':
+						aOn = true;
+						break;
+						
 					case 'r':
 						rOn  = true;
 						break;
@@ -226,6 +232,11 @@ int main(int argc, char *argv[]){
 					if (dOn) {
 						dOn = false;
 						d   = atoi(pchar);
+					}
+				else
+					if (aOn) {
+						aOn = false;
+						prABF = atof(pchar);
 					}
 				else
 					if (mOn) {
@@ -310,7 +321,6 @@ int main(int argc, char *argv[]){
 		cerr << "ERROR: d = " << d << " is greater than 10." << endl;
 		exit(-1);
 	}
-	
 	vector<string> addOn;
 	addOn.push_back(db2str(nuE));
 	addOn.push_back(db2str(nuG));
@@ -320,6 +330,14 @@ int main(int argc, char *argv[]){
 		addOn.push_back(missF);
 	}
 	addOn.push_back(model);
+	if (model == "SM") {
+		if (prABF) {
+			addOn.push_back("BF");
+		}
+		else {
+			addOn.push_back("P");
+		}
+	}
 	addOn.push_back(cNum);
 	
 	finishFlNam(LNout, addOn);
@@ -347,7 +365,6 @@ int main(int argc, char *argv[]){
 	RanIndex gm2pr = RanIndex(Npc);
 	RanIndex mu2pr = RanIndex();
 	
-	
 	Grp *datI;
 	if (miss) {
 		datI = new MuGrpMiss(dfNam, mMatFnam, mVecFnam, e2rp, d);
@@ -364,8 +381,14 @@ int main(int argc, char *argv[]){
 	MuGrp datDevI = dat - muRep;
 	Grp &datDev   = datDevI;
 	
-	BetaGrpPCpex gammaI(muRep, string("MESAevec.gbin"), string("MESAeval.gbin"), Npc, 1e-6, rp2ln, gm2pr, nThr);
-	Grp &gamma = gammaI;
+	Grp *gammaI;
+	if (nuG <= 10.0) {
+		gammaI = new BetaGrpPC(muRep, string("MESAevec.gbin"), string("MESAeval.gbin"), Npc, rp2ln, gm2pr, nThr);
+	}
+	else {
+		gammaI = new BetaGrpPCpex(muRep, string("MESAevec.gbin"), string("MESAeval.gbin"), Npc, 1e-6, rp2ln, gm2pr, nThr);
+	}
+	Grp &gamma = *gammaI;
 	
 	MuGrp muRspI = muRep - gamma;
 	Grp &muRsp   = muRspI;
@@ -498,7 +521,7 @@ int main(int argc, char *argv[]){
 			snpBetI = new BetaGrpFt(repDev, SigIrep, snpIn, Nsnp, Nmul, ldCt, rp2ln, snp2pr, betOut, nThr);
 		}
 	else {
-		snpBetI = new BetaGrpSnp(snpIn, betOut, rp2ln, Nsnp, d, nThr);
+		snpBetI = new BetaGrpSnp(snpIn, betOut, rp2ln, Nsnp, d, nThr, prABF); // if prABF is 0.0, it will output p-values
 	}
 	
 	Grp &snpBet = *snpBetI;
@@ -771,5 +794,8 @@ int main(int argc, char *argv[]){
 	}
 	
 	delete snpBetI;
+	delete datI;
+	delete gammaI;
+	
 	
 }
