@@ -55,35 +55,37 @@ void ldTest(const gsl_vector *mySNP, const int &myCHR, const int &myPOS, const d
 int main(int argc, char *argv[]){
 	bool sOn = false;
 	bool dOn = false;
+	bool DOn = false;
+	bool mOn = false;
 	bool cOn = false;
 	bool tOn = false;
 	bool nOn = false;
 	bool TOn = false; // transpose flag
 	
-	const size_t d    = 11;
 	const size_t Nln  = 750;
 	const size_t Ntru = 500;
 	const size_t Nsnp = 669958;
-	const int Dist    = 1e6;    // max distance to between SNPs that still allows them to be "linked"
+	const int Dist    = 1e6;    // max distance between SNPs that still allows them to be "linked"
 	const size_t Nts  = 100;    // total number of simulations
 	
 	string snpFlNam("MESAsnp.gbin");
-	vector<string>truSnpFlNam(d);
 	string chromIDflNam("MESAchromID.gbin");
 	string chrPosflNam("MESAposition.gbin");
 	string numTrSnpFlNam("numTrueSNP.gbin");
 	string betFlNam("betSNP");
 	string betDirNam;
 	string hitsDirNam;
-	vector<string> hitsFlNam(d);
 	
 	string simNum;
 	int simID;
 	
+	size_t d       = 11;
 	int Ntst       = 2000;
 	int Nthr       = 4;
 	double LDctOff = 0.05;
-	bool trans     = false; // transpose = false means Nsnp x d beta file; otherwise d x Nsnp, as in simple regression output
+	double LDall   = 0.20;
+	size_t multi   = 0;      // is the last trait a multi-trait statistic? (yes == 1)
+	bool trans     = false;  // transpose = false means Nsnp x d beta file; otherwise d x Nsnp, as in simple regression output
 	
 	for (int iArg = 1; iArg < argc; iArg++) {
 		char *pchar = argv[iArg];
@@ -116,8 +118,17 @@ int main(int argc, char *argv[]){
 						dOn = true;
 						break;
 						
+					case 'D':
+						DOn = true;
+						break;
+						
+					case 'm':
+						mOn = true;
+						multi = 1;
+						break;
+						
 					case 'T':
-						dOn = true;
+						TOn = true;
 						break;
 						
 					case 'c':
@@ -126,7 +137,7 @@ int main(int argc, char *argv[]){
 						
 					case 'h':
 						cerr << "usage:\n"
-						<< "makeROC [-n hit_or_miss_SNP_number] [-s simulation_number] [-d directory_with_SNP_scores] [-c LD_cutoff] [-t n_threads] [-T transpose?]" << endl;
+						<< "makeROC [-n hit_or_miss_SNP_number] [-s simulation_number] [-D directory_with_SNP_scores] [-d trait_number] [-m multi-trait test LD cut-off] [-c LD_cutoff] [-t n_threads] [-T transpose?]" << endl;
 						exit(-1);
 					default:
 						cerr << "ERROR: inrecognized flag " << pchar[1] << endl;
@@ -156,22 +167,47 @@ int main(int argc, char *argv[]){
 							LDctOff = atof(pchar);
 						}
 					else
+						if (mOn) {
+							mOn = false;
+							LDall = atof(pchar);
+						}
+					else
 						if (sOn) {
 							sOn = false;
 							simNum = pchar;
 							simID  = atoi(pchar);
 						}
+					else
+						if (dOn) {
+							dOn = false;
+							d = static_cast<size_t>(atoi(pchar));
+						}
 					else {
-						dOn = false;
+						DOn = false;
 						betDirNam = pchar;
+						cout << "dir name: " << betDirNam << endl;
 					}
 			}
 				break;
 		}
 	}
-	hitsDirNam = "hits" + betDirNam.substr(3);
+	vector<double> LDctVec(d, LDctOff);
+	if (multi) {
+		LDctVec[d-1] = LDall;
+	}
+	vector<string>truSnpFlNam(d);
+	vector<string> hitsFlNam(d);
+	hitsDirNam = "hits" + betDirNam.substr(3);  // adding everything from betDirNam but the first three letters (i.e., "bet")
+	if (d < 1) {
+		cerr << "ERROR: number of traits " << d << " is invalid" << endl;
+		exit(-1);
+	}
+	if ((d == 1) && multi) {
+		cerr << "ERROR: cannot have the only trait be multi-trait" << endl;
+		exit(-1);
+	}
 	
-	for (size_t iPhn = 0; iPhn < d - 1; iPhn++) {
+	for (size_t iPhn = 0; iPhn < d - multi; iPhn++) {
 		stringstream phnStrm;
 		phnStrm << iPhn + 1;
 		truSnpFlNam[iPhn] = "SNPtrueID/SNPtrue" + simNum + "_" + phnStrm.str() + ".gbin";
@@ -179,9 +215,11 @@ int main(int argc, char *argv[]){
 		remove(hitsFlNam[iPhn].c_str());
 		phnStrm << flush;
 	}
-	truSnpFlNam[d -1] = "SNPtrueID/SNPtrue" + simNum + ".gbin";
-	hitsFlNam[d - 1]   = hitsDirNam + "/hits" + simNum + ".tsv";
-	remove(hitsFlNam[d-1].c_str());
+	if (multi) {
+		truSnpFlNam[d - 1] = "SNPtrueID/SNPtrue" + simNum + ".gbin";
+		hitsFlNam[d - 1]   = hitsDirNam + "/hits" + simNum + ".tsv";
+		remove(hitsFlNam[d - 1].c_str());
+	}
 	
 	gsl_matrix *snpScore;
 	gsl_matrix *curChnVl;
@@ -218,7 +256,9 @@ int main(int argc, char *argv[]){
 	}
 	cout << "# of chains found: " << chnNum << endl;
 	gsl_matrix_free(curChnVl);
-	gsl_matrix_scale(snpScore, 1.0/chnNum);
+	if (chnNum > 1.0) {
+		gsl_matrix_scale(snpScore, 1.0/chnNum);
+	}
 	
 	cout << "Opening SNP file..." << endl;
 	gsl_matrix *snp = gsl_matrix_alloc(Nln, Nsnp);
@@ -240,13 +280,13 @@ int main(int argc, char *argv[]){
 	FILE *trNMin = fopen(numTrSnpFlNam.c_str(), "r");
 	gsl_vector_int_fread(trNMin, nTr);
 	fclose(trNMin);
-	const size_t NtruAll = gsl_vector_int_get(nTr, simID - 1); // that's the total number of true SNPs for all phenotypes
+	const size_t NtruAll = gsl_vector_int_get(nTr, simID - 1); // that's the total number of true SNPs for all traits
 	gsl_vector_int_free(nTr);
 	
 	cout << "Populating true position list..." << endl;
 	vector< vector<size_t> > trueX(d);
 	gsl_vector_int *curTruX = gsl_vector_int_alloc(Ntru);
-	for (size_t iPhn = 0; iPhn < d - 1; iPhn++) {
+	for (size_t iPhn = 0; iPhn < d - multi; iPhn++) {
 		FILE *trIn = fopen(truSnpFlNam[iPhn].c_str(), "r");
 		gsl_vector_int_fread(trIn, curTruX);
 		fclose(trIn);
@@ -257,19 +297,21 @@ int main(int argc, char *argv[]){
 	}
 	gsl_vector_int_free(curTruX);
 	
-	// Now the "all-phenotype" true positions
-	gsl_vector_int *allTruX = gsl_vector_int_alloc(NtruAll);
-	FILE *allTrIn = fopen(truSnpFlNam[d-1].c_str(), "r");
-	gsl_vector_int_fread(allTrIn, allTruX);
-	fclose(allTrIn);
-	for (size_t iTr = 0; iTr < allTruX->size; iTr++) {
-		trueX[d-1].push_back(gsl_vector_int_get(allTruX, iTr));
+	// Now the "all-trait" true positions
+	if (multi) {
+		gsl_vector_int *allTruX = gsl_vector_int_alloc(NtruAll);
+		FILE *allTrIn = fopen(truSnpFlNam[d-1].c_str(), "r");
+		gsl_vector_int_fread(allTrIn, allTruX);
+		fclose(allTrIn);
+		for (size_t iTr = 0; iTr < allTruX->size; iTr++) {
+			trueX[d-1].push_back(gsl_vector_int_get(allTruX, iTr));
+		}
+		gsl_vector_int_free(allTruX);
 	}
-	gsl_vector_int_free(allTruX);
 	
 	vector<int> tossLD(d); // store here the number of SNPs eliminated b/c of LD
 	
-	cout << "Starting the processing by phenotype..." << endl;
+	cout << "Starting the processing by trait..." << endl;
 #pragma omp parallel for num_threads(Nthr)
 	for (size_t phI = 0; phI < d; phI++) {
 		
