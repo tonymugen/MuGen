@@ -36,22 +36,6 @@ using std::list;
 using std::vector;
 using std::advance;
 
-void ldTest(const gsl_vector *mySNP, const int &myCHR, const int &myPOS, const double &ldCt, const int &dist, const vector<gsl_vector *> &tstSNP, const vector<int> &tstCHR, const vector<int> &tstPOS, size_t &disc);
-
-void ldTest(const gsl_vector *mySNP, const int &myCHR, const int &myPOS, const double &ldCt, const int &dist, const vector<gsl_vector *> &tstSNP, const vector<int> &tstCHR, const vector<int> &tstPOS, size_t &disc){
-	for (size_t iFP = 0; iFP < tstSNP.size(); iFP++) {
-		if ( (myCHR == tstCHR[iFP]) && (abs(myPOS - tstPOS[iFP]) > dist) ) {  // only need to test for LD if the choromosome and distance are right
-			double rSq = gsl_pow_2(gsl_stats_correlation(mySNP->data, 1, (tstSNP[iFP])->data, 1, mySNP->size));
-			if (rSq >= ldCt) {
-				disc++;
-				break;
-			}
-		}
-		
-	}
-
-}
-
 int main(int argc, char *argv[]){
 	bool sOn = false;
 	bool dOn = false;
@@ -63,15 +47,16 @@ int main(int argc, char *argv[]){
 	bool TOn = false; // transpose flag
 	
 	const size_t Nln  = 750;
-	const size_t Ntru = 500;
 	const size_t Nsnp = 669958;
-	const int Dist    = 1e6;    // max distance between SNPs that still allows them to be "linked"
+	const int Dist    = 1e7;    // max distance between SNPs that still allows them to be "linked"
 	const size_t Nts  = 100;    // total number of simulations
+	const double LDct = 0.04;   // for testing LD to discard SNPs; the other cut-offs are for testing for positives
 	
 	string snpFlNam("MESAsnp.gbin");
 	string chromIDflNam("MESAchromID.gbin");
 	string chrPosflNam("MESAposition.gbin");
 	string numTrSnpFlNam("numTrueSNP.gbin");
+	string numEaSnpFlNam("numTrueSNPeach.gbin");
 	string betFlNam("betSNP");
 	string betDirNam;
 	string hitsDirNam;
@@ -195,8 +180,9 @@ int main(int argc, char *argv[]){
 	if (multi) {
 		LDctVec[d-1] = LDall;
 	}
-	vector<string>truSnpFlNam(d);
+	vector<string> truSnpFlNam(d);
 	vector<string> hitsFlNam(d);
+	vector<string> truesFlNam(d);  // will dump the ID of the true SNP found
 	hitsDirNam = "hits" + betDirNam.substr(3);  // adding everything from betDirNam but the first three letters (i.e., "bet")
 	if (d < 1) {
 		cerr << "ERROR: number of traits " << d << " is invalid" << endl;
@@ -213,12 +199,16 @@ int main(int argc, char *argv[]){
 		truSnpFlNam[iPhn] = "SNPtrueID/SNPtrue" + simNum + "_" + phnStrm.str() + ".gbin";
 		hitsFlNam[iPhn]   = hitsDirNam + "/hits" + simNum + "_" + phnStrm.str() + ".tsv";
 		remove(hitsFlNam[iPhn].c_str());
+		truesFlNam[iPhn] = hitsDirNam + "/trueID" + simNum + "_" + phnStrm.str() + ".tsv";
+		remove(truesFlNam[iPhn].c_str());
 		phnStrm << flush;
 	}
 	if (multi) {
 		truSnpFlNam[d - 1] = "SNPtrueID/SNPtrue" + simNum + ".gbin";
 		hitsFlNam[d - 1]   = hitsDirNam + "/hits" + simNum + ".tsv";
 		remove(hitsFlNam[d - 1].c_str());
+		truesFlNam[d - 1]   = hitsDirNam + "/trueID" + simNum + ".tsv";
+		remove(truesFlNam[d - 1].c_str());
 	}
 	
 	gsl_matrix *snpScore;
@@ -283,10 +273,16 @@ int main(int argc, char *argv[]){
 	const size_t NtruAll = gsl_vector_int_get(nTr, simID - 1); // that's the total number of true SNPs for all traits
 	gsl_vector_int_free(nTr);
 	
+	gsl_matrix_int *nTrEa = gsl_matrix_int_alloc(100, 10);  // master file, so always 100 sims by 10 traits
+	FILE *eaNMin = fopen(numEaSnpFlNam.c_str(), "r");
+	gsl_matrix_int_fread(eaNMin, nTrEa);
+	fclose(eaNMin);
+	
+	
 	cout << "Populating true position list..." << endl;
 	vector< vector<size_t> > trueX(d);
-	gsl_vector_int *curTruX = gsl_vector_int_alloc(Ntru);
 	for (size_t iPhn = 0; iPhn < d - multi; iPhn++) {
+		gsl_vector_int *curTruX = gsl_vector_int_alloc(gsl_matrix_int_get(nTrEa, simID - 1, iPhn)); // not all true vectors are of the same length
 		FILE *trIn = fopen(truSnpFlNam[iPhn].c_str(), "r");
 		gsl_vector_int_fread(trIn, curTruX);
 		fclose(trIn);
@@ -294,8 +290,10 @@ int main(int argc, char *argv[]){
 		for (size_t iTr = 0; iTr < curTruX->size; iTr++) {
 			trueX[iPhn].push_back(gsl_vector_int_get(curTruX, iTr));
 		}
+		
+		gsl_vector_int_free(curTruX);
 	}
-	gsl_vector_int_free(curTruX);
+	gsl_matrix_int_free(nTrEa);
 	
 	// Now the "all-trait" true positions
 	if (multi) {
@@ -316,6 +314,7 @@ int main(int argc, char *argv[]){
 	for (size_t phI = 0; phI < d; phI++) {
 		
 		vector<size_t> hits;
+		vector<size_t> trueIDs;
 		gsl_vector *betRow = gsl_vector_alloc(Nsnp); // it's a row in the SNP table, but could be a column in the score file
 		if (trans) {
 			gsl_matrix_get_row(betRow, snpScore, phI);
@@ -353,32 +352,76 @@ int main(int argc, char *argv[]){
 		while ((hits.size() < Ntst) && (edge < betRow->size) && (trSNPid.size())) { // either we get the number of data points we need, run out of candidate SNPs, or run out of true SNPs
 			list<size_t>::iterator curCand = candidates.begin();
 			gsl_matrix_get_col(curSNP, snp, *curCand);
-			size_t nDiscard = 0;
 			
 			// figure out the LD of the current top SNP with the true ones, then sort that
 			vector<double> crRsq;
 			gsl_vector *tmpX = gsl_vector_alloc(Nln);
-			for (vector<size_t>::iterator truIt = trSNPid.begin(); truIt != trSNPid.end(); ++truIt) {
-				gsl_matrix_get_col(tmpX, snp, *truIt);
-				crRsq.push_back(gsl_pow_2(gsl_stats_correlation(curSNP->data, 1, tmpX->data, 1, Nln)));
+			for (size_t trI = 0; trI < trSNPid.size(); trI++) {
+				// only the SNPs meeting closeness and same-chromosome criteria are assigned a non-0 rSq
+				if ( (gsl_vector_int_get(chrID, *curCand) != trCHR[trI]) && abs(gsl_vector_int_get(chrPos, *curCand) - trPOS[trI]) > Dist ) {
+					crRsq.push_back(0.0);
+				}
+				else {
+					gsl_matrix_get_col(tmpX, snp, trSNPid[trI]);
+					crRsq.push_back(gsl_pow_2(gsl_stats_correlation(curSNP->data, 1, tmpX->data, 1, Nln)));
+				}
 			}
 			gsl_vector_free(tmpX);
 			
 			vector<size_t> crRsqSortInd(crRsq.size());
 			gsl_sort_index(crRsqSortInd.data(), crRsq.data(), 1, crRsq.size());
 			
-			if (crRsq[crRsqSortInd.back()] < LDctOff) { // max LD does not meet cut-off: false positive; sort is in INCREASING order, so going backwards
+			if (crRsq[crRsqSortInd.back()] < LDctVec[phI]) { // max LD does not meet cut-off: false positive; sort is in INCREASING order, so going backwards
 				// see if it's in LD with some that are already on the FP list
 				if (fpSNP.size()) {
-					ldTest(curSNP, gsl_vector_int_get(chrID, *curCand), gsl_vector_int_get(chrPos, *curCand), LDctOff, Dist, fpSNP, fpCHR, fpPOS, nDiscard);
-				}
-				
-				if (nDiscard) {  // tossing it if it's in LD with an already IDed FP (don't want to count those multiple times)
-					curCand = candidates.erase(curCand);
-					candidates.push_back(gsl_permutation_get(snpRank, edge)); // just appending the extra candidate to the end.  No need to check if it's in LD with any exsting FP, since it still might be a hit, and if not that LD will be checked
-					edge++;
-					tossLD[phI]++;
-					continue;
+					int nDrp = 0;
+					size_t fpID = 0;
+					for (size_t iFP = 0; iFP < fpSNP.size(); iFP++) {
+						if ( (gsl_vector_int_get(chrID, *curCand) == fpCHR[iFP]) && (abs(gsl_vector_int_get(chrPos, *curCand) - fpPOS[iFP]) <= Dist) ) {  // only need to test for LD if the choromosome and distance are right
+							double rSq = gsl_pow_2(gsl_stats_correlation(curSNP->data, 1, (fpSNP[iFP])->data, 1, Nln));
+							if (rSq >= LDct) {
+								curCand = candidates.erase(curCand);
+								nDrp++;
+								fpID = iFP;
+								break;
+							}
+						}
+						
+					}
+					if (nDrp) {
+						while (nDrp) {
+							size_t ind = gsl_permutation_get(snpRank, edge);
+							gsl_vector *tstX = gsl_vector_alloc(Nln);
+							gsl_matrix_get_col(tstX, snp, ind);
+							if (gsl_pow_2(gsl_stats_correlation(curSNP->data, 1, tstX->data, 1, Nln)) >= LDct) { // make sure the new one is not in LD with the current positive
+								edge++;
+							}
+							else if (gsl_pow_2(gsl_stats_correlation((fpSNP[fpID])->data, 1, tstX->data, 1, Nln)) >= LDct){ // make sure the new one is not in LD with the current false positive
+								edge++;
+							}
+							else {
+								candidates.push_back(ind);
+								edge++;
+								nDrp--;
+							}
+							gsl_vector_free(tstX);
+						}
+						
+					}
+					else {
+						hits.push_back(0);
+						
+						size_t crSz = fpSNP.size() + 1;
+						fpSNP.resize(crSz);
+						fpSNP[crSz - 1] = gsl_vector_alloc(Nln);
+						gsl_vector_memcpy(fpSNP[crSz - 1], curSNP);
+						fpCHR.push_back(gsl_vector_int_get(chrID, *curCand));
+						fpPOS.push_back(gsl_vector_int_get(chrPos, *curCand));
+						
+						curCand = candidates.erase(curCand);
+						
+						continue;
+					}
 				}
 				else {
 					hits.push_back(0);
@@ -397,142 +440,70 @@ int main(int argc, char *argv[]){
 				
 			}
 			else { // in LD with at least one true SNP
-				if ( (gsl_vector_int_get(chrID, *curCand) == trCHR[crRsqSortInd.back()]) && (abs(gsl_vector_int_get(chrPos, *curCand) - trPOS[crRsqSortInd.back()]) <= Dist) ) { // both on the same chromosome and close enough: true positive (hit)
-					hits.push_back(*curCand);
-					
-					gsl_matrix_get_col(curSNP, snp, crRsqSortInd.back()); // switch over the curSNP to the true SNP to be tested for LD with other candidates
-					int curCHRid = trCHR[crRsqSortInd.back()];
-					int curPOSid = trPOS[crRsqSortInd.back()];
-					
-					int nDrp = 0;
-					gsl_vector *tstX = gsl_vector_alloc(Nln);
-					
-					curCand = candidates.erase(curCand); // erase the current, test the rest
-					while (curCand != candidates.end()) {
-						if ( (curCHRid == gsl_vector_int_get(chrID, *curCand)) && (abs(curPOSid - gsl_vector_int_get(chrPos, *curCand)) <= Dist) ) {
-							gsl_matrix_get_col(tstX, snp, *curCand);
-							double rSq = gsl_pow_2(gsl_stats_correlation(curSNP->data, 1, tstX->data, 1, Nln));
-							if (rSq >= LDctOff) {
-								curCand = candidates.erase(curCand);
-								nDrp++;
-							}
-							else {
-								curCand++;
-							}
+				hits.push_back((*curCand) + 1); // make base-1 for R
+				trueIDs.push_back(trSNPid[crRsqSortInd.back()] + 1);
+				
+				gsl_vector *crTrSNP = gsl_vector_alloc(Nln);  // the true SNP to be tested for LD with other candidates
+				gsl_matrix_get_col(crTrSNP, snp, crRsqSortInd.back());
+				int crTrCHRid = trCHR[crRsqSortInd.back()];
+				int crTrPOSid = trPOS[crRsqSortInd.back()];
+				int curCHRid  = gsl_vector_int_get(chrID, *curCand);
+				int curPOSid  = gsl_vector_int_get(chrPos, *curCand);
+				
+				int nDrp = 0;
+				gsl_vector *tstX = gsl_vector_alloc(Nln);
+				
+				curCand = candidates.erase(curCand); // erase the current, test the rest
+				while (curCand != candidates.end()) {
+					if ( (curCHRid == gsl_vector_int_get(chrID, *curCand)) && (abs(curPOSid - gsl_vector_int_get(chrPos, *curCand)) <= Dist) ) { // test for LD of the current positive with other candidates
+						gsl_matrix_get_col(tstX, snp, *curCand);
+						double rSq = gsl_pow_2(gsl_stats_correlation(curSNP->data, 1, tstX->data, 1, Nln));
+						if (rSq >= LDct) {
+							tossLD[phI]++;
+							curCand = candidates.erase(curCand);
+							nDrp++;
 						}
 						else {
 							curCand++;
 						}
 					}
-					while (nDrp) {
-						size_t ind = gsl_permutation_get(snpRank, edge);
-						gsl_matrix_get_col(tstX, snp, ind);
-						if (gsl_pow_2(gsl_stats_correlation(curSNP->data, 1, tstX->data, 1, Nln)) >= LDctOff) { // make sure the new one is not in LD with the current
-							edge++;
-						}
-						else {
-							candidates.push_back(ind);
-							edge++;
-							nDrp--;
-						}
-						
-					}
-					gsl_vector_free(tstX);
-					trSNPid.erase(trSNPid.begin() + crRsqSortInd.back()); // erase the hit from the vector of trues so that it can't be hit more than once; base-0 counts in crRsqSortInd, so no need to subtract 1
-					trCHR.erase(trCHR.begin() + crRsqSortInd.back());
-					trPOS.erase(trPOS.begin() + crRsqSortInd.back());
-					continue;
-				}
-				else {  // if high enough LD, but location wrong, look to see if lesser LD guys meet the criteria
-					bool isFP = true;
-					vector<size_t>::reverse_iterator ldIt = crRsqSortInd.rbegin(); // stepping backwards from the end
-					ldIt++;
-					for (; ldIt != crRsqSortInd.rend(); ++ldIt) {
-						if (crRsq[*ldIt] < LDctOff) {
-							break;
-						}
-						else {
-							if ( (gsl_vector_int_get(chrID, *curCand) == trCHR[*ldIt]) && (abs(gsl_vector_int_get(chrPos, *curCand) - trPOS[*ldIt]) <= Dist) ) { // found a hit
-								isFP = false;
-								hits.push_back(*curCand);
-								
-								gsl_matrix_get_col(curSNP, snp, *ldIt); // switch over the curSNP to the true SNP to be tested for LD with other candidates
-								int curCHRid = trCHR[*ldIt];
-								int curPOSid = trPOS[*ldIt];
-								
-								int nDrp = 0;
-								gsl_vector *tstX = gsl_vector_alloc(Nln);
-								
-								curCand = candidates.erase(curCand);  // erase the current, test the rest
-								while (curCand != candidates.end()) {
-									if ( (curCHRid == gsl_vector_int_get(chrID, *curCand)) && (abs(curPOSid - gsl_vector_int_get(chrPos, *curCand)) <= Dist) ) {
-										gsl_matrix_get_col(tstX, snp, *curCand);
-										double rSq = gsl_pow_2(gsl_stats_correlation(curSNP->data, 1, tstX->data, 1, Nln));
-										if (rSq >= LDctOff) {
-											curCand = candidates.erase(curCand);
-											nDrp++;
-										}
-										else {
-											curCand++;
-										}
-									}
-									else {
-										curCand++;
-									}
-								}
-								while (nDrp) {
-									size_t ind = gsl_permutation_get(snpRank, edge);
-									gsl_matrix_get_col(tstX, snp, ind);
-									if (gsl_pow_2(gsl_stats_correlation(curSNP->data, 1, tstX->data, 1, Nln)) >= LDctOff) { // make sure the new one is not in LD with the current
-										edge++;
-									}
-									else {
-										candidates.push_back(ind);
-										edge++;
-										nDrp--;
-									}
-									
-								}
-								gsl_vector_free(tstX);
-								trSNPid.erase(trSNPid.begin() + (*ldIt)); // erase the hit from the vector of trues so that it can't be hit more than once; *ldIt has base-0 positions, so no need to subtract 1
-								trCHR.erase(trCHR.begin() + (*ldIt));
-								trPOS.erase(trPOS.begin() + (*ldIt));
-								break;
-							}
-							else {
-								continue;
-							}
-						}
-					}
-					if (isFP) {
-						if (fpSNP.size()) {
-							ldTest(curSNP, gsl_vector_int_get(chrID, *curCand), gsl_vector_int_get(chrPos, *curCand), LDctOff, Dist, fpSNP, fpCHR, fpPOS, nDiscard);
-						}
-						
-						if (nDiscard) {  // tossing it if it's in LD with an already IDed FP (don't want to count those multiple times)
-							curCand = candidates.erase(curCand);
-							candidates.push_back(gsl_permutation_get(snpRank, edge)); // just appending the extra candidate to the end.  No need to check if it's in LD with any exsting FP, since it still might be a hit, and if not that LD will be checked
-							edge++;
+					else if ( (crTrCHRid == gsl_vector_int_get(chrID, *curCand)) && (abs(crTrPOSid - gsl_vector_int_get(chrPos, *curCand)) <= Dist) ){ // test for LD of the current true with other candidates
+						gsl_matrix_get_col(tstX, snp, *curCand);
+						double rSq = gsl_pow_2(gsl_stats_correlation(crTrSNP->data, 1, tstX->data, 1, Nln));
+						if (rSq >= LDct) {
 							tossLD[phI]++;
-							continue;
+							curCand = candidates.erase(curCand);
+							nDrp++;
 						}
 						else {
-							hits.push_back(0);
-							
-							size_t crSz = fpSNP.size() + 1;
-							fpSNP.resize(crSz);
-							fpSNP[crSz - 1] = gsl_vector_alloc(Nln);
-							gsl_vector_memcpy(fpSNP[crSz - 1], curSNP);
-							fpCHR.push_back(gsl_vector_int_get(chrID, *curCand));
-							fpPOS.push_back(gsl_vector_int_get(chrPos, *curCand));
-							
-							curCand = candidates.erase(curCand);
-							
-							continue;
+							curCand++;
 						}
-
+					}
+					else {
+						curCand++;
 					}
 				}
+				while (nDrp) {
+					size_t ind = gsl_permutation_get(snpRank, edge);
+					gsl_matrix_get_col(tstX, snp, ind);
+					if (gsl_pow_2(gsl_stats_correlation(curSNP->data, 1, tstX->data, 1, Nln)) >= LDct) { // make sure the new one is not in LD with the current positive
+						edge++;
+					}
+					else if (gsl_pow_2(gsl_stats_correlation(crTrSNP->data, 1, tstX->data, 1, Nln)) >= LDct){ // make sure the new one is not in LD with the current true
+						edge++;
+					}
+					else {
+						candidates.push_back(ind);
+						edge++;
+						nDrp--;
+					}
+					
+				}
+				gsl_vector_free(crTrSNP);
+				gsl_vector_free(tstX);
+				trSNPid.erase(trSNPid.begin() + crRsqSortInd.back()); // erase the hit from the vector of trues so that it can't be hit more than once; base-0 counts in crRsqSortInd, so no need to subtract 1
+				trCHR.erase(trCHR.begin() + crRsqSortInd.back());
+				trPOS.erase(trPOS.begin() + crRsqSortInd.back());
 			}
 		}
 		
@@ -543,6 +514,14 @@ int main(int argc, char *argv[]){
 		
 		outHits << endl;
 		outHits.close();
+		
+		ofstream outMtrues(truesFlNam[phI].c_str());
+		for (vector<size_t>::iterator hI = trueIDs.begin(); hI != trueIDs.end(); ++hI) {
+			outMtrues << *hI << " " << flush;
+		}
+		
+		outMtrues << endl;
+		outMtrues.close();
 		
 		gsl_permutation_free(snpRank);
 		gsl_vector_free(betRow);
