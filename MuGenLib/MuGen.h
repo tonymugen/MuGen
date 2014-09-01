@@ -127,7 +127,7 @@ size_t rtgeom(const double&, const size_t&, const gsl_rng*);
  *
  * @{
  */
-
+double mhl(const gsl_vector *beta, const gsl_matrix *SigI);
 void rspRsd(const MVnormMu *rsp, const MVnormMu *ftd, const int &N, const int &d, gsl_matrix *rsd);
 double plsOne(const gsl_matrix *resp, const gsl_vector *pred, const vector<int> &pres, const int &d, const gsl_rng *r);
 void colCenter(gsl_matrix *inplace);
@@ -1024,11 +1024,11 @@ protected:
 	gsl_matrix *_fakeFmat; // is all 0, in case someone uses this class in an addition/subtraction operator
 	
 	gsl_matrix *_Ystore;   // storing the values for predictor until the end, when the mean is used for the SNP regression
-	gsl_matrix *_SIstore;  // the same for the inv-Sig matrix
 	
 	size_t _Npred;
 	int _nThr;
 	double _numSaves;
+	double _priorVar;  // W in Wakefield's (2007) ABF paper
 	
 	string _inPredFl;
 	
@@ -1036,6 +1036,8 @@ public:
 	BetaGrpSnp();
 	BetaGrpSnp(const string &predFlNam, const string &outFlNam, const size_t &Ndat, const size_t &Npred, const size_t &d, const int &Nthr);
 	BetaGrpSnp(const string &predFlNam, const string &outFlNam, RanIndex &low, const size_t &Npred, const size_t &d, const int &Nthr);
+	BetaGrpSnp(const string &predFlNam, const string &outFlNam, const size_t &Ndat, const size_t &Npred, const size_t &d, const int &Nthr, const double &prVar);
+	BetaGrpSnp(const string &predFlNam, const string &outFlNam, RanIndex &low, const size_t &Npred, const size_t &d, const int &Nthr, const double &prVar);
 	
 	~BetaGrpSnp();
 	
@@ -1055,12 +1057,12 @@ protected:
 	gsl_matrix *_fakeFmat;
 	
 	gsl_matrix *_Ystore;   // storing the values for predictor until the end, when the mean is used for the SNP regression
-	gsl_matrix *_SIstore;  // the same for the inv-Sig matrix
 	
 	size_t _Npred;
 	int _nThr;
 	double _numSaves;
 	double _absLab;
+	double _priorVar;  // W in Wakefield's (2007) ABF paper
 	
 	string _inPredFl;
 	
@@ -1068,6 +1070,8 @@ public:
 	BetaGrpSnpMiss();
 	BetaGrpSnpMiss(const string &predFlNam, const string &outFlNam, const size_t &Ndat, const size_t &Npred, const size_t &d, const int &Nthr, const double &absLab);
 	BetaGrpSnpMiss(const string &predFlNam, const string &outFlNam, RanIndex &low, const size_t &Npred, const size_t &d, const int &Nthr, const double &absLab);
+	BetaGrpSnpMiss(const string &predFlNam, const string &outFlNam, const size_t &Ndat, const size_t &Npred, const size_t &d, const int &Nthr, const double &prVar, const double &absLab);
+	BetaGrpSnpMiss(const string &predFlNam, const string &outFlNam, RanIndex &low, const size_t &Npred, const size_t &d, const int &Nthr, const double &prVar, const double &absLab);
 	
 	~BetaGrpSnpMiss();
 	

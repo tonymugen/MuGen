@@ -59,6 +59,9 @@ void Wishart(const gsl_matrix *SigC, const int &df, const gsl_rng *r, gsl_matrix
 	gsl_matrix *tmp = gsl_matrix_calloc(SigC->size1, SigC->size2);
 	for (size_t rwI = 0; rwI < SigC->size1; rwI++){
 		gsl_matrix_set(tmp, rwI, rwI, sqrt(gsl_ran_chisq(r, df - rwI)));
+		if (rwI == 0) {
+			continue;
+		}
 		for (size_t clI = 0; clI < rwI - 1; clI++){
 			gsl_matrix_set(tmp, rwI, clI, gsl_ran_gaussian_ziggurat(r, 1.0));
 		}
@@ -73,6 +76,9 @@ void Wishart(const gsl_matrix *SigC, const size_t &df, const gsl_rng *r, gsl_mat
 	gsl_matrix *tmp = gsl_matrix_calloc(SigC->size1, SigC->size2);
 	for (size_t rwI = 0; rwI < SigC->size1; rwI++){
 		gsl_matrix_set(tmp, rwI, rwI, sqrt(gsl_ran_chisq(r, df - rwI)));
+		if (rwI == 0) {
+			continue;
+		}
 		for (size_t clI = 0; clI < rwI - 1; clI++){
 			gsl_matrix_set(tmp, rwI, clI, gsl_ran_gaussian_ziggurat(r, 1.0));
 		}
@@ -91,8 +97,20 @@ size_t rtgeom(const double &p, const size_t &limit, const gsl_rng *r){
 }
 
 /*
-	function to calculate centered residuals to use for SNP regessions
-*/
+ *	function to calculate centered residuals to use for SNP regessions
+ */
+
+double mhl(const gsl_vector *beta, const gsl_matrix *SigI){ // distance to 0
+	double m = 0.0;
+	gsl_vector *tmp    = gsl_vector_alloc(SigI->size1);
+	
+	gsl_blas_dsymv(CblasLower, 1.0, SigI, beta, 0.0, tmp);
+	gsl_blas_ddot(beta, tmp, &m);
+	
+	gsl_vector_free(tmp);
+	
+	return m;
+}
 
 void rspRsd(const MVnormMu *rsp, const MVnormMu *ftd, const int &N, const int &d, gsl_matrix *rsd){
 	gsl_vector *tmp  = gsl_vector_alloc(d);
@@ -8041,28 +8059,48 @@ BetaGrpPC & BetaGrpPC::operator=(const BetaGrpPC &bG){
  *	BetaGrpSnp methods
  */
 
-BetaGrpSnp::BetaGrpSnp() : _numSaves(0.0), _nThr(1), _Npred(1), MuGrp(){
+BetaGrpSnp::BetaGrpSnp() : _numSaves(0.0), _nThr(1), _Npred(1), _priorVar(0.0), MuGrp(){
 	_Xmat    = gsl_matrix_calloc(1, 1);
 	_Ystore  = gsl_matrix_calloc(1, 1);
-	_SIstore = gsl_matrix_calloc(1, 1);
 }
-BetaGrpSnp::BetaGrpSnp(const string &predFlNam, const string &outFlNam, const size_t &Ndat, const size_t &Npred, const size_t &d, const int &Nthr) : _numSaves(0.0), _nThr(Nthr), _Npred(Npred), _inPredFl(predFlNam), MuGrp(){
+BetaGrpSnp::BetaGrpSnp(const string &predFlNam, const string &outFlNam, const size_t &Ndat, const size_t &Npred, const size_t &d, const int &Nthr) : _numSaves(0.0), _nThr(Nthr), _Npred(Npred), _priorVar(0.0), _inPredFl(predFlNam), MuGrp(){
 	_fakeFmat = gsl_matrix_calloc(Ndat, d);       // will be all zero, so we can use it for addition and subtraction without any consequences other than loss of efficiency
 	_Ystore   = gsl_matrix_calloc(Ndat, d);
-	_SIstore  = gsl_matrix_calloc(d, d);
 	
 	_outFlNam = outFlNam;
 	remove(_outFlNam.c_str());
 	
 	// the rest of the set-up happens before the results are dumped into a file by the dump() function
 }
-BetaGrpSnp::BetaGrpSnp(const string &predFlNam, const string &outFlNam, RanIndex &low, const size_t &Npred, const size_t &d, const int &Nthr) : _numSaves(0.0), _nThr(Nthr), _Npred(Npred), _inPredFl(predFlNam), MuGrp(){
+BetaGrpSnp::BetaGrpSnp(const string &predFlNam, const string &outFlNam, RanIndex &low, const size_t &Npred, const size_t &d, const int &Nthr) : _numSaves(0.0), _nThr(Nthr), _Npred(Npred), _priorVar(0.0), _inPredFl(predFlNam), MuGrp(){
 	
 	_fakeFmat = gsl_matrix_calloc(low.getNgrp(), d);       // will be all zero, so we can use it for addition and subtraction without any consequences other than loss of efficiency
 	_lowLevel = &low;
 	
 	_Ystore   = gsl_matrix_calloc(low.getNgrp(), d);
-	_SIstore  = gsl_matrix_calloc(d, d);
+	
+	_outFlNam = outFlNam;
+	remove(_outFlNam.c_str());
+	
+	// the rest of the set-up happens before the results are dumped into a file by the dump() function
+	
+}
+
+BetaGrpSnp::BetaGrpSnp(const string &predFlNam, const string &outFlNam, const size_t &Ndat, const size_t &Npred, const size_t &d, const int &Nthr, const double &prVar) : _numSaves(0.0), _nThr(Nthr), _Npred(Npred), _priorVar(prVar), _inPredFl(predFlNam), MuGrp(){
+	_fakeFmat = gsl_matrix_calloc(Ndat, d);       // will be all zero, so we can use it for addition and subtraction without any consequences other than loss of efficiency
+	_Ystore   = gsl_matrix_calloc(Ndat, d);
+	
+	_outFlNam = outFlNam;
+	remove(_outFlNam.c_str());
+	
+	// the rest of the set-up happens before the results are dumped into a file by the dump() function
+}
+BetaGrpSnp::BetaGrpSnp(const string &predFlNam, const string &outFlNam, RanIndex &low, const size_t &Npred, const size_t &d, const int &Nthr, const double &prVar) : _numSaves(0.0), _nThr(Nthr), _Npred(Npred), _priorVar(prVar), _inPredFl(predFlNam), MuGrp(){
+	
+	_fakeFmat = gsl_matrix_calloc(low.getNgrp(), d);       // will be all zero, so we can use it for addition and subtraction without any consequences other than loss of efficiency
+	_lowLevel = &low;
+	
+	_Ystore   = gsl_matrix_calloc(low.getNgrp(), d);
 	
 	_outFlNam = outFlNam;
 	remove(_outFlNam.c_str());
@@ -8074,13 +8112,13 @@ BetaGrpSnp::BetaGrpSnp(const string &predFlNam, const string &outFlNam, RanIndex
 BetaGrpSnp::BetaGrpSnp(const BetaGrpSnp &mG){
 	gsl_matrix_free(_valueMat);
 	_Ystore  = gsl_matrix_calloc((mG._Ystore)->size1, (mG._Ystore)->size2);
-	_SIstore = gsl_matrix_calloc((mG._SIstore)->size1, (mG._SIstore)->size2);
 	
 	_lowLevel = mG._lowLevel;
 	_upLevel  = mG._upLevel;
 	_nThr     = mG._nThr;
 	_Npred    = mG._Npred;
 	_inPredFl = mG._inPredFl;
+	_priorVar = mG._priorVar;
 	
 	_Xmat = gsl_matrix_alloc((mG._Xmat)->size1, (mG._Xmat)->size2);
 	gsl_matrix_memcpy(_Xmat, mG._Xmat);
@@ -8110,13 +8148,13 @@ BetaGrpSnp::BetaGrpSnp(const BetaGrpSnp &mG){
 BetaGrpSnp & BetaGrpSnp::operator=(const BetaGrpSnp &mG){
 	gsl_matrix_free(_valueMat);
 	_Ystore  = gsl_matrix_calloc((mG._Ystore)->size1, (mG._Ystore)->size2);
-	_SIstore = gsl_matrix_calloc((mG._SIstore)->size1, (mG._SIstore)->size2);
 	
 	_lowLevel = mG._lowLevel;
 	_upLevel  = mG._upLevel;
 	_nThr     = mG._nThr;
 	_Npred    = mG._Npred;
 	_inPredFl = mG._inPredFl;
+	_priorVar = mG._priorVar;
 	
 	_Xmat = gsl_matrix_alloc((mG._Xmat)->size1, (mG._Xmat)->size2);
 	gsl_matrix_memcpy(_Xmat, mG._Xmat);
@@ -8152,7 +8190,6 @@ BetaGrpSnp::~BetaGrpSnp(){
 	}
 	gsl_matrix_free(_fakeFmat);
 	gsl_matrix_free(_Ystore);
-	gsl_matrix_free(_SIstore);
 	
 }
 
@@ -8162,9 +8199,7 @@ void BetaGrpSnp::dump(){
 		
 		_Xmat     = gsl_matrix_alloc(_Ystore->size1, _Npred);
 		_valueMat = gsl_matrix_calloc(_Npred, _Ystore->size2 + 1);  // the extra column will have the Hotelling-type statistic for all the traits
-		
-		_theta.resize(_Npred);
-		
+				
 		if (_nThr > 1) {
 			const gsl_rng_type *T = gsl_rng_mt19937;
 			_rV.resize(_nThr);
@@ -8182,23 +8217,96 @@ void BetaGrpSnp::dump(){
 		gsl_matrix_fread(prdIn, _Xmat);
 		fclose(prdIn);
 		colCenter(_Xmat); // essential to mimic an intercept
-		
-		for (size_t Xj = 0; Xj < _Npred; Xj++) {
-			delete _theta[Xj];
-			_theta[Xj] = new MVnormBetaCmp(_Xmat, Xj, _valueMat, Xj);
-		}
-		
+				
 		gsl_matrix_scale(_Ystore, 1.0/_numSaves);
-		gsl_matrix_scale(_SIstore, 1.0/_numSaves);
 		colCenter(_Ystore);
-		MuGrp datI(_Ystore);
-		Grp &dat = datI;
-		SigmaI Sinv(_SIstore);
 		
-#pragma omp parallel for num_threads(_nThr)
-		for (int jSnp = 0; jSnp < _Npred; jSnp++) { // iterators not supported in older versions of OpenMP; also the iteration variable has to be signed unless you have a newer version of OpenMP
-			_theta[jSnp]->update(dat, Sinv, _rV[omp_get_thread_num()]);
-		}
+#pragma omp parallel num_threads(_nThr)
+		{
+			double XtX;
+			gsl_vector *bTmp  = gsl_vector_alloc(_Ystore->size2);
+			gsl_matrix *S     = gsl_matrix_alloc(_Ystore->size2, _Ystore->size2);
+			gsl_matrix *VW    = gsl_matrix_alloc(_Ystore->size2, _Ystore->size2);
+			gsl_matrix *resd  = gsl_matrix_alloc(_Ystore->size1, _Ystore->size2);
+			if (_priorVar) {  // if we have a prior variance, then we are doing approximate Bayes factors as God intended
+#pragma omp for
+				for (int iSnp = 0; iSnp < _Npred; iSnp++) {
+					gsl_vector_view Xtmp = gsl_matrix_column(_Xmat, iSnp);
+					gsl_blas_ddot(&Xtmp.vector, &Xtmp.vector, &XtX);
+					XtX = 1.0/XtX;
+					
+					gsl_blas_dgemv(CblasTrans, XtX, _Ystore, &Xtmp.vector, 0.0, bTmp);
+					
+					gsl_matrix_memcpy(resd, _Ystore);
+					gsl_blas_dger(-1.0, &Xtmp.vector, bTmp, resd);  // subtracting the Xb
+					
+					gsl_blas_dsyrk(CblasLower, CblasTrans, XtX/static_cast<double>(_Ystore->size1 - 1), resd, 0.0, S);
+					for (int iPh = 0; iPh < _Ystore->size2; iPh++) {
+						double V  = gsl_matrix_get(S, iPh, iPh);
+						double r  = _priorVar/(V + _priorVar);  // W/(V+W) of Wakefield (2007)
+						double pV = 0.5*(log(1.0 - r) + gsl_pow_2(gsl_vector_get(bTmp, iPh))*r/V) ;
+						gsl_matrix_set(_valueMat, iSnp, iPh, pV);
+						
+					}
+					gsl_matrix_memcpy(VW, S);
+					gsl_vector_view VWdiag = gsl_matrix_diagonal(VW);
+					gsl_vector_add_constant(&VWdiag.vector, _priorVar);
+					gsl_linalg_cholesky_decomp(S);
+					gsl_linalg_cholesky_decomp(VW);
+					double lnSrSdet = 0.0;  // ln of the square root of the determinant
+					double lnSrVWdet = 0.0;
+					for (size_t iPh = 0; iPh < _Ystore->size2; iPh++) {
+						lnSrSdet  += log(gsl_matrix_get(S, iPh, iPh));
+						lnSrVWdet += log(gsl_matrix_get(VW, iPh, iPh));
+					}
+					gsl_linalg_cholesky_invert(S);
+					gsl_linalg_cholesky_invert(VW);
+					gsl_matrix_sub(S, VW);
+					double m = mhl(bTmp, S);
+					double pV = lnSrSdet - lnSrVWdet + 0.5*m;
+					gsl_matrix_set(_valueMat, iSnp, _Ystore->size2, pV);
+					
+				}
+
+			}
+			else {
+#pragma omp for
+				for (int iSnp = 0; iSnp < _Npred; iSnp++) {
+					gsl_vector_view Xtmp = gsl_matrix_column(_Xmat, iSnp);
+					gsl_blas_ddot(&Xtmp.vector, &Xtmp.vector, &XtX);
+					XtX = 1.0/XtX;
+					
+					gsl_blas_dgemv(CblasTrans, XtX, _Ystore, &Xtmp.vector, 0.0, bTmp);
+					
+					gsl_matrix_memcpy(resd, _Ystore);
+					gsl_blas_dger(-1.0, &Xtmp.vector, bTmp, resd);  // subtracting the Xb
+					
+					gsl_blas_dsyrk(CblasLower, CblasTrans, XtX, resd, 0.0, S);
+					
+					for (int iPh = 0; iPh < _Ystore->size2; iPh++) {
+						double seB  = sqrt(gsl_matrix_get(S, iPh, iPh)/static_cast<double>(_Ystore->size1 - 1));
+						double tVal = fabs(gsl_vector_get(bTmp, iPh))/seB;
+						double pV   = -log10(gsl_cdf_tdist_Q(tVal, _Ystore->size1 - 1)*2.0);
+						gsl_matrix_set(_valueMat, iSnp, iPh, pV);
+					
+					}
+					
+					
+					gsl_linalg_cholesky_decomp(S);
+					gsl_linalg_cholesky_invert(S);
+					double m = mhl(bTmp, S);
+					m = (static_cast<double>(_Ystore->size1) - static_cast<double>(_Ystore->size2))/static_cast<double>(_Ystore->size2)*m;
+					double pV = -log10(gsl_cdf_fdist_Q(m, static_cast<double>(_Ystore->size2), static_cast<double>(_Ystore->size1) - static_cast<double>(_Ystore->size2)));
+					
+					gsl_matrix_set(_valueMat, iSnp, _Ystore->size2, pV);
+					
+				}
+				
+			}
+			gsl_vector_free(bTmp);
+			gsl_matrix_free(S);
+			gsl_matrix_free(resd);
+		}//end omp block
 		
 		FILE *btOut = fopen(_outFlNam.c_str(), "w");
 		gsl_matrix_fwrite(btOut, _valueMat);
@@ -8212,14 +8320,13 @@ void BetaGrpSnp::dump(){
 }
 
 void BetaGrpSnp::update(const Grp &dat, const SigmaI &SigIm){
+	// Sigma ignored
 	if (_lowLevel) {
 		MuGrp datMnI = dat.mean(*_lowLevel);
 		gsl_matrix_add(_Ystore, datMnI.fMat());
-		gsl_matrix_add(_SIstore, SigIm.getMat());
 	}
 	else {
 		gsl_matrix_add(_Ystore, dat.fMat());
-		gsl_matrix_add(_SIstore, SigIm.getMat());
 	}
 	_numSaves += 1.0;
 }
@@ -8227,14 +8334,12 @@ void BetaGrpSnp::update(const Grp &dat, const SigmaI &SigIm){
 /*
 	BetaGrpSnpMiss methods
  */
-BetaGrpSnpMiss::BetaGrpSnpMiss() : _numSaves(0.0), _nThr(1), _Npred(1), _absLab(-9.0), MuGrp() {
+BetaGrpSnpMiss::BetaGrpSnpMiss() : _numSaves(0.0), _nThr(1), _Npred(1), _priorVar(0.0), _absLab(-9.0), MuGrp() {
 	_Ystore  = gsl_matrix_calloc(1, 1);
-	_SIstore = gsl_matrix_calloc(1, 1);
 }
 
-BetaGrpSnpMiss::BetaGrpSnpMiss(const string &predFlNam, const string &outFlNam, const size_t &Ndat, const size_t &Npred, const size_t &d, const int &Nthr, const double &absLab) : _numSaves(0.0), _nThr(Nthr), _Npred(Npred), _inPredFl(predFlNam), _absLab(absLab), MuGrp(){
+BetaGrpSnpMiss::BetaGrpSnpMiss(const string &predFlNam, const string &outFlNam, const size_t &Ndat, const size_t &Npred, const size_t &d, const int &Nthr, const double &absLab) : _numSaves(0.0), _nThr(Nthr), _Npred(Npred), _inPredFl(predFlNam), _priorVar(0.0), _absLab(absLab), MuGrp(){
 	_Ystore  = gsl_matrix_calloc(Ndat, d);
-	_SIstore = gsl_matrix_calloc(d, d);
 	
 	_fakeFmat = gsl_matrix_calloc(Ndat, d);     // will be all zero, so we can use it for addition and subtraction without any consequences other than loss of efficiency
 	_lowLevel = 0;
@@ -8242,9 +8347,25 @@ BetaGrpSnpMiss::BetaGrpSnpMiss(const string &predFlNam, const string &outFlNam, 
 	remove(_outFlNam.c_str());
 	
 }
-BetaGrpSnpMiss::BetaGrpSnpMiss(const string &predFlNam, const string &outFlNam, RanIndex &low, const size_t &Npred, const size_t &d, const int &Nthr, const double &absLab) : _numSaves(0.0), _nThr(Nthr), _Npred(Npred), _inPredFl(predFlNam), _absLab(absLab), MuGrp() {
+BetaGrpSnpMiss::BetaGrpSnpMiss(const string &predFlNam, const string &outFlNam, RanIndex &low, const size_t &Npred, const size_t &d, const int &Nthr, const double &absLab) : _numSaves(0.0), _nThr(Nthr), _Npred(Npred), _inPredFl(predFlNam), _priorVar(0.0), _absLab(absLab), MuGrp() {
 	_Ystore  = gsl_matrix_calloc(low.getNgrp(), d);
-	_SIstore = gsl_matrix_calloc(d, d);
+	
+	_fakeFmat = gsl_matrix_calloc(low.getNgrp(), d);     // will be all zero, so we can use it for addition and subtraction without any consequences other than loss of efficiency
+	_lowLevel = &low;
+	_outFlNam = outFlNam;
+	remove(_outFlNam.c_str());
+}
+BetaGrpSnpMiss::BetaGrpSnpMiss(const string &predFlNam, const string &outFlNam, const size_t &Ndat, const size_t &Npred, const size_t &d, const int &Nthr, const double &prVar, const double &absLab) : _numSaves(0.0), _nThr(Nthr), _Npred(Npred), _inPredFl(predFlNam), _priorVar(prVar), _absLab(absLab), MuGrp(){
+	_Ystore  = gsl_matrix_calloc(Ndat, d);
+	
+	_fakeFmat = gsl_matrix_calloc(Ndat, d);     // will be all zero, so we can use it for addition and subtraction without any consequences other than loss of efficiency
+	_lowLevel = 0;
+	_outFlNam = outFlNam;
+	remove(_outFlNam.c_str());
+	
+}
+BetaGrpSnpMiss::BetaGrpSnpMiss(const string &predFlNam, const string &outFlNam, RanIndex &low, const size_t &Npred, const size_t &d, const int &Nthr, const double &prVar, const double &absLab) : _numSaves(0.0), _nThr(Nthr), _Npred(Npred), _inPredFl(predFlNam), _priorVar(prVar), _absLab(absLab), MuGrp() {
+	_Ystore  = gsl_matrix_calloc(low.getNgrp(), d);
 	
 	_fakeFmat = gsl_matrix_calloc(low.getNgrp(), d);     // will be all zero, so we can use it for addition and subtraction without any consequences other than loss of efficiency
 	_lowLevel = &low;
@@ -8255,13 +8376,13 @@ BetaGrpSnpMiss::BetaGrpSnpMiss(const string &predFlNam, const string &outFlNam, 
 BetaGrpSnpMiss::BetaGrpSnpMiss(const BetaGrpSnpMiss &mG){
 	gsl_matrix_free(_valueMat);
 	_Ystore  = gsl_matrix_calloc((mG._Ystore)->size1, (mG._Ystore)->size2);
-	_SIstore = gsl_matrix_calloc((mG._SIstore)->size1, (mG._SIstore)->size2);
 	
 	_lowLevel = mG._lowLevel;
 	_upLevel  = mG._upLevel;
 	_nThr     = mG._nThr;
 	_Npred    = mG._Npred;
 	_absLab   = mG._absLab;
+	_priorVar = mG._priorVar;
 	_inPredFl = mG._inPredFl;
 	
 	_valueMat = gsl_matrix_alloc((mG._valueMat)->size1, (mG._valueMat)->size2);
@@ -8289,13 +8410,13 @@ BetaGrpSnpMiss::BetaGrpSnpMiss(const BetaGrpSnpMiss &mG){
 BetaGrpSnpMiss & BetaGrpSnpMiss::operator=(const BetaGrpSnpMiss &mG){
 	gsl_matrix_free(_valueMat);
 	_Ystore  = gsl_matrix_calloc((mG._Ystore)->size1, (mG._Ystore)->size2);
-	_SIstore = gsl_matrix_calloc((mG._SIstore)->size1, (mG._SIstore)->size2);
 	
 	_lowLevel = mG._lowLevel;
 	_upLevel  = mG._upLevel;
 	_nThr     = mG._nThr;
 	_Npred    = mG._Npred;
 	_absLab   = mG._absLab;
+	_priorVar = mG._priorVar;
 	_inPredFl = mG._inPredFl;
 	
 	_valueMat = gsl_matrix_alloc((mG._valueMat)->size1, (mG._valueMat)->size2);
@@ -8325,12 +8446,10 @@ BetaGrpSnpMiss & BetaGrpSnpMiss::operator=(const BetaGrpSnpMiss &mG){
 BetaGrpSnpMiss::~BetaGrpSnpMiss(){
 	gsl_matrix_free(_fakeFmat);
 	gsl_matrix_free(_Ystore);
-	gsl_matrix_free(_SIstore);
 }
 
 void BetaGrpSnpMiss::dump(){
 	if (_numSaves) {
-		_theta.resize(_Npred);
 		_Xmat.resize(_Npred);
 		
 		gsl_matrix_free(_valueMat);
@@ -8363,34 +8482,131 @@ void BetaGrpSnpMiss::dump(){
 			}
 		}
 		fclose(prdIn);
-		
-		for (size_t XjCl = 0; XjCl < _Npred; XjCl++) {
-			_Xmat[XjCl].resize(_Xmat[XjCl].size()); // just in case there was extra memeory allocated on push_back()
-			double mn = gsl_stats_mean(_Xmat[XjCl].data(), 1, _Xmat[XjCl].size());
-			gsl_vector_view vx = gsl_vector_view_array(_Xmat[XjCl].data(), _Xmat[XjCl].size());
-			gsl_vector_add_constant(&vx.vector, -mn); // center predictor
-			_theta[XjCl] = new MVnormBetaMiss(_Xmat[XjCl], presInd[XjCl], _valueMat, XjCl);
-			
-		}
-		
 		gsl_vector_free(tmpX);
 
 		gsl_matrix_scale(_Ystore, 1.0/_numSaves);
-		gsl_matrix_scale(_SIstore, 1.0/_numSaves);
 		colCenter(_Ystore);
-		MuGrp datI(_Ystore);
-		Grp &dat = datI;
-		SigmaI Sinv(_SIstore);
 		
-#pragma omp parallel for num_threads(_nThr)
-		for (int jSnp = 0; jSnp < _Npred; jSnp++) { // iterators not supported in older versions of OpenMP; also the iteration variable has to be signed unless you have a newer version of OpenMP
-			_theta[jSnp]->update(dat, Sinv, _rV[omp_get_thread_num()]);
-		}
+#pragma omp parallel num_threads(_nThr)
+		{
+			double XtX;
+			gsl_vector *bTmp  = gsl_vector_alloc(_Ystore->size2);
+			gsl_matrix *S     = gsl_matrix_alloc(_Ystore->size2, _Ystore->size2);
+			gsl_matrix *VW    = gsl_matrix_alloc(_Ystore->size2, _Ystore->size2);
+			if (_priorVar) {  // if we have a prior variance, then we are doing approximate Bayes factors as God intended
+#pragma omp for
+				for (int iSnp = 0; iSnp < _Npred; iSnp++) {
+					gsl_matrix *resd;
+					if (presInd[iSnp].size()) {
+						resd = gsl_matrix_alloc(presInd.size(), _Ystore->size2);
+						int ind = 0;
+						for (vector<size_t>::const_iterator it = presInd[iSnp].begin(); it != presInd[iSnp].end(); ++it) {
+							gsl_vector_view rspRw = gsl_matrix_row(_Ystore, *it);
+							gsl_matrix_set_row(resd, ind, &rspRw.vector);
+							ind++;
+						}
+						colCenter(resd);
+						
+					}
+					else {
+						resd = gsl_matrix_alloc(_Ystore->size1, _Ystore->size2);
+						gsl_matrix_memcpy(resd, _Ystore);
+					}
+					gsl_vector_view Xtmp = gsl_vector_view_array(_Xmat[iSnp].data(), _Xmat[iSnp].size());
+					gsl_blas_ddot(&Xtmp.vector, &Xtmp.vector, &XtX);
+					XtX = 1.0/XtX;
+					
+					gsl_blas_dgemv(CblasTrans, XtX, resd, &Xtmp.vector, 0.0, bTmp);
+					
+					gsl_blas_dger(-1.0, &Xtmp.vector, bTmp, resd);  // subtracting the Xb
+					
+					gsl_blas_dsyrk(CblasLower, CblasTrans, XtX/static_cast<double>(presInd[iSnp].size() - 1), resd, 0.0, S);
+					
+					for (int iPh = 0; iPh < _Ystore->size2; iPh++) {
+						double V  = gsl_matrix_get(S, iPh, iPh);
+						double r  = _priorVar/(V + _priorVar);  // W/(V+W) of Wakefield (2007)
+						double pV = 0.5*(log(1.0 - r) + gsl_pow_2(gsl_vector_get(bTmp, iPh))*r/V) ;
+						gsl_matrix_set(_valueMat, iSnp, iPh, pV);
+						
+					}
+					gsl_matrix_memcpy(VW, S);
+					gsl_vector_view VWdiag = gsl_matrix_diagonal(VW);
+					gsl_vector_add_constant(&VWdiag.vector, _priorVar);
+					gsl_linalg_cholesky_decomp(S);
+					gsl_linalg_cholesky_decomp(VW);
+					double lnSrSdet = 0.0;  // ln of the square root of the determinant
+					double lnSrVWdet = 0.0;
+					for (size_t iPh = 0; iPh < _Ystore->size2; iPh++) {
+						lnSrSdet  += log(gsl_matrix_get(S, iPh, iPh));
+						lnSrVWdet += log(gsl_matrix_get(VW, iPh, iPh));
+					}
+					gsl_linalg_cholesky_invert(S);
+					gsl_linalg_cholesky_invert(VW);
+					gsl_matrix_sub(S, VW);
+					double m = mhl(bTmp, S);
+					double pV = lnSrSdet - lnSrVWdet + 0.5*m;
+					gsl_matrix_set(_valueMat, iSnp, _Ystore->size2, pV);
+					
+					gsl_matrix_free(resd);
+				}
+				
+			}
+			else {
+#pragma omp for
+				for (int iSnp = 0; iSnp < _Npred; iSnp++) {
+					gsl_matrix *resd;
+					if (presInd[iSnp].size()) {
+						resd = gsl_matrix_alloc(presInd.size(), _Ystore->size2);
+						int ind = 0;
+						for (vector<size_t>::const_iterator it = presInd[iSnp].begin(); it != presInd[iSnp].end(); ++it) {
+							gsl_vector_view rspRw = gsl_matrix_row(_Ystore, *it);
+							gsl_matrix_set_row(resd, ind, &rspRw.vector);
+							ind++;
+						}
+						colCenter(resd);
+						
+					}
+					else {
+						resd = gsl_matrix_alloc(_Ystore->size1, _Ystore->size2);
+						gsl_matrix_memcpy(resd, _Ystore);
+					}
+					gsl_vector_view Xtmp = gsl_vector_view_array(_Xmat[iSnp].data(), _Xmat[iSnp].size());
+					gsl_blas_ddot(&Xtmp.vector, &Xtmp.vector, &XtX);
+					XtX = 1.0/XtX;
+					
+					gsl_blas_dgemv(CblasTrans, XtX, resd, &Xtmp.vector, 0.0, bTmp);
+					gsl_blas_dger(-1.0, &Xtmp.vector, bTmp, resd);  // subtracting the Xb
+					
+					gsl_blas_dsyrk(CblasLower, CblasTrans, XtX, resd, 0.0, S);
+					
+					for (int iPh = 0; iPh < _Ystore->size2; iPh++) {
+						double seB  = sqrt(gsl_matrix_get(S, iPh, iPh)/static_cast<double>(presInd[iSnp].size() - 1));
+						double tVal = fabs(gsl_vector_get(bTmp, iPh))/seB;
+						double pV   = -log10(gsl_cdf_tdist_Q(tVal, _Ystore->size1 - 1)*2.0);
+						gsl_matrix_set(_valueMat, iSnp, iPh, pV);
+						
+					}
+					
+					
+					gsl_linalg_cholesky_decomp(S);
+					gsl_linalg_cholesky_invert(S);
+					double m = mhl(bTmp, S);
+					m = (static_cast<double>(presInd[iSnp].size()) - static_cast<double>(_Ystore->size2))/static_cast<double>(_Ystore->size2)*m;
+					double pV = -log10(gsl_cdf_fdist_Q(m, static_cast<double>(_Ystore->size2), static_cast<double>(presInd[iSnp].size()) - static_cast<double>(_Ystore->size2)));
+					
+					gsl_matrix_set(_valueMat, iSnp, _Ystore->size2, pV);
+					gsl_matrix_free(resd);
+				}
+				
+			}
+			gsl_vector_free(bTmp);
+			gsl_matrix_free(S);
+			
+		}//end omp block
 		
 		FILE *btOut = fopen(_outFlNam.c_str(), "w");
 		gsl_matrix_fwrite(btOut, _valueMat);
 		fclose(btOut);
-
 	}
 	else {
 		cout << "BetaGrpSnpMiss: nothing to dump" << endl;
@@ -8401,17 +8617,15 @@ void BetaGrpSnpMiss::update(const Grp &dat, const SigmaI &SigIm){
 	if (_lowLevel) {
 		MuGrp datMnI = dat.mean(*_lowLevel);
 		gsl_matrix_add(_Ystore, datMnI.fMat());
-		gsl_matrix_add(_SIstore, SigIm.getMat());
 	}
 	else {
 		gsl_matrix_add(_Ystore, dat.fMat());
-		gsl_matrix_add(_SIstore, SigIm.getMat());
 	}
 	_numSaves += 1.0;
 }
 
 /*
-	BetaGrpBVSR methods
+ *	BetaGrpBVSR methods
  */
 
 BetaGrpBVSR::BetaGrpBVSR(const Grp &y, const SigmaI &SigI, const string &predFlNam, const double &Nmul, const double &rSqMax, RanIndex &up, const string &outFlNam, const int &nThr) : BetaGrpFt(){
