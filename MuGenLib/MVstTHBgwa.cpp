@@ -312,7 +312,7 @@ int main(int argc, char *argv[]){
 		}
 	}
 	
-	if ((model != "SM") && (model != "VS") && (model != "RS")) {
+	if ((model != "SM") && (model != "SMP") && (model != "VS") && (model != "RS")) {
 		cerr << "ERROR: Specified SNP model (" << model << ") not supported." << endl;
 		exit(-1);
 	}
@@ -330,7 +330,7 @@ int main(int argc, char *argv[]){
 		addOn.push_back(missF);
 	}
 	addOn.push_back(model);
-	if (model == "SM") {
+	if ((model == "SM") || (model == "SMP")) {
 		if (prABF) {
 			addOn.push_back("BF");
 		}
@@ -520,6 +520,13 @@ int main(int argc, char *argv[]){
 		if (model == "RS"){
 			snpBetI = new BetaGrpFt(repDev, SigIrep, snpIn, Nsnp, Nmul, ldCt, rp2ln, snp2pr, betOut, nThr);
 		}
+	else
+		if (model == "SMP"){
+			if (d == 1) {
+				cerr << "WARNING: trying to do partial regression with only one trait." << endl;
+			}
+			snpBetI = new BetaGrpPSR(snpIn, betOut, rp2ln, Nsnp, d, nThr, prABF); // if prABF is 0.0, it will output p-values
+	}
 	else {
 		snpBetI = new BetaGrpSnp(snpIn, betOut, rp2ln, Nsnp, d, nThr, prABF); // if prABF is 0.0, it will output p-values
 	}
@@ -533,7 +540,7 @@ int main(int argc, char *argv[]){
 	MuGrp snpDevI = repDev;
 	Grp &snpDev   = snpDevI;
 	
-	if (model != "SM") {
+	if ( (model != "SM") && (model != "SMP") ) {
 		cout << "Pre-burnin..." << endl;
 		for (int iSt = 0; iSt < 100; iSt++) {
 			if (miss) {
@@ -578,7 +585,7 @@ int main(int argc, char *argv[]){
 
 	}
 	
-	if (model == "SM") {
+	if ( (model == "SM") || (model == "SMP") ) {
 		cout << "Single marker model." << endl;
 		cout << "Starting burnin..." << endl;
 		for (int iBnin = 0; iBnin < floor(0.4*Nbnin); iBnin++) {
