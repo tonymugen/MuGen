@@ -56,7 +56,9 @@ class MuGrpPEX;
 class BetaGrpPEX;
 class MuGrpMiss;
 class BetaGrpSnp;
+class BetaGrpPSR;
 class BetaGrpSnpMiss;
+class BetaGrpPSRmiss;
 class BetaGrpFt;
 class BetaGrpSc;
 class BetaGrpPC;
@@ -134,6 +136,8 @@ void colCenter(gsl_matrix *inplace);
 void colCenter(const gsl_matrix *source, gsl_matrix *res);
 void colCenter(gsl_matrix *inplace, const double &absLab); // when there are missing data labeled by absLab
 void colCenter(const gsl_matrix *source, gsl_matrix *res, const double &absLab);
+void vecCenter(gsl_vector *inplace);
+void vecCenter(const gsl_vector *source, gsl_vector *res);
 void printMat(const gsl_matrix *);
 unsigned long long rdtsc();
 /** @} */
@@ -376,58 +380,6 @@ public:
 	
 	const size_t *up() const{return _upLevel; };
 	double scalePar() const {return _scale; };
-};
-
-class MVnormBetaCmp : public MVnormBeta { // for simple SNP regressions on complete SNP data
-protected:
-	// we multiply &_X.vector inherited from MVnormBeta by 1/_scale at initialization so that we can do the generic regression (XtX)^-1Xt faster.  This modifies the matrix _X is pointing to
-	double _mhl(const SigmaI &SigI);
-public:
-	MVnormBetaCmp() : MVnormBeta() {};
-	MVnormBetaCmp(gsl_matrix *pred, const size_t &iCl, gsl_matrix *bet, const size_t &iRw);
-	MVnormBetaCmp(const gsl_matrix *resp, gsl_matrix *pred, const size_t &iCl, const gsl_matrix *Sig, const gsl_rng *r, gsl_matrix *bet, const size_t &iRw) : MVnormBeta(resp, pred, iCl, Sig, r, bet, iRw) {gsl_vector_scale(&_X.vector, 1.0/_scale); };
-	MVnormBetaCmp(const Grp &resp, gsl_matrix *pred, const size_t &iCl, const gsl_matrix *Sig, const gsl_rng *r, gsl_matrix *bet, const size_t &iRw) : MVnormBeta(resp, pred, iCl, Sig, r, bet, iRw) {gsl_vector_scale(&_X.vector, 1.0/_scale); };
-	
-	MVnormBetaCmp(const MVnormBetaCmp &); // copy constructor
-	MVnormBetaCmp & operator=(const MVnormBetaCmp &);
-	
-	~MVnormBetaCmp() {}; 	// destructor
-	
-	double mhl(const MVnorm *x, const SigmaI &SigI){return gsl_vector_get(&_vec.vector, _d - 1); };
-	double mhl(const SigmaI &SigI){return gsl_vector_get(&_vec.vector, _d - 1); }; // distance from 0
-	double mhl(const gsl_vector *x, const SigmaI &SigI){return gsl_vector_get(&_vec.vector, _d - 1); };
-	double mhl(const MVnorm *x, const SigmaI &SigI) const{return gsl_vector_get(&_vec.vector, _d - 1); };
-	double mhl(const SigmaI &SigI) const{return gsl_vector_get(&_vec.vector, _d - 1); }; // distance from 0
-	double mhl(const gsl_vector *x, const SigmaI &SigI) const{return gsl_vector_get(&_vec.vector, _d - 1); };
-	
-	void update(const Grp &dat, const SigmaI &SigIb, const gsl_rng *r);
-};
-
-class MVnormBetaMiss : public MVnormBeta {
-protected:
-	vector<size_t> _presInd;
-	
-	double _mhl(const SigmaI &SigI);
-public:
-	MVnormBetaMiss() : MVnormBeta() {};
-	MVnormBetaMiss(vector<double> &pred, const vector<size_t> &pres, gsl_matrix *bet, const size_t &iRw);
-	MVnormBetaMiss(const gsl_matrix *resp, gsl_matrix *pred, const size_t &iCl, const gsl_matrix *Sig, const gsl_rng *r, const vector<size_t> &pres, gsl_matrix *bet, const size_t &iRw);
-	MVnormBetaMiss(const Grp &resp, gsl_matrix *pred, const size_t &iCl, const gsl_matrix *Sig, const gsl_rng *r, const vector<size_t> &pres, gsl_matrix *bet, const size_t &iRw);
-	
-	MVnormBetaMiss(const MVnormBetaMiss &); // copy constructor
-	MVnormBetaMiss & operator=(const MVnormBetaMiss &);
-	
-	~MVnormBetaMiss() {}; 	// destructor
-	
-	double mhl(const MVnorm *x, const SigmaI &SigI){return gsl_vector_get(&_vec.vector, _d - 1); };
-	double mhl(const SigmaI &SigI){return gsl_vector_get(&_vec.vector, _d - 1); }; // distance from 0
-	double mhl(const gsl_vector *x, const SigmaI &SigI){return gsl_vector_get(&_vec.vector, _d - 1); };
-	double mhl(const MVnorm *x, const SigmaI &SigI) const{return gsl_vector_get(&_vec.vector, _d - 1); };
-	double mhl(const SigmaI &SigI) const{return gsl_vector_get(&_vec.vector, _d - 1); }; // distance from 0
-	double mhl(const gsl_vector *x, const SigmaI &SigI) const{return gsl_vector_get(&_vec.vector, _d - 1); };
-	
-	void update(const Grp &dat, const SigmaI &SigIb, const gsl_rng *r);
-	
 };
 
 class MVnormBetaFt: public MVnormBeta {
@@ -1041,7 +993,7 @@ public:
 	
 	~BetaGrpSnp();
 	
-	void dump();
+	virtual void dump();
 	
 	BetaGrpSnp(const BetaGrpSnp &mG); // copy constructor
 	BetaGrpSnp & operator=(const BetaGrpSnp &mG);
@@ -1049,6 +1001,28 @@ public:
 	const gsl_matrix *fMat() const{return _fakeFmat; };
 
 	void update(const Grp &dat, const SigmaI &SigIm);
+};
+
+/** \brief regressions on a single SNP controlling for other traits
+ *
+ */
+class BetaGrpPSR : public BetaGrpSnp {
+protected:
+	
+public:
+	BetaGrpPSR() : BetaGrpSnp() {};
+	BetaGrpPSR(const string &predFlNam, const string &outFlNam, const size_t &Ndat, const size_t &Npred, const size_t &d, const int &Nthr) : BetaGrpSnp(predFlNam, outFlNam, Ndat, Npred, d, Nthr) {};
+	BetaGrpPSR(const string &predFlNam, const string &outFlNam, RanIndex &low, const size_t &Npred, const size_t &d, const int &Nthr) : BetaGrpSnp(predFlNam, outFlNam, low, Npred, d, Nthr) {};
+	BetaGrpPSR(const string &predFlNam, const string &outFlNam, const size_t &Ndat, const size_t &Npred, const size_t &d, const int &Nthr, const double &prVar) : BetaGrpSnp(predFlNam, outFlNam, Ndat, Npred, d, Nthr, prVar) {};
+	BetaGrpPSR(const string &predFlNam, const string &outFlNam, RanIndex &low, const size_t &Npred, const size_t &d, const int &Nthr, const double &prVar) : BetaGrpSnp(predFlNam, outFlNam, low, Npred, d, Nthr, prVar) {};
+	
+	~BetaGrpPSR() {};
+	
+	void dump();
+	
+	BetaGrpPSR(const BetaGrpPSR &mG); // copy constructor
+	BetaGrpPSR & operator=(const BetaGrpPSR &mG);
+	
 };
 
 class BetaGrpSnpMiss : public MuGrp {
@@ -1078,12 +1052,31 @@ public:
 	BetaGrpSnpMiss(const BetaGrpSnpMiss &mG); // copy constructor
 	BetaGrpSnpMiss & operator=(const BetaGrpSnpMiss &mG);
 	
-	void dump();
+	virtual void dump();
 	
 	const gsl_matrix *fMat() const{return _fakeFmat; };
 	
 	void update(const Grp &dat, const SigmaI &SigIm);
 	
+};
+
+class BetaGrpPSRmiss : public BetaGrpSnpMiss {
+protected:
+	
+public:
+	BetaGrpPSRmiss() : BetaGrpSnpMiss() {};
+	BetaGrpPSRmiss(const string &predFlNam, const string &outFlNam, const size_t &Ndat, const size_t &Npred, const size_t &d, const int &Nthr, const double &absLab) : BetaGrpSnpMiss(predFlNam, outFlNam, Ndat, Npred, d, Nthr, absLab) {};
+	BetaGrpPSRmiss(const string &predFlNam, const string &outFlNam, RanIndex &low, const size_t &Npred, const size_t &d, const int &Nthr, const double &absLab) : BetaGrpSnpMiss(predFlNam, outFlNam, low, Npred, d, Nthr, absLab) {};
+	BetaGrpPSRmiss(const string &predFlNam, const string &outFlNam, const size_t &Ndat, const size_t &Npred, const size_t &d, const int &Nthr, const double &prVar, const double &absLab) : BetaGrpSnpMiss(predFlNam, outFlNam, Ndat, Npred, d, Nthr, prVar, absLab) {};
+	BetaGrpPSRmiss(const string &predFlNam, const string &outFlNam, RanIndex &low, const size_t &Npred, const size_t &d, const int &Nthr, const double &prVar, const double &absLab) : BetaGrpSnpMiss(predFlNam, outFlNam, low, Npred, d, Nthr, prVar, absLab) {};
+	
+	~BetaGrpPSRmiss() {};
+	
+	BetaGrpPSRmiss(const BetaGrpPSRmiss &mG); // copy constructor
+	BetaGrpPSRmiss & operator=(const BetaGrpPSRmiss &mG);
+	
+	void dump();
+
 };
 
 class BetaGrpBVSR : public BetaGrpFt {
