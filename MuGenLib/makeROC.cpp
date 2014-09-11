@@ -36,6 +36,47 @@ using std::list;
 using std::vector;
 using std::advance;
 
+// test if a current miss hits another trait; if yes returns the index into the SNP ID (base 1), otherwise 0
+size_t offHitID(const gsl_vector *curX, const int &curCHR, const int &curPOS, const size_t &curTrt, const gsl_matrix *xMat, const vector< vector<size_t> > &trueIND, const vector< vector<int> > &trueCHR, const vector< vector<int> > &truePOS, const double &ldCt, const int &distCt, const size_t &d, const size_t &mul);
+
+size_t offHitID(const gsl_vector *curX, const int &curCHR, const int &curPOS, const size_t &curTrt, const gsl_matrix *xMat, const vector< vector<size_t> > &trueIND, const vector< vector<int> > &trueCHR, const vector< vector<int> > &truePOS, const double &ldCt, const int &distCt, const size_t &d, const size_t &mul){
+	
+	vector<size_t> htInd;
+	vector<double> rSq;
+	
+	for (size_t iTrt = 0; iTrt < d - mul; iTrt++) { // stop comparison before reaching the multi-trait "trait"
+		if (iTrt == curTrt) { // not interested in current trait
+			continue;
+		}
+		
+		for (size_t jX = 0; jX < trueIND[iTrt].size(); jX++) {
+			if ( (trueCHR[iTrt][jX] == curCHR) && (abs(truePOS[iTrt][jX] - curPOS) <= distCt) ) {
+				gsl_vector *tmpX = gsl_vector_alloc(curX->size);
+				gsl_matrix_get_col(tmpX, xMat, trueIND[iTrt][jX]);
+				double curRsq = gsl_pow_2(gsl_stats_correlation(curX->data, 1, tmpX->data, 1, curX->size));
+				if (curRsq >= ldCt) {
+					rSq.push_back(curRsq);
+					htInd.push_back(trueIND[iTrt][jX]);
+				}
+				gsl_vector_free(tmpX);
+			}
+		}
+		
+	}
+	if (rSq.size() > 1) {
+		vector<size_t> rSqSortInd(rSq.size());
+		gsl_sort_index(rSqSortInd.data(), rSq.data(), 1, rSq.size()); // will report the index with the greatest rSq, in case there are more than one
+		
+		return htInd[rSqSortInd.back()] + 1; // base-1 for R
+	}
+	else if (rSq.size() == 1){
+		return htInd[0] + 1;
+	}
+	else {
+		return 0;
+	}
+}
+
 int main(int argc, char *argv[]){
 	bool sOn = false;
 	bool dOn = false;
@@ -182,7 +223,8 @@ int main(int argc, char *argv[]){
 	}
 	vector<string> truSnpFlNam(d);
 	vector<string> hitsFlNam(d);
-	vector<string> truesFlNam(d);  // will dump the ID of the true SNP found
+	vector<string> offHitsFlNam(d); // will save the misses that hit other traits
+	vector<string> truesFlNam(d);   // will dump the ID of the true SNP found
 	hitsDirNam = "hits" + betDirNam.substr(3);  // adding everything from betDirNam but the first three letters (i.e., "bet")
 	if (d < 1) {
 		cerr << "ERROR: number of traits " << d << " is invalid" << endl;
@@ -199,11 +241,13 @@ int main(int argc, char *argv[]){
 		truSnpFlNam[iPhn] = "SNPtrueID/SNPtrue" + simNum + "_" + phnStrm.str() + ".gbin";
 		hitsFlNam[iPhn]   = hitsDirNam + "/hits" + simNum + "_" + phnStrm.str() + ".tsv";
 		remove(hitsFlNam[iPhn].c_str());
+		offHitsFlNam[iPhn] = hitsDirNam + "/offHits" + simNum + "_" + phnStrm.str() + ".tsv";
+		remove(offHitsFlNam[iPhn].c_str());
 		truesFlNam[iPhn] = hitsDirNam + "/trueID" + simNum + "_" + phnStrm.str() + ".tsv";
 		remove(truesFlNam[iPhn].c_str());
 		phnStrm << flush;
 	}
-	if (multi) {
+	if (multi) {  // no off-trait hits possible
 		truSnpFlNam[d - 1] = "SNPtrueID/SNPtrue" + simNum + ".gbin";
 		hitsFlNam[d - 1]   = hitsDirNam + "/hits" + simNum + ".tsv";
 		remove(hitsFlNam[d - 1].c_str());
@@ -281,6 +325,8 @@ int main(int argc, char *argv[]){
 	
 	cout << "Populating true position list..." << endl;
 	vector< vector<size_t> > trueX(d);
+	vector< vector<int> > trueCHR(d);
+	vector< vector<int> > truePOS(d);
 	for (size_t iPhn = 0; iPhn < d - multi; iPhn++) {
 		gsl_vector_int *curTruX = gsl_vector_int_alloc(gsl_matrix_int_get(nTrEa, simID - 1, iPhn)); // not all true vectors are of the same length
 		FILE *trIn = fopen(truSnpFlNam[iPhn].c_str(), "r");
@@ -289,6 +335,8 @@ int main(int argc, char *argv[]){
 		
 		for (size_t iTr = 0; iTr < curTruX->size; iTr++) {
 			trueX[iPhn].push_back(gsl_vector_int_get(curTruX, iTr));
+			trueCHR[iPhn].push_back(gsl_vector_int_get(chrID, gsl_vector_int_get(curTruX, iTr)));
+			truePOS[iPhn].push_back(gsl_vector_int_get(chrPos, gsl_vector_int_get(curTruX, iTr)));
 		}
 		
 		gsl_vector_int_free(curTruX);
@@ -314,6 +362,7 @@ int main(int argc, char *argv[]){
 	for (size_t phI = 0; phI < d; phI++) {
 		
 		vector<size_t> hits;
+		vector<size_t> offHits;
 		vector<size_t> trueIDs;
 		gsl_vector *betRow = gsl_vector_alloc(Nsnp); // it's a row in the SNP table, but could be a column in the score file
 		if (trans) {
@@ -410,6 +459,7 @@ int main(int argc, char *argv[]){
 					}
 					else {
 						hits.push_back(0);
+						offHits.push_back(offHitID(curSNP, gsl_vector_int_get(chrID, *curCand), gsl_vector_int_get(chrPos, *curCand), phI, snp, trueX, trueCHR, truePOS, LDctVec[phI], Dist, d, multi));
 						
 						size_t crSz = fpSNP.size() + 1;
 						fpSNP.resize(crSz);
@@ -425,6 +475,7 @@ int main(int argc, char *argv[]){
 				}
 				else {
 					hits.push_back(0);
+					offHits.push_back(offHitID(curSNP, gsl_vector_int_get(chrID, *curCand), gsl_vector_int_get(chrPos, *curCand), phI, snp, trueX, trueCHR, truePOS, LDctVec[phI], Dist, d, multi));
 					
 					size_t crSz = fpSNP.size() + 1;
 					fpSNP.resize(crSz);
@@ -522,6 +573,14 @@ int main(int argc, char *argv[]){
 		
 		outMtrues << endl;
 		outMtrues.close();
+		
+		ofstream outOffhts(offHitsFlNam[phI].c_str());
+		for (vector<size_t>::iterator hI = offHits.begin(); hI != offHits.end(); ++hI) {
+			outOffhts << *hI << " " << flush;
+		}
+		
+		outOffhts << endl;
+		outOffhts.close();
 		
 		gsl_permutation_free(snpRank);
 		gsl_vector_free(betRow);
