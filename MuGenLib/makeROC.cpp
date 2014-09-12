@@ -81,6 +81,7 @@ int main(int argc, char *argv[]){
 	bool sOn = false;
 	bool dOn = false;
 	bool DOn = false;
+	bool lOn = false; // large effect?
 	bool mOn = false;
 	bool cOn = false;
 	bool tOn = false;
@@ -96,8 +97,6 @@ int main(int argc, char *argv[]){
 	string snpFlNam("MESAsnp.gbin");
 	string chromIDflNam("MESAchromID.gbin");
 	string chrPosflNam("MESAposition.gbin");
-	string numTrSnpFlNam("numTrueSNP.gbin");
-	string numEaSnpFlNam("numTrueSNPeach.gbin");
 	string betFlNam("betSNP");
 	string betDirNam;
 	string hitsDirNam;
@@ -147,7 +146,10 @@ int main(int argc, char *argv[]){
 					case 'D':
 						DOn = true;
 						break;
-						
+					
+					case 'l':
+						lOn = true;
+						break;
 					case 'm':
 						mOn = true;
 						multi = 1;
@@ -217,6 +219,12 @@ int main(int argc, char *argv[]){
 				break;
 		}
 	}
+	string numTrSnpFlNam("numTrueSNP.gbin");
+	string numEaSnpFlNam("numTrueSNPeach.gbin");
+	if (lOn) {
+		numTrSnpFlNam = "numTrueSNPle.gbin";
+		numEaSnpFlNam = "numTrueSNPeachLE.gbin";
+	}
 	vector<double> LDctVec(d, LDctOff);
 	if (multi) {
 		LDctVec[d-1] = LDall;
@@ -225,7 +233,14 @@ int main(int argc, char *argv[]){
 	vector<string> hitsFlNam(d);
 	vector<string> offHitsFlNam(d); // will save the misses that hit other traits
 	vector<string> truesFlNam(d);   // will dump the ID of the true SNP found
-	hitsDirNam = "hits" + betDirNam.substr(3);  // adding everything from betDirNam but the first three letters (i.e., "bet")
+	
+	if (lOn) {
+		hitsDirNam = "hitsLe" + betDirNam.substr(3);  // adding everything from betDirNam but the first three letters (i.e., "bet")
+	}
+	else{
+		hitsDirNam = "hits" + betDirNam.substr(3);  // adding everything from betDirNam but the first three letters (i.e., "bet")
+	}
+	
 	if (d < 1) {
 		cerr << "ERROR: number of traits " << d << " is invalid" << endl;
 		exit(-1);
@@ -238,7 +253,13 @@ int main(int argc, char *argv[]){
 	for (size_t iPhn = 0; iPhn < d - multi; iPhn++) {
 		stringstream phnStrm;
 		phnStrm << iPhn + 1;
-		truSnpFlNam[iPhn] = "SNPtrueID/SNPtrue" + simNum + "_" + phnStrm.str() + ".gbin";
+		if (lOn) {
+			truSnpFlNam[iPhn] = "SNPtrueIDle/SNPtrue";
+		}
+		else {
+			truSnpFlNam[iPhn] = "SNPtrueID/SNPtrue";
+		}
+		truSnpFlNam[iPhn] = truSnpFlNam[iPhn] + simNum + "_" + phnStrm.str() + ".gbin";
 		hitsFlNam[iPhn]   = hitsDirNam + "/hits" + simNum + "_" + phnStrm.str() + ".tsv";
 		remove(hitsFlNam[iPhn].c_str());
 		offHitsFlNam[iPhn] = hitsDirNam + "/offHits" + simNum + "_" + phnStrm.str() + ".tsv";
@@ -248,7 +269,13 @@ int main(int argc, char *argv[]){
 		phnStrm << flush;
 	}
 	if (multi) {  // no off-trait hits possible
-		truSnpFlNam[d - 1] = "SNPtrueID/SNPtrue" + simNum + ".gbin";
+		if (lOn) {
+			truSnpFlNam[d - 1] = "SNPtrueIDle/SNPtrue";
+		}
+		else {
+			truSnpFlNam[d - 1] = "SNPtrueID/SNPtrue";
+		}
+		truSnpFlNam[d - 1] = truSnpFlNam[d - 1] + simNum + ".gbin";
 		hitsFlNam[d - 1]   = hitsDirNam + "/hits" + simNum + ".tsv";
 		remove(hitsFlNam[d - 1].c_str());
 		truesFlNam[d - 1]   = hitsDirNam + "/trueID" + simNum + ".tsv";
