@@ -112,84 +112,8 @@ double mhl(const gsl_vector *beta, const gsl_matrix *SigI){ // distance to 0
 	return m;
 }
 
-void rspRsd(const MVnormMu *rsp, const MVnormMu *ftd, const int &N, const int &d, gsl_matrix *rsd){
-	gsl_vector *tmp  = gsl_vector_alloc(d);
-	gsl_vector *tmp2 = gsl_vector_calloc(d);
-	
-	for (int iLn = 0; iLn < N; iLn++) {
-		gsl_vector_memcpy(tmp, rsp[iLn].getVec());
-		gsl_vector_sub(tmp, ftd[iLn].getVec());
-		gsl_vector_add(tmp2, tmp);
-		gsl_matrix_set_row(rsd, iLn, tmp);
-	}
-	gsl_vector_scale(tmp2, 1.0/N);
-	for (int iLn = 0; iLn < N; iLn++) {
-		gsl_matrix_get_row(tmp, rsd, iLn);
-		gsl_vector_sub(tmp, tmp2);
-		gsl_matrix_set_row(rsd, iLn, tmp);
-	}
-	
-	gsl_vector_free(tmp);
-	gsl_vector_free(tmp2);
-}
-
 /*
-	function that calculates first partial least-squares coefficient of the regression of a SNP on the phenotypes
-	notation and algorythm from Hastie and Tibshirani
-	subtracting a correlation with a projection of a uniform vector, which gives a direction close to the first eigenvector
-*/
-
-
-double plsOne(const gsl_matrix *resp, const gsl_vector *pred, const vector<int> &pres, const int &d, const gsl_rng *r){
-	gsl_matrix *prsResp = gsl_matrix_alloc(pres.size(), d);
-	gsl_vector *z       = gsl_vector_alloc(pres.size());
-	gsl_vector *u       = gsl_vector_alloc(pres.size());
-	gsl_vector *phi     = gsl_vector_alloc(d);
-	gsl_vector *phiU    = gsl_vector_alloc(d);
-	double betPls       = 0.0;
-	double zDot         = 0.0;
-	double betU			= 0.0;
-	
-	for (int iU = 0; iU < pres.size(); iU++) {
-		gsl_vector_set(u, iU, gsl_ran_flat(r, 0.0, 1.0));
-	}
-	int ind = 0;
-	for (vector<int>::const_iterator it = pres.begin(); it != pres.end(); ++it) {
-		gsl_vector_const_view tmpRw = gsl_matrix_const_row(resp, *it);
-		gsl_matrix_set_row(prsResp, ind, &tmpRw.vector);
-		ind++;
-	}
-	
-	for (int iCl = 0; iCl < d; iCl++) {
-		gsl_vector_view rspCol = gsl_matrix_column(prsResp, iCl);
-		double nrm = gsl_blas_dnrm2(&rspCol.vector);
-		nrm = nrm/sqrt(pres.size() - 1);
-		gsl_vector_scale(&rspCol.vector, 1.0/nrm);
-	}
-	
-	gsl_blas_dgemv(CblasTrans, 1.0, prsResp, pred, 0.0, phi);
-	gsl_blas_dgemv(CblasTrans, 1.0, prsResp, u, 0.0, phiU);
-	
-	gsl_blas_dgemv(CblasNoTrans, 1.0, prsResp, phi, 0.0, z);
-	gsl_blas_dgemv(CblasNoTrans, 1.0, prsResp, phiU, 0.0, u);
-	
-	gsl_blas_ddot(z, pred, &betPls);
-	gsl_blas_ddot(z, z, &zDot);
-	gsl_blas_ddot(z, u, &betU);
-	
-	betPls = (betPls - betU)/zDot;
-	
-	gsl_matrix_free(prsResp);
-	gsl_vector_free(z);
-	gsl_vector_free(u);
-	gsl_vector_free(phi);
-	gsl_vector_free(phiU);
-	
-	return betPls;
-}
-
-/*
-	Functions to mean-center columns of matrices
+ *	Functions to mean-center columns of matrices
  */
 void colCenter(gsl_matrix *inplace){
 	gsl_vector *cl  = gsl_vector_alloc(inplace->size1);

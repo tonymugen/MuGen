@@ -118,6 +118,7 @@ void Wishart(const gsl_matrix*, const size_t&, const gsl_rng*, gsl_matrix*);
  * \param[in] double& probability of success
  * \param[in] size_t& maximum value
  * \param[in] gsl_rng* pointer to a PNG
+ * \return a value of the type size_t that is a sample from the distribution
  *
  */
 size_t rtgeom(const double&, const size_t&, const gsl_rng*);
@@ -129,19 +130,89 @@ size_t rtgeom(const double&, const size_t&, const gsl_rng*);
  *
  * @{
  */
+/** \brief Mahalanobis distance
+ *
+ * Calculates the Mahalonobis distance of a vector from zero
+ *
+ * \param[in] gsl_vector* the vector
+ * \param[in] gsl_matrix* the corresponding inverse-covariance matrix
+ * \return a scalar value of type double
+ *
+ */
 double mhl(const gsl_vector *beta, const gsl_matrix *SigI);
-void rspRsd(const MVnormMu *rsp, const MVnormMu *ftd, const int &N, const int &d, gsl_matrix *rsd);
-double plsOne(const gsl_matrix *resp, const gsl_vector *pred, const vector<int> &pres, const int &d, const gsl_rng *r);
+/** \defgroup clCen Centering functions
+ *
+ * Functions that center matrix columns and vectors
+ *
+ * @{
+ */
+/** \brief Matrix centering in-place
+ *
+ * \param[in,out] gsl_matrix* the matrix to be modified in-place
+ *
+ */
 void colCenter(gsl_matrix *inplace);
+/** \brief Matrix centering with copy
+ *
+ * \param[in] gsl_matrix* the matrix to be centered.  It is not modified
+ * \param[out] gsl_matrix* the modified matrix
+ *
+ */
 void colCenter(const gsl_matrix *source, gsl_matrix *res);
-void colCenter(gsl_matrix *inplace, const double &absLab); // when there are missing data labeled by absLab
+/** \brief Matrix centering in-place with missing values
+ *
+ * \param[in,out] gsl_matrix* matrix to be modified in-place
+ * \param[in] double& label for missing values
+ *
+ */
+void colCenter(gsl_matrix *inplace, const double &absLab);
+/** \brief Matrix centering with copy and missing values
+ *
+ * \param[in] gsl_matrix* matrix to be centered, but not changed
+ * \param[out] gsl_matrix* centered matrix
+ * \param[in] double& label for missing values
+ *
+ */
 void colCenter(const gsl_matrix *source, gsl_matrix *res, const double &absLab);
+/** \brief Vector centering in-place
+ *
+ * \param[in,out] gsl_vector* vector to be modified
+ *
+ */
 void vecCenter(gsl_vector *inplace);
+/** \brief Vector centering with copy
+ *
+ * \param[in] gsl_vector* vector to be centered, but not changed
+ * \param[out] gsl_vector* modified vector
+ *
+ */
 void vecCenter(const gsl_vector *source, gsl_vector *res);
+/** @} */
+/** \brief Print matrix to screen
+ *
+ * Printing a GSL matrix to screen, with each row on a line, values seprated by spaces
+ *
+ * \param[in] gsl_matrix* matrix to be displayed
+ *
+ */
 void printMat(const gsl_matrix *);
+/** \brief Accessing the processor RTDSC instruction
+ *
+ * \return a value of type unsigned long long
+ *
+ * This function outputs the processor RTDSC instruction for use in seeding random number generators
+ * \warning this function is unlikely to work under Windows
+ *
+ */
 unsigned long long rdtsc();
 /** @} */
 
+/** \defgroup lineLoc Individual location parameters
+ *
+ * A hierarchy of classes that refer to rows of location parameter matrices. These classes are internal to Grp classes and are not directly declared by the user of the library.  They are typically updated with samples from the multivariate normal distribution
+ *
+ * @{
+ */
 class MVnorm {
 protected:
 	gsl_vector_view _vec; // the vector of values
@@ -528,6 +599,9 @@ public:
 	void update(const Grp &dat, const Qgrp &q, const SigmaI &SigIb, const Grp &muPr, const double &qPr, const SigmaI &SigIp, const gsl_rng *r);
 
 };
+/** @} */
+// end of lineLoc group
+
 /*
  *	random index class that allows for mixture models.  Can be used as a deterministic index if there is deterministic initiation and no updating
  */
