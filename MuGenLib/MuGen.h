@@ -168,6 +168,8 @@ void colCenter(const gsl_matrix *source, gsl_matrix *res);
 void colCenter(gsl_matrix *inplace, const double &absLab);
 /** \brief Matrix centering with copy and missing values
  *
+ *	In addition to centering does mean-imputation of missing values
+ *
  * \param[in] gsl_matrix* matrix to be centered, but not changed
  * \param[out] gsl_matrix* centered matrix
  * \param[in] double& label for missing values
@@ -187,6 +189,13 @@ void vecCenter(gsl_vector *inplace);
  *
  */
 void vecCenter(const gsl_vector *source, gsl_vector *res);
+/** \brief Mean imputation without centering
+ *
+ * \param[in,out] gsl_matrix* matrix to be modified in-place
+ * \param[in] double& label for missing values
+ *
+ */
+void meanImpute(gsl_matrix *inplace, const double &absLab);
 /** @} */
 /** \brief Print matrix to screen
  *

@@ -201,6 +201,28 @@ void vecCenter(const gsl_vector *source, gsl_vector *res){
 	gsl_vector_add_constant(res, -mn);
 }
 
+void meanImpute(gsl_matrix *inplace, const double &absLab){
+	double clMn;
+	for (size_t jCl = 0; jCl < inplace->size2; jCl++) {
+		vector<double> prNonMiss;
+		vector<size_t> missInd;
+		double val;
+		for (size_t iRw = 0; iRw < inplace->size1; iRw++) {
+			val = gsl_matrix_get(inplace, iRw, jCl);
+			if (val > absLab) {
+				prNonMiss.push_back(val);
+			}
+			else {
+				missInd.push_back(iRw);
+			}
+		}
+		
+		clMn = gsl_stats_mean(prNonMiss.data(), 1, prNonMiss.size());
+		for (vector<size_t>::iterator missIt = missInd.begin(); missIt != missInd.end(); ++missIt) {
+			gsl_matrix_set(inplace, *missIt, jCl, 0.0);
+		}
+	}
+}
 // to print a GSL matrix to stdout
 void printMat(const gsl_matrix *m){
 	for (size_t i = 0; i < m->size1; i++) {
@@ -434,12 +456,12 @@ void MVnorm::save(FILE *fileStr){
 
 /*
  *	MVnormMu methods
-*/
+ */
 
 
 /*
-	various constructors to be used for initialization, in place of the .init() functions used in the R implementation
-*/
+ *	various constructors to be used for initialization, in place of the .init() functions used in the R implementation
+ */
 MVnormMu::MVnormMu() : MVnorm(){
 	_lowLevel = 0;
 	_upLevel  = 0;
@@ -527,7 +549,7 @@ MVnormMu::~MVnormMu(){
 }
 
 /*
-	overloaded update() methods
+ *	overloaded update() methods
  */
 
 void MVnormMu::update(const Grp &dat, const SigmaI &SigIm, const gsl_rng *r){
@@ -830,7 +852,7 @@ void MVnormMu::update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, const 
 }
 
 /*
-	MVnormMuPEX methods
+ *	MVnormMuPEX methods
  */
 MVnormMuPEX::MVnormMuPEX(gsl_matrix *mn, const size_t &iRw, const vector<size_t> &low, const size_t &up, Apex &A, gsl_matrix *tSigIAt) : MVnormMu(mn, iRw, low, up) {
 	_A = &A;
@@ -1258,7 +1280,7 @@ void MVnormMuMiss::update(const Grp &mu, const SigmaI &SigIm, const gsl_rng *r){
 		gsl_linalg_cholesky_invert(Sig);
 		
 		/*
-		 when copying over elements of SigI etc, keep in mind that only the lower triangle is stably defined, so we need only assign to the lower triangles
+		 * when copying over elements of SigI etc, keep in mind that only the lower triangle is stably defined, so we need only assign to the lower triangles
 		 */
 		int trkMis = 0;
 		int trkPrs = 0;
@@ -1298,7 +1320,7 @@ void MVnormMuMiss::update(const Grp &mu, const SigmaI &SigIm, const gsl_rng *r){
 		
 		// comments track the notation in the Wikipedia MV normal page
 		gsl_vector_sub(xKnwn, muKnwn); // a - mu2
-		gsl_blas_dsymv(CblasLower, 1.0, SigKnwn, xKnwn, 0.0, muKnwn); // V = Sig_{22}^{-1}(a - mu2)
+		gsl_blas_dsymv(CblasLower, 1.0, SigKnwn, xKnwn, 0.0, muKnwn);  // V = Sig_{22}^{-1}(a - mu2)
 		gsl_blas_dgemv(CblasNoTrans, 1.0, Sig12, muKnwn, 1.0, muUnkn); // mu1 + Sig12 %*% V
 		
 		MVgauss(muUnkn, SigUnkn, r, xUnkn);
@@ -2720,7 +2742,7 @@ void MVnormMuBlk::update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, con
 }
 
 /*
-	MVnormBetaBlk methods
+ *	MVnormBetaBlk methods
  */
 
 MVnormBetaBlk::MVnormBetaBlk(const Grp &resp, gsl_matrix *pred, const vector<size_t> &iCl, const gsl_matrix *Sig, const vector<size_t> &blkStart, const gsl_rng *r, gsl_matrix *bet, const size_t &iRw){
@@ -5768,10 +5790,9 @@ BetaGrpFt::BetaGrpFt() : _numSaves(0.0), Grp() {
 	_Xmat       = gsl_matrix_calloc(1, 1);
 }
 
-BetaGrpFt::BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npred, const int &nThr) : _numSaves(0.0), Grp(){
+BetaGrpFt::BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npred, const int &nThr) : _numSaves(0.0), _nThr(nThr), Grp(){
 	_fittedEach.resize(Npred);
 	_fittedAll  = gsl_matrix_calloc(rsp.Ndata(), rsp.phenD());
-	_nThr       = nThr;
 	_Xmat       = gsl_matrix_alloc(rsp.Ndata(), Npred);
 	gsl_matrix_free(_valueMat);
 	_valueMat   = gsl_matrix_alloc(Npred, rsp.phenD());
@@ -5817,10 +5838,9 @@ BetaGrpFt::BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npre
 	gsl_matrix_free(y);
 }
 
-BetaGrpFt::BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npred, RanIndex &up, const int &nThr) : _numSaves(0.0), Grp(){
+BetaGrpFt::BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npred, RanIndex &up, const int &nThr) : _numSaves(0.0), _nThr(nThr), Grp(){
 	_fittedEach.resize(Npred);
 	_fittedAll  = gsl_matrix_calloc(rsp.Ndata(), rsp.phenD());
-	_nThr       = nThr;
 	_Xmat       = gsl_matrix_alloc(rsp.Ndata(), Npred);
 	gsl_matrix_free(_valueMat);
 	_valueMat   = gsl_matrix_alloc(Npred, rsp.phenD());
@@ -5869,14 +5889,13 @@ BetaGrpFt::BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npre
 	gsl_matrix_free(y);
 }
 
-BetaGrpFt::BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npred, RanIndex &low, RanIndex &up, const int &nThr) : _numSaves(0.0), Grp(){
+BetaGrpFt::BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npred, RanIndex &low, RanIndex &up, const int &nThr) : _numSaves(0.0), _nThr(nThr), Grp(){
 	//	the _lowLevel RanIndex plays the role of the design matrix, and relates the unique values of the predictor (low.getNgrp()x1) to the predictor for all the rsp rows
-	//  the parameters still have the dimensions of the N(unique level of predictor) by d, but the _lowLevel is kept for the purposes of addition/subtraction and updating with the larger response matrix
+	//  the _fittedAll matrix still has only the unique rows; this is for efficiency when adding it to other Grp classes
 	
 	_fittedEach.resize(Npred);
 	_fittedAll  = gsl_matrix_calloc(low.getNgrp(), rsp.phenD());
-	_nThr       = nThr;
-	_Xmat       = gsl_matrix_alloc(low.getNgrp(), Npred);
+	_Xmat       = gsl_matrix_alloc(low.getNtot(), Npred);
 	gsl_matrix_free(_valueMat);
 	_valueMat   = gsl_matrix_alloc(Npred, rsp.phenD());
 	_lowLevel   = &low;
@@ -5900,21 +5919,32 @@ BetaGrpFt::BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npre
 	
 	_theta.resize(Npred);
 	
+	/*
+	 *  will read on line at a time so as not to have two potentially big matrices in memory at the same time; taking advantage of the row-major arrangement
+	 */
+	
 	FILE *prdIn = fopen(predFlNam.c_str(), "r");
-	gsl_matrix_fread(prdIn, _Xmat);
+	gsl_vector *row = gsl_vector_alloc(Npred);
+	for (size_t iGrp = 0; iGrp < _lowLevel->getNgrp(); iGrp++) {
+		gsl_vector_fread(prdIn, row);
+		for (vector<size_t>::iterator grpIt = (*_lowLevel)[iGrp].begin(); grpIt != (*_lowLevel)[iGrp].end(); ++grpIt) {
+			gsl_matrix_set_row(_Xmat, *grpIt, row);
+		}
+		
+	}
+	gsl_vector_free(row);
 	fclose(prdIn);
 	colCenter(_Xmat);
 	
-	MuGrp rspMn = rsp.mean(*_lowLevel);
-	gsl_matrix *y = gsl_matrix_alloc(rspMn.dMat()->size1, rspMn.dMat()->size2);
-	colCenter(rspMn.dMat(), y);
+	gsl_matrix *y = gsl_matrix_alloc(rsp.dMat()->size1, rsp.dMat()->size2);
+	colCenter(rsp.dMat(), y);
 	
 	if (Npred == 1) {
 		_theta[0] = new MVnormBeta(y, _Xmat, 0, Sig, _rV[0], _upLevel->priorInd(0), _valueMat, 0);
 	}
 	else {
 		for (size_t Xj = 0; Xj < Npred; Xj++) {
-			_fittedEach[Xj].resize(low.getNgrp()*rsp.phenD());
+			_fittedEach[Xj].resize(low.getNtot()*rsp.phenD());
 			_theta[Xj] = new MVnormBetaFt(y, _Xmat, Xj, _fittedEach[Xj], Sig, _rV[0], _upLevel->priorInd(Xj), _valueMat, Xj);
 		}
 	}
@@ -5924,10 +5954,9 @@ BetaGrpFt::BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npre
 	gsl_matrix_free(y);
 }
 
-BetaGrpFt::BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npred, const string &outFlNam, const int &nThr) : _numSaves(0.0), Grp(){
+BetaGrpFt::BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npred, const string &outFlNam, const int &nThr) : _numSaves(0.0), _nThr(nThr), Grp(){
 	_fittedEach.resize(Npred);
 	_fittedAll  = gsl_matrix_calloc(rsp.Ndata(), rsp.phenD());
-	_nThr       = nThr;
 	_Xmat       = gsl_matrix_alloc(rsp.Ndata(), Npred);
 	gsl_matrix_free(_valueMat);
 	_valueMat   = gsl_matrix_alloc(Npred, rsp.phenD());
@@ -5976,10 +6005,9 @@ BetaGrpFt::BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npre
 	gsl_matrix_free(y);
 }
 
-BetaGrpFt::BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npred, RanIndex &up, const string &outFlNam, const int &nThr) : _numSaves(0.0), Grp(){
+BetaGrpFt::BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npred, RanIndex &up, const string &outFlNam, const int &nThr) : _numSaves(0.0), _nThr(nThr), Grp(){
 	_fittedEach.resize(Npred);
 	_fittedAll  = gsl_matrix_calloc(rsp.Ndata(), rsp.phenD());
-	_nThr       = nThr;
 	_Xmat       = gsl_matrix_alloc(rsp.Ndata(), Npred);
 	gsl_matrix_free(_valueMat);
 	_valueMat   = gsl_matrix_alloc(Npred, rsp.phenD());
@@ -6029,14 +6057,12 @@ BetaGrpFt::BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npre
 	gsl_matrix_free(y);
 }
 
-BetaGrpFt::BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npred, RanIndex &low, RanIndex &up, const string &outFlNam, const int &nThr) : _numSaves(0.0), Grp(){
+BetaGrpFt::BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npred, RanIndex &low, RanIndex &up, const string &outFlNam, const int &nThr) : _numSaves(0.0), _nThr(nThr), Grp(){
 	//	the _lowLevel RanIndex plays the role of the design matrix, and relates the unique values of the predictor (low.getNgrp()x1) to the predictor for all the rsp rows
-	//  the parameters still have the dimensions of the N(unique level of predictor) by d, but the _lowLevel is kept for the purposes of addition/subtraction and updating with the larger response matrix
 	
 	_fittedEach.resize(Npred);
 	_fittedAll  = gsl_matrix_calloc(low.getNgrp(), rsp.phenD());
-	_nThr       = nThr;
-	_Xmat       = gsl_matrix_alloc(low.getNgrp(), Npred);
+	_Xmat       = gsl_matrix_alloc(low.getNtot(), Npred);
 	gsl_matrix_free(_valueMat);
 	_valueMat   = gsl_matrix_alloc(Npred, rsp.phenD());
 	_lowLevel   = &low;
@@ -6062,21 +6088,32 @@ BetaGrpFt::BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npre
 	
 	_theta.resize(Npred);
 	
+	/*
+	 *  will read on line at a time so as not to have two potentially big matrices in memory at the same time; taking advantage of the row-major arrangement
+	 */
+	
 	FILE *prdIn = fopen(predFlNam.c_str(), "r");
-	gsl_matrix_fread(prdIn, _Xmat);
+	gsl_vector *row = gsl_vector_alloc(Npred);
+	for (size_t iGrp = 0; iGrp < _lowLevel->getNgrp(); iGrp++) {
+		gsl_vector_fread(prdIn, row);
+		for (vector<size_t>::iterator grpIt = (*_lowLevel)[iGrp].begin(); grpIt != (*_lowLevel)[iGrp].end(); ++grpIt) {
+			gsl_matrix_set_row(_Xmat, *grpIt, row);
+		}
+		
+	}
+	gsl_vector_free(row);
 	fclose(prdIn);
 	colCenter(_Xmat);
 	
-	MuGrp rspMn = rsp.mean(*_lowLevel);
-	gsl_matrix *y = gsl_matrix_alloc(rspMn.dMat()->size1, rspMn.dMat()->size2);
-	colCenter(rspMn.dMat(), y);
+	gsl_matrix *y = gsl_matrix_alloc(rsp.dMat()->size1, rsp.dMat()->size2);
+	colCenter(rsp.dMat(), y);
 	
 	if (Npred == 1) {
 		_theta[0] = new MVnormBeta(y, _Xmat, 0, Sig, _rV[0], _upLevel->priorInd(0), _valueMat, 0);
 	}
 	else {
 		for (size_t Xj = 0; Xj < Npred; Xj++) {
-			_fittedEach[Xj].resize(low.getNgrp()*rsp.phenD());
+			_fittedEach[Xj].resize(low.getNtot()*rsp.phenD());
 			_theta[Xj] = new MVnormBetaFt(y, _Xmat, Xj, _fittedEach[Xj], Sig, _rV[0], _upLevel->priorInd(Xj), _valueMat, Xj);
 		}
 	}
@@ -6089,10 +6126,9 @@ BetaGrpFt::BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npre
 /*
  *	constructors with missing predictor data
  */
-BetaGrpFt::BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npred, const double &absLab, const int &nThr) :  _numSaves(0.0), Grp() {
+BetaGrpFt::BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npred, const double &absLab, const int &nThr) :  _numSaves(0.0), _nThr(nThr), Grp() {
 	_fittedEach.resize(Npred);
 	_fittedAll  = gsl_matrix_calloc(rsp.Ndata(), rsp.phenD());
-	_nThr       = nThr;
 	_Xmat       = gsl_matrix_alloc(rsp.Ndata(), Npred);
 	gsl_matrix_free(_valueMat);
 	_valueMat   = gsl_matrix_alloc(Npred, rsp.phenD());
@@ -6137,10 +6173,9 @@ BetaGrpFt::BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npre
 	gsl_matrix_free(Sig);
 	gsl_matrix_free(y);
 }
-BetaGrpFt::BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npred, const double &absLab, RanIndex &up, const int &nThr) :  _numSaves(0.0), Grp() {
+BetaGrpFt::BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npred, const double &absLab, RanIndex &up, const int &nThr) :  _numSaves(0.0), _nThr(nThr), Grp() {
 	_fittedEach.resize(Npred);
 	_fittedAll  = gsl_matrix_calloc(rsp.Ndata(), rsp.phenD());
-	_nThr       = nThr;
 	_Xmat       = gsl_matrix_alloc(rsp.Ndata(), Npred);
 	gsl_matrix_free(_valueMat);
 	_valueMat   = gsl_matrix_alloc(Npred, rsp.phenD());
@@ -6187,11 +6222,10 @@ BetaGrpFt::BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npre
 	gsl_matrix_free(Sig);
 	gsl_matrix_free(y);
 }
-BetaGrpFt::BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npred, const double &absLab, RanIndex &low, RanIndex &up, const int &nThr) :  _numSaves(0.0), Grp() {
+BetaGrpFt::BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npred, const double &absLab, RanIndex &low, RanIndex &up, const int &nThr) :  _numSaves(0.0), _nThr(nThr), Grp() {
 	_fittedEach.resize(Npred);
 	_fittedAll  = gsl_matrix_calloc(low.getNgrp(), rsp.phenD());
-	_nThr       = nThr;
-	_Xmat       = gsl_matrix_alloc(low.getNgrp(), Npred);
+	_Xmat       = gsl_matrix_alloc(low.getNtot(), Npred);
 	gsl_matrix_free(_valueMat);
 	_valueMat   = gsl_matrix_alloc(Npred, rsp.phenD());
 	_lowLevel   = &low;
@@ -6215,21 +6249,31 @@ BetaGrpFt::BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npre
 	
 	_theta.resize(Npred);
 	
+	gsl_matrix *tmpX = gsl_matrix_alloc(_lowLevel->getNgrp(), Npred);
 	FILE *prdIn = fopen(predFlNam.c_str(), "r");
-	gsl_matrix_fread(prdIn, _Xmat);
+	gsl_matrix_fread(prdIn, tmpX);
 	fclose(prdIn);
-	colCenter(_Xmat, absLab);
+	meanImpute(tmpX, absLab);
 	
-	MuGrp rspMn = rsp.mean(*_lowLevel);
-	gsl_matrix *y = gsl_matrix_alloc(rspMn.dMat()->size1, rspMn.dMat()->size2);
-	colCenter(rspMn.dMat(), y);
+	for (size_t iGrp = 0; iGrp < _lowLevel->getNgrp(); iGrp++) {
+		gsl_vector_view tmpRow = gsl_matrix_row(tmpX, iGrp);
+		for (vector<size_t>::iterator grpIt = (*_lowLevel)[iGrp].begin(); grpIt != (*_lowLevel)[iGrp].end(); ++grpIt) {
+			gsl_matrix_set_row(_Xmat, *grpIt, &tmpRow.vector);
+		}
+		
+	}
+	colCenter(_Xmat);
+	gsl_matrix_free(tmpX);
+	
+	gsl_matrix *y = gsl_matrix_alloc(rsp.dMat()->size1, rsp.dMat()->size2);
+	colCenter(rsp.dMat(), y);
 	
 	if (Npred == 1) {
 		_theta[0] = new MVnormBeta(y, _Xmat, 0, Sig, _rV[0], _upLevel->priorInd(0), _valueMat, 0);
 	}
 	else {
 		for (size_t Xj = 0; Xj < Npred; Xj++) {
-			_fittedEach[Xj].resize(low.getNgrp()*rsp.phenD());
+			_fittedEach[Xj].resize(low.getNtot()*rsp.phenD());
 			_theta[Xj] = new MVnormBetaFt(y, _Xmat, Xj, _fittedEach[Xj], Sig, _rV[0], _upLevel->priorInd(Xj), _valueMat, Xj);
 		}
 	}
@@ -6238,10 +6282,9 @@ BetaGrpFt::BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npre
 	gsl_matrix_free(Sig);
 	gsl_matrix_free(y);
 }
-BetaGrpFt::BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npred, const double &absLab, const string &outFlNam, const int &nThr) :  _numSaves(0.0), Grp(){
+BetaGrpFt::BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npred, const double &absLab, const string &outFlNam, const int &nThr) :  _numSaves(0.0), _nThr(nThr), Grp(){
 	_fittedEach.resize(Npred);
 	_fittedAll  = gsl_matrix_calloc(rsp.Ndata(), rsp.phenD());
-	_nThr       = nThr;
 	_Xmat       = gsl_matrix_alloc(rsp.Ndata(), Npred);
 	gsl_matrix_free(_valueMat);
 	_valueMat   = gsl_matrix_alloc(Npred, rsp.phenD());
@@ -6289,10 +6332,9 @@ BetaGrpFt::BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npre
 	gsl_matrix_free(y);
 
 }
-BetaGrpFt::BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npred, const double &absLab, RanIndex &up, const string &outFlNam, const int &nThr) :  _numSaves(0.0), Grp() {
+BetaGrpFt::BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npred, const double &absLab, RanIndex &up, const string &outFlNam, const int &nThr) :  _numSaves(0.0), _nThr(nThr), Grp() {
 	_fittedEach.resize(Npred);
 	_fittedAll  = gsl_matrix_calloc(rsp.Ndata(), rsp.phenD());
-	_nThr       = nThr;
 	_Xmat       = gsl_matrix_alloc(rsp.Ndata(), Npred);
 	gsl_matrix_free(_valueMat);
 	_valueMat   = gsl_matrix_alloc(Npred, rsp.phenD());
@@ -6341,11 +6383,10 @@ BetaGrpFt::BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npre
 	gsl_matrix_free(Sig);
 	gsl_matrix_free(y);
 }
-BetaGrpFt::BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npred, const double &absLab, RanIndex &low, RanIndex &up, const string &outFlNam, const int &nThr) :  _numSaves(0.0), Grp() {
+BetaGrpFt::BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npred, const double &absLab, RanIndex &low, RanIndex &up, const string &outFlNam, const int &nThr) :  _numSaves(0.0), _nThr(nThr), Grp() {
 	_fittedEach.resize(Npred);
 	_fittedAll  = gsl_matrix_calloc(low.getNgrp(), rsp.phenD());
-	_nThr       = nThr;
-	_Xmat       = gsl_matrix_alloc(low.getNgrp(), Npred);
+	_Xmat       = gsl_matrix_alloc(low.getNtot(), Npred);
 	gsl_matrix_free(_valueMat);
 	_valueMat   = gsl_matrix_alloc(Npred, rsp.phenD());
 	_lowLevel   = &low;
@@ -6371,21 +6412,31 @@ BetaGrpFt::BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npre
 	
 	_theta.resize(Npred);
 	
+	gsl_matrix *tmpX = gsl_matrix_alloc(_lowLevel->getNgrp(), Npred);
 	FILE *prdIn = fopen(predFlNam.c_str(), "r");
-	gsl_matrix_fread(prdIn, _Xmat);
+	gsl_matrix_fread(prdIn, tmpX);
 	fclose(prdIn);
-	colCenter(_Xmat, absLab);
+	meanImpute(tmpX, absLab);
 	
-	MuGrp rspMn = rsp.mean(*_lowLevel);
-	gsl_matrix *y = gsl_matrix_alloc(rspMn.dMat()->size1, rspMn.dMat()->size2);
-	colCenter(rspMn.dMat(), y);
+	for (size_t iGrp = 0; iGrp < _lowLevel->getNgrp(); iGrp++) {
+		gsl_vector_view tmpRow = gsl_matrix_row(tmpX, iGrp);
+		for (vector<size_t>::iterator grpIt = (*_lowLevel)[iGrp].begin(); grpIt != (*_lowLevel)[iGrp].end(); ++grpIt) {
+			gsl_matrix_set_row(_Xmat, *grpIt, &tmpRow.vector);
+		}
+		
+	}
+	colCenter(_Xmat);
+	gsl_matrix_free(tmpX);
+	
+	gsl_matrix *y = gsl_matrix_alloc(rsp.dMat()->size1, rsp.dMat()->size2);
+	colCenter(rsp.dMat(), y);
 	
 	if (Npred == 1) {
 		_theta[0] = new MVnormBeta(y, _Xmat, 0, Sig, _rV[0], _upLevel->priorInd(0), _valueMat, 0);
 	}
 	else {
 		for (size_t Xj = 0; Xj < Npred; Xj++) {
-			_fittedEach[Xj].resize(low.getNgrp()*rsp.phenD());
+			_fittedEach[Xj].resize(low.getNtot()*rsp.phenD());
 			_theta[Xj] = new MVnormBetaFt(y, _Xmat, Xj, _fittedEach[Xj], Sig, _rV[0], _upLevel->priorInd(Xj), _valueMat, Xj);
 		}
 	}
@@ -6398,10 +6449,9 @@ BetaGrpFt::BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npre
 /*
  *	constructors with rank pre-selection
  */
-BetaGrpFt::BetaGrpFt(const Grp &rsp, const SigmaI &SigI, const string &predFlNam, const size_t &Npred, const double &Nmul, const double &rSqMax, RanIndex &up, const string &outFlNam, const int &nThr) : _numSaves(0.0), Grp(){
+BetaGrpFt::BetaGrpFt(const Grp &rsp, const SigmaI &SigI, const string &predFlNam, const size_t &Npred, const double &Nmul, const double &rSqMax, RanIndex &up, const string &outFlNam, const int &nThr) : _numSaves(0.0), _nThr(nThr), Grp(){
 	gsl_matrix_free(_valueMat);
 	_fittedAll = gsl_matrix_calloc(rsp.Ndata(), rsp.phenD());
-	_nThr      = nThr;
 	_Xmat      = gsl_matrix_alloc(rsp.Ndata(), Npred);
 	
 	_upLevel  = &up;
@@ -6463,10 +6513,9 @@ BetaGrpFt::BetaGrpFt(const Grp &rsp, const SigmaI &SigI, const string &predFlNam
 	gsl_matrix_free(y);
 }
 
-BetaGrpFt::BetaGrpFt(const Grp &rsp, const SigmaI &SigI, const string &predFlNam, const size_t &Npred, const double &Nmul, const double &rSqMax, RanIndex &low, RanIndex &up, const string &outFlNam, const int &nThr) : _numSaves(0.0), Grp(){
+BetaGrpFt::BetaGrpFt(const Grp &rsp, const SigmaI &SigI, const string &predFlNam, const size_t &Npred, const double &Nmul, const double &rSqMax, RanIndex &low, RanIndex &up, const string &outFlNam, const int &nThr) : _numSaves(0.0), _nThr(nThr), Grp(){
 	gsl_matrix_free(_valueMat);
 	_fittedAll  = gsl_matrix_calloc(low.getNgrp(), rsp.phenD());
-	_nThr       = nThr;
 	_Xmat       = gsl_matrix_alloc(low.getNgrp(), Npred);
 	_lowLevel   = &low;
 	_upLevel    = &up;
@@ -6498,6 +6547,7 @@ BetaGrpFt::BetaGrpFt(const Grp &rsp, const SigmaI &SigI, const string &predFlNam
 	gsl_permutation *allP = gsl_permutation_alloc(_Xmat->size2);
 	
 	_rankPred(y, SigI, XtX, allP); // will center _Xmat
+	gsl_matrix_free(y);
 	
 	size_t Npck = ceil(_Xmat->size1*Nmul);
 	vector< vector<size_t> > tmpUp(2);
@@ -6512,27 +6562,34 @@ BetaGrpFt::BetaGrpFt(const Grp &rsp, const SigmaI &SigI, const string &predFlNam
 	
 	// keeping only the selected predictors
 	gsl_matrix_free(_Xmat);
-	_Xmat = gsl_matrix_alloc(tmpX->size1, tmpX->size2);
-	gsl_matrix_memcpy(_Xmat, tmpX);
+	_Xmat = gsl_matrix_alloc(_lowLevel->getNtot(), tmpX->size2);
+	for (size_t iGrp = 0; iGrp < _lowLevel->getNgrp(); iGrp++) {
+		gsl_vector_view row = gsl_matrix_row(tmpX, iGrp);
+		for (vector<size_t>::iterator grpIt = (*_lowLevel)[iGrp].begin(); grpIt != (*_lowLevel)[iGrp].end(); ++grpIt) {
+			gsl_matrix_set_row(_Xmat, *grpIt, &row.vector);
+		}
+	}
 	gsl_matrix_free(tmpX);
+	colCenter(_Xmat);
 	
 	_theta.resize(_Xmat->size2);
 	_valueMat  = gsl_matrix_calloc(_Xmat->size2, rsp.phenD());
 	_fittedEach.resize(_Xmat->size2);
-
+	
+	gsl_matrix *Ylng = gsl_matrix_alloc(rsp.dMat()->size1, rsp.dMat()->size2);
+	colCenter(rsp.dMat(), Ylng);
 	for (size_t Xj = 0; Xj < (*_upLevel)[0].size(); Xj++) {
-		_fittedEach[Xj].resize(low.getNgrp()*rsp.phenD());
-		_theta[Xj] = new MVnormBetaFt(y, _Xmat, Xj, _fittedEach[Xj], SigI.getMat(), _rV[0], _upLevel->priorInd(Xj), _valueMat, Xj);
+		_fittedEach[Xj].resize(low.getNtot()*rsp.phenD());
+		_theta[Xj] = new MVnormBetaFt(Ylng, _Xmat, Xj, _fittedEach[Xj], SigI.getMat(), _rV[0], _upLevel->priorInd(Xj), _valueMat, Xj);
 	}
 	
 	_updateFitted();
-	gsl_matrix_free(y);
+	gsl_matrix_free(Ylng);
 }
 
-BetaGrpFt::BetaGrpFt(const Grp &rsp, const SigmaI &SigI, const string &predFlNam, const size_t &Npred, const double &Nmul, const double &rSqMax, const double &absLab, RanIndex &up, const string &outFlNam, const int &nThr) :  _numSaves(0.0), Grp() {
+BetaGrpFt::BetaGrpFt(const Grp &rsp, const SigmaI &SigI, const string &predFlNam, const size_t &Npred, const double &Nmul, const double &rSqMax, const double &absLab, RanIndex &up, const string &outFlNam, const int &nThr) :  _numSaves(0.0), _nThr(nThr), Grp() {
 	gsl_matrix_free(_valueMat);
 	_fittedAll  = gsl_matrix_calloc(rsp.Ndata(), rsp.phenD());
-	_nThr       = nThr;
 	_Xmat       = gsl_matrix_alloc(rsp.Ndata(), Npred);
 	
 	_upLevel  = &up;
@@ -6593,10 +6650,9 @@ BetaGrpFt::BetaGrpFt(const Grp &rsp, const SigmaI &SigI, const string &predFlNam
 	_updateFitted();
 	gsl_matrix_free(y);
 }
-BetaGrpFt::BetaGrpFt(const Grp &rsp, const SigmaI &SigI, const string &predFlNam, const size_t &Npred, const double &Nmul, const double &rSqMax, const double &absLab, RanIndex &low, RanIndex &up, const string &outFlNam, const int &nThr) :  _numSaves(0.0), Grp() {
+BetaGrpFt::BetaGrpFt(const Grp &rsp, const SigmaI &SigI, const string &predFlNam, const size_t &Npred, const double &Nmul, const double &rSqMax, const double &absLab, RanIndex &low, RanIndex &up, const string &outFlNam, const int &nThr) :  _numSaves(0.0), _nThr(nThr), Grp() {
 	gsl_matrix_free(_valueMat);
 	_fittedAll  = gsl_matrix_calloc(low.getNgrp(), rsp.phenD());
-	_nThr       = nThr;
 	_Xmat       = gsl_matrix_alloc(low.getNgrp(), Npred);
 	_lowLevel   = &low;
 	_upLevel    = &up;
@@ -6629,6 +6685,7 @@ BetaGrpFt::BetaGrpFt(const Grp &rsp, const SigmaI &SigI, const string &predFlNam
 	gsl_permutation *allP = gsl_permutation_alloc(_Xmat->size2);
 	
 	_rankPred(y, SigI, XtX, allP); // will center _Xmat
+	gsl_matrix_free(y);
 	
 	size_t Npck = ceil(_Xmat->size1*Nmul);
 	vector< vector<size_t> > tmpUp(2);
@@ -6643,21 +6700,29 @@ BetaGrpFt::BetaGrpFt(const Grp &rsp, const SigmaI &SigI, const string &predFlNam
 	
 	// keeping only the selected predictors
 	gsl_matrix_free(_Xmat);
-	_Xmat = gsl_matrix_alloc(tmpX->size1, tmpX->size2);
-	gsl_matrix_memcpy(_Xmat, tmpX);
+	_Xmat = gsl_matrix_alloc(_lowLevel->getNtot(), tmpX->size2);
+	for (size_t iGrp = 0; iGrp < _lowLevel->getNgrp(); iGrp++) {
+		gsl_vector_view row = gsl_matrix_row(tmpX, iGrp);
+		for (vector<size_t>::iterator grpIt = (*_lowLevel)[iGrp].begin(); grpIt != (*_lowLevel)[iGrp].end(); ++grpIt) {
+			gsl_matrix_set_row(_Xmat, *grpIt, &row.vector);
+		}
+	}
 	gsl_matrix_free(tmpX);
+	colCenter(_Xmat);
 	
 	_theta.resize(_Xmat->size2);
 	_valueMat  = gsl_matrix_calloc(_Xmat->size2, rsp.phenD());
 	_fittedEach.resize(_Xmat->size2);
 	
+	gsl_matrix *Ylng = gsl_matrix_alloc(rsp.dMat()->size1, rsp.dMat()->size2);
+	colCenter(rsp.dMat(), Ylng);
 	for (size_t Xj = 0; Xj < (*_upLevel)[0].size(); Xj++) {
-		_fittedEach[Xj].resize(low.getNgrp()*rsp.phenD());
-		_theta[Xj] = new MVnormBetaFt(y, _Xmat, Xj, _fittedEach[Xj], SigI.getMat(), _rV[0], _upLevel->priorInd(Xj), _valueMat, Xj);
+		_fittedEach[Xj].resize(low.getNtot()*rsp.phenD());
+		_theta[Xj] = new MVnormBetaFt(Ylng, _Xmat, Xj, _fittedEach[Xj], SigI.getMat(), _rV[0], _upLevel->priorInd(Xj), _valueMat, Xj);
 	}
 	
 	_updateFitted();
-	gsl_matrix_free(y);
+	gsl_matrix_free(Ylng);
 }
 
 
@@ -6747,32 +6812,65 @@ BetaGrpFt::~BetaGrpFt(){
  *  Independently confirmed that it is doing the right thing by comparing to GSL dgemm results.
  */
 void BetaGrpFt::_updateFitted(){
+	if (_lowLevel) {
 #pragma omp parallel num_threads(_nThr)
-	{
-		gsl_vector *tmpVec = gsl_vector_alloc(_theta.size()); // have to make a OMP team copy of the temp array
-		double pSum;
-		
+		{
+			gsl_vector *tmpVec = gsl_vector_alloc(_theta.size()); // have to make a OMP team copy of the temp array
+			double totSum;
+			
 #pragma omp for
-		for (int prdRow = 0; prdRow < _Xmat->size1; prdRow++) {   // going through pred, row by row
-			for (int bcol = 0; bcol < _valueMat->size2; bcol++) { // going through columns of coefficients (i.e. through _valueMat)
-				pSum = 0.0;
-				gsl_matrix_get_row(tmpVec, _Xmat, prdRow);
-				gsl_vector_view evCol = gsl_matrix_column(_valueMat, bcol);
-				gsl_vector_mul(tmpVec, &evCol.vector); // multiplying a column of _valueMat (estimated values) and row of _Xmat (predictors), fill the tmpVec with a[im]*b[mi] (m = 1, ..., Npred), to sum next
-				for (int iBt = 0; iBt < _valueMat->size1; iBt++) {
-					pSum += gsl_vector_get(tmpVec, iBt);
-				}
-				gsl_matrix_set(_fittedAll,  prdRow, bcol, pSum);
-				if (_valueMat->size1 > 1) {
-					for (int jBt = 0; jBt < _valueMat->size1; jBt++) {
-						_fittedEach[jBt][prdRow*(_valueMat->size2) + bcol] = pSum - gsl_vector_get(tmpVec, jBt); // following the idiom set in the GSL description of the matrix element representation in the underlying array
+			for (int prdRow = 0; prdRow < _lowLevel->getNgrp(); prdRow++) {   // going through pred, row by row, but only non-redundant rows
+				for (int bcol = 0; bcol < _valueMat->size2; bcol++) { // going through columns of coefficients (i.e. through _valueMat)
+					totSum = 0.0;
+					gsl_matrix_get_row(tmpVec, _Xmat, (*_lowLevel)[prdRow][0]);
+					gsl_vector_view evCol = gsl_matrix_column(_valueMat, bcol);
+					gsl_vector_mul(tmpVec, &evCol.vector); // multiplying a column of _valueMat (estimated values) and row of _Xmat (predictors), fill the tmpVec with a[im]*b[mi] (m = 1, ..., Npred), to sum next
+					for (int iBt = 0; iBt < _valueMat->size1; iBt++) {
+						totSum += gsl_vector_get(tmpVec, iBt);
+					}
+					gsl_matrix_set(_fittedAll,  prdRow, bcol, totSum); // _fittedAll only has the unique elements
+					if (_valueMat->size1 > 1) {
+						for (int jBt = 0; jBt < _valueMat->size1; jBt++) {
+							double pSum = totSum - gsl_vector_get(tmpVec, jBt);
+							for (vector<size_t>::iterator grpIt = (*_lowLevel)[prdRow].begin(); grpIt != (*_lowLevel)[prdRow].end(); ++grpIt) {
+								_fittedEach[jBt][(*grpIt)*(_valueMat->size2) + bcol] = pSum; // following the idiom set in the GSL description of the matrix element representation in the underlying array
+							}
+						}
 					}
 				}
 			}
-		}
-		
-		gsl_vector_free(tmpVec);
-	} // end parallel block
+			
+			gsl_vector_free(tmpVec);
+		} // end parallel block
+	}
+	else {
+#pragma omp parallel num_threads(_nThr)
+		{
+			gsl_vector *tmpVec = gsl_vector_alloc(_theta.size()); // have to make a OMP team copy of the temp array
+			double pSum;
+			
+#pragma omp for
+			for (int prdRow = 0; prdRow < _Xmat->size1; prdRow++) {   // going through pred, row by row
+				for (int bcol = 0; bcol < _valueMat->size2; bcol++) { // going through columns of coefficients (i.e. through _valueMat)
+					pSum = 0.0;
+					gsl_matrix_get_row(tmpVec, _Xmat, prdRow);
+					gsl_vector_view evCol = gsl_matrix_column(_valueMat, bcol);
+					gsl_vector_mul(tmpVec, &evCol.vector); // multiplying a column of _valueMat (estimated values) and row of _Xmat (predictors), fill the tmpVec with a[im]*b[mi] (m = 1, ..., Npred), to sum next
+					for (int iBt = 0; iBt < _valueMat->size1; iBt++) {
+						pSum += gsl_vector_get(tmpVec, iBt);
+					}
+					gsl_matrix_set(_fittedAll,  prdRow, bcol, pSum);
+					if (_valueMat->size1 > 1) {
+						for (int jBt = 0; jBt < _valueMat->size1; jBt++) {
+							_fittedEach[jBt][prdRow*(_valueMat->size2) + bcol] = pSum - gsl_vector_get(tmpVec, jBt); // following the idiom set in the GSL description of the matrix element representation in the underlying array
+						}
+					}
+				}
+			}
+			
+			gsl_vector_free(tmpVec);
+		} // end parallel block
+	}
 }
 
 void BetaGrpFt::_rankPred(const gsl_matrix *y, const SigmaI &SigI, gsl_vector *XtX, gsl_permutation *prm){
@@ -6937,7 +7035,8 @@ void BetaGrpFt::_ldToss(const gsl_vector *var, const gsl_permutation *prm, const
 
 double BetaGrpFt::_MGkernel(const Grp &dat, const SigmaI &SigI) const{
 	/*
-	 MV Gaussian kernel, typically written as sum{(x[i]-mu)Sig^{-1}(x[i]-m)'}, can be re-written as Tr[Sig^{-1}(x-m)'(x-m)], which in turn is ddot(vec[Sig^{-1}]vec[(x-m)'(x-m)]) and can be calculated several-fold faster b/c of the use of level3 BLAS (especially for big x)
+	 *  MV Gaussian kernel, typically written as sum{(x[i]-mu)Sig^{-1}(x[i]-m)'}, can be re-written as Tr[Sig^{-1}(x-m)'(x-m)], which in turn is ddot(vec[Sig^{-1}]vec[(x-m)'(x-m)]) and can be calculated several-fold faster b/c of the use of level3 BLAS (especially for big x)
+	 *  Have to test for the case where there is replication!!!
 	 */
 	gsl_matrix *dif = gsl_matrix_alloc(_fittedAll->size1, _fittedAll->size2);
 	gsl_matrix *s   = gsl_matrix_alloc(_fittedAll->size2, _fittedAll->size2);
@@ -7074,216 +7173,77 @@ double BetaGrpFt::lnOddsRat(const Grp &y, const SigmaI &SigI, const size_t i) co
  */
 // improper prior
 void BetaGrpFt::update(const Grp &dat, const SigmaI &SigIm){
-	if (_lowLevel) {
-		MuGrp datMnI = dat.mean(*_lowLevel);
-		Grp &datMn   = datMnI;
-		
-		for (vector<MVnorm *>::const_iterator elm = _theta.begin(); elm != _theta.end(); ++elm) {
-			(*elm)->update(datMn, SigIm, _rV[0]);
-		}
-
+	for (vector<MVnorm *>::const_iterator elm = _theta.begin(); elm != _theta.end(); ++elm) {
+		(*elm)->update(dat, SigIm, _rV[0]);
 	}
-	else {
-		for (vector<MVnorm *>::const_iterator elm = _theta.begin(); elm != _theta.end(); ++elm) {
-			(*elm)->update(dat, SigIm, _rV[0]);
-		}
-
-	}
-	
 	_updateFitted();
 }
 void BetaGrpFt::update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm){
-	if (_lowLevel) {
-		MuGrp datMnI = dat.mean(*_lowLevel);
-		Grp &datMn   = datMnI;
-		
 #pragma omp parallel for num_threads(_nThr)
-		for (int iTh = 0; iTh < _theta.size(); iTh++) {
-			_theta[iTh]->update(datMn, q, SigIm, _rV[omp_get_thread_num()]);
-		}
-
+	for (int iTh = 0; iTh < _theta.size(); iTh++) {
+		_theta[iTh]->update(dat, q, SigIm, _rV[omp_get_thread_num()]);
 	}
-	else {
-#pragma omp parallel for num_threads(_nThr)
-		for (int iTh = 0; iTh < _theta.size(); iTh++) {
-			_theta[iTh]->update(dat, q, SigIm, _rV[omp_get_thread_num()]);
-		}
-
-	}
-	
 	_updateFitted();
 }
 
 // 0-mean prior
 void BetaGrpFt::update(const Grp &dat, const SigmaI &SigIm, const SigmaI &SigIp){
-	if (_lowLevel) {
-		MuGrp datMnI = dat.mean(*_lowLevel);
-		Grp &datMn   = datMnI;
-		
 #pragma omp parallel for num_threads(_nThr)
-		for (int iTh = 0; iTh < _theta.size(); iTh++) {
-			_theta[iTh]->update(datMn, SigIm, SigIp, _rV[0]);
-		}
-
+	for (int iTh = 0; iTh < _theta.size(); iTh++) {
+		_theta[iTh]->update(dat, SigIm, SigIp, _rV[0]);
 	}
-	else {
-#pragma omp parallel for num_threads(_nThr)
-		for (int iTh = 0; iTh < _theta.size(); iTh++) {
-			_theta[iTh]->update(dat, SigIm, SigIp, _rV[0]);
-		}
-
-	}
-
 	_updateFitted();
 }
 void BetaGrpFt::update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, const SigmaI &SigIp){
-	if (_lowLevel) {
-		MuGrp datMnI = dat.mean(*_lowLevel);
-		Grp &datMn   = datMnI;
-		
 #pragma omp parallel for num_threads(_nThr)
-		for (int iTh = 0; iTh < _theta.size(); iTh++) {
-			_theta[iTh]->update(datMn, q, SigIm, SigIp, _rV[omp_get_thread_num()]);
-		}
-
+	for (int iTh = 0; iTh < _theta.size(); iTh++) {
+		_theta[iTh]->update(dat, q, SigIm, SigIp, _rV[omp_get_thread_num()]);
 	}
-	else {
-#pragma omp parallel for num_threads(_nThr)
-		for (int iTh = 0; iTh < _theta.size(); iTh++) {
-			_theta[iTh]->update(dat, q, SigIm, SigIp, _rV[omp_get_thread_num()]);
-		}
-
-	}
-	
 	_updateFitted();
 }
 
 void BetaGrpFt::update(const Grp &dat, const SigmaI &SigIm, const Qgrp &qPr, const SigmaI &SigIp){
-	if (_lowLevel) {
-		MuGrp datMnI = dat.mean(*_lowLevel);
-		Grp &datMn   = datMnI;
-		
 #pragma omp parallel for num_threads(_nThr)
-		for (size_t iTh = 0; iTh < _theta.size(); iTh++) {
-			_theta[iTh]->update(datMn, SigIm, qPr[iTh], SigIp, _rV[0]);
-		}
-
+	for (size_t iTh = 0; iTh < _theta.size(); iTh++) {
+		_theta[iTh]->update(dat, SigIm, qPr[iTh], SigIp, _rV[0]);
 	}
-	else {
-#pragma omp parallel for num_threads(_nThr)
-		for (size_t iTh = 0; iTh < _theta.size(); iTh++) {
-			_theta[iTh]->update(dat, SigIm, qPr[iTh], SigIp, _rV[0]);
-		}
-
-	}
-	
 	_updateFitted();
 }
 void BetaGrpFt::update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, const Qgrp &qPr, const SigmaI &SigIp){
-	if (_lowLevel) {
-		MuGrp datMnI = dat.mean(*_lowLevel);
-		Grp &datMn   = datMnI;
-		
 #pragma omp parallel for num_threads(_nThr)
-		for (int iTh = 0; iTh < _theta.size(); iTh++) {
-			_theta[iTh]->update(datMn, q, SigIm, qPr[iTh], SigIp, _rV[omp_get_thread_num()]);
-		}
-
+	for (int iTh = 0; iTh < _theta.size(); iTh++) {
+		_theta[iTh]->update(dat, q, SigIm, qPr[iTh], SigIp, _rV[omp_get_thread_num()]);
 	}
-	else {
-#pragma omp parallel for num_threads(_nThr)
-		for (int iTh = 0; iTh < _theta.size(); iTh++) {
-			_theta[iTh]->update(dat, q, SigIm, qPr[iTh], SigIp, _rV[omp_get_thread_num()]);
-		}
-
-	}
-		
 	_updateFitted();
 }
 
 // non-0-mean prior
 void BetaGrpFt::update(const Grp &dat, const SigmaI &SigIm, const Grp &muPr, const SigmaI &SigIp){
-	if (_lowLevel) {
-		MuGrp datMnI = dat.mean(*_lowLevel);
-		Grp &datMn   = datMnI;
-		
 #pragma omp parallel for num_threads(_nThr)
-		for (int iTh = 0; iTh < _theta.size(); iTh++) {
-			_theta[iTh]->update(datMn, SigIm, muPr, SigIp, _rV[0]);
-		}
-
+	for (int iTh = 0; iTh < _theta.size(); iTh++) {
+		_theta[iTh]->update(dat, SigIm, muPr, SigIp, _rV[0]);
 	}
-	else {
-#pragma omp parallel for num_threads(_nThr)
-		for (int iTh = 0; iTh < _theta.size(); iTh++) {
-			_theta[iTh]->update(dat, SigIm, muPr, SigIp, _rV[0]);
-		}
-
-	}
-	
 	_updateFitted();
 }
 void BetaGrpFt::update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, const Grp &muPr, const SigmaI &SigIp){
-	if (_lowLevel) {
-		MuGrp datMnI = dat.mean(*_lowLevel);
-		Grp &datMn   = datMnI;
-		
 #pragma omp parallel for num_threads(_nThr)
-		for (int iTh = 0; iTh < _theta.size(); iTh++) {
-			_theta[iTh]->update(datMn, q, SigIm, muPr, SigIp, _rV[omp_get_thread_num()]);
-		}
-
+	for (int iTh = 0; iTh < _theta.size(); iTh++) {
+		_theta[iTh]->update(dat, q, SigIm, muPr, SigIp, _rV[omp_get_thread_num()]);
 	}
-	else {
-#pragma omp parallel for num_threads(_nThr)
-		for (int iTh = 0; iTh < _theta.size(); iTh++) {
-			_theta[iTh]->update(dat, q, SigIm, muPr, SigIp, _rV[omp_get_thread_num()]);
-		}
-
-	}
-	
 	_updateFitted();
 }
 void BetaGrpFt::update(const Grp &dat, const SigmaI &SigIm, const Grp &muPr, const Qgrp &qPr, const SigmaI &SigIp){
-	if (_lowLevel) {
-		MuGrp datMnI = dat.mean(*_lowLevel);
-		Grp &datMn   = datMnI;
-		
 #pragma omp parallel for num_threads(_nThr)
-		for (int iTh = 0; iTh < _theta.size(); iTh++) {
-			_theta[iTh]->update(datMn, SigIm, muPr, qPr[iTh], SigIp, _rV[0]);
-		}
-
+	for (int iTh = 0; iTh < _theta.size(); iTh++) {
+		_theta[iTh]->update(dat, SigIm, muPr, qPr[iTh], SigIp, _rV[0]);
 	}
-	else {
-#pragma omp parallel for num_threads(_nThr)
-		for (int iTh = 0; iTh < _theta.size(); iTh++) {
-			_theta[iTh]->update(dat, SigIm, muPr, qPr[iTh], SigIp, _rV[0]);
-		}
-
-	}
-	
 	_updateFitted();
 }
 void BetaGrpFt::update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, const Grp &muPr, const Qgrp &qPr, const SigmaI &SigIp){
-	if (_lowLevel) {
-		MuGrp datMnI = dat.mean(*_lowLevel);
-		Grp &datMn   = datMnI;
-		
 #pragma omp parallel for num_threads(_nThr)
-		for (int iTh = 0; iTh < _theta.size(); iTh++) {
-			_theta[iTh]->update(datMn, q, SigIm, muPr, qPr[iTh], SigIp, _rV[omp_get_thread_num()]);
-		}
-
+	for (int iTh = 0; iTh < _theta.size(); iTh++) {
+		_theta[iTh]->update(dat, q, SigIm, muPr, qPr[iTh], SigIp, _rV[omp_get_thread_num()]);
 	}
-	else {
-#pragma omp parallel for num_threads(_nThr)
-		for (int iTh = 0; iTh < _theta.size(); iTh++) {
-			_theta[iTh]->update(dat, q, SigIm, muPr, qPr[iTh], SigIp, _rV[omp_get_thread_num()]);
-		}
-
-	}
-	
 	_updateFitted();
 }
 
@@ -7315,47 +7275,98 @@ void BetaGrpPEX::_finishConstruct(const double &Spr){
  *	making XB out of X[Xi]
  */
 void BetaGrpPEX::_finishFitted(){
+	if (_lowLevel) {
 #pragma omp parallel num_threads(_nThr)
-	{
-		gsl_matrix *tmpFt = gsl_matrix_alloc(_fittedAll->size1, _fittedAll->size2);
-		
+		{
+			gsl_matrix *tmpFt = gsl_matrix_alloc(_lowLevel->getNtot(), _fittedAll->size2);
+			
 #pragma omp for
-		for (size_t iEa = 0; iEa < _fittedEach.size(); iEa++) { // not using an iterator in case the OpenMP version in use balks
-			gsl_matrix_view curFE = gsl_matrix_view_array(_fittedEach[iEa].data(), _fittedAll->size1, _fittedAll->size2);
-			gsl_blas_dgemm(CblasNoTrans, CblasNoTrans, 1.0, &curFE.matrix, _A.getMat(), 0.0, tmpFt);
-			gsl_matrix_memcpy(&curFE.matrix, tmpFt);
+			for (size_t iEa = 0; iEa < _fittedEach.size(); iEa++) { // not using an iterator in case the OpenMP version in use balks
+				gsl_matrix_view curFE = gsl_matrix_view_array(_fittedEach[iEa].data(), _lowLevel->getNtot(), _fittedAll->size2);
+				gsl_blas_dgemm(CblasNoTrans, CblasNoTrans, 1.0, &curFE.matrix, _A.getMat(), 0.0, tmpFt);
+				gsl_matrix_memcpy(&curFE.matrix, tmpFt);
+			}
+			
+			gsl_matrix_free(tmpFt);
 		}
-		
-		gsl_matrix_free(tmpFt);
+
+	}
+	else {
+#pragma omp parallel num_threads(_nThr)
+		{
+			gsl_matrix *tmpFt = gsl_matrix_alloc(_fittedAll->size1, _fittedAll->size2);
+			
+#pragma omp for
+			for (size_t iEa = 0; iEa < _fittedEach.size(); iEa++) { // not using an iterator in case the OpenMP version in use balks
+				gsl_matrix_view curFE = gsl_matrix_view_array(_fittedEach[iEa].data(), _fittedAll->size1, _fittedAll->size2);
+				gsl_blas_dgemm(CblasNoTrans, CblasNoTrans, 1.0, &curFE.matrix, _A.getMat(), 0.0, tmpFt);
+				gsl_matrix_memcpy(&curFE.matrix, tmpFt);
+			}
+			
+			gsl_matrix_free(tmpFt);
+		}
 	}
 	
 }
+
 void BetaGrpPEX::_updateAfitted(){ // separate X%*%Xi%*%A for each trait
+	if (_lowLevel) {
 #pragma omp parallel num_threads(_nThr)
-	{
-		gsl_vector *tmpVec = gsl_vector_alloc(_fittedAll->size2); // have to make a OMP team copy of the temp array
-		double pSum;
-		
+		{
+			gsl_vector *tmpVec = gsl_vector_alloc(_fittedAll->size2); // have to make an OMP team copy of the temp array
+			double totSum;
+			
 #pragma omp for
-		for (int prdRow = 0; prdRow < _fittedAll->size1; prdRow++) {
-			for (int bcol = 0; bcol < _A.getMat()->size2; bcol++) {
-				pSum = 0.0;
-				gsl_matrix_get_row(tmpVec, _fittedAll, prdRow);
-				gsl_vector_view evCol = gsl_matrix_column(_A.getMat(), bcol);
-				gsl_vector_mul(tmpVec, &evCol.vector);
-				for (int iBt = 0; iBt < _A.getMat()->size1; iBt++) {
-					pSum += gsl_vector_get(tmpVec, iBt);
-				}
-				gsl_matrix_set(_fittedAllAdj,  prdRow, bcol, pSum);
-				for (int jBt = 0; jBt < _A.getMat()->size1; jBt++) {
-					double pSumDif = pSum - gsl_vector_get(tmpVec, jBt);
-					_ftA[jBt][prdRow*(_fittedAll->size2) + bcol] = pSumDif;
+			for (int prdRow = 0; prdRow < _lowLevel->getNgrp(); prdRow++) {
+				for (int bcol = 0; bcol < _A.getMat()->size2; bcol++) {
+					totSum = 0.0;
+					gsl_matrix_get_row(tmpVec, _fittedAll, prdRow);
+					gsl_vector_view evCol = gsl_matrix_column(_A.getMat(), bcol);
+					gsl_vector_mul(tmpVec, &evCol.vector);
+					for (int iBt = 0; iBt < _A.getMat()->size1; iBt++) {
+						totSum += gsl_vector_get(tmpVec, iBt);
+					}
+					gsl_matrix_set(_fittedAllAdj,  prdRow, bcol, totSum);
+					for (int jBt = 0; jBt < _A.getMat()->size1; jBt++) {
+						double pSumDif = totSum - gsl_vector_get(tmpVec, jBt);
+						for (vector<size_t>::iterator grpIt = (*_lowLevel)[prdRow].begin(); grpIt != (*_lowLevel)[prdRow].end(); ++grpIt) {
+							_ftA[jBt][(*grpIt)*(_fittedAll->size2) + bcol] = pSumDif; // individual fitted matrices always match the _lowLevel->getNtot()
+						}
+					}
 				}
 			}
-		}
-		
-		gsl_vector_free(tmpVec);
-	} // end parallel block
+			
+			gsl_vector_free(tmpVec);
+		} // end parallel block
+
+	}
+	else {
+#pragma omp parallel num_threads(_nThr)
+		{
+			gsl_vector *tmpVec = gsl_vector_alloc(_fittedAll->size2); // have to make an OMP team copy of the temp array
+			double pSum;
+			
+#pragma omp for
+			for (int prdRow = 0; prdRow < _fittedAll->size1; prdRow++) {
+				for (int bcol = 0; bcol < _A.getMat()->size2; bcol++) {
+					pSum = 0.0;
+					gsl_matrix_get_row(tmpVec, _fittedAll, prdRow);
+					gsl_vector_view evCol = gsl_matrix_column(_A.getMat(), bcol);
+					gsl_vector_mul(tmpVec, &evCol.vector);
+					for (int iBt = 0; iBt < _A.getMat()->size1; iBt++) {
+						pSum += gsl_vector_get(tmpVec, iBt);
+					}
+					gsl_matrix_set(_fittedAllAdj,  prdRow, bcol, pSum);
+					for (int jBt = 0; jBt < _A.getMat()->size1; jBt++) {
+						double pSumDif = pSum - gsl_vector_get(tmpVec, jBt);
+						_ftA[jBt][prdRow*(_fittedAll->size2) + bcol] = pSumDif;
+					}
+				}
+			}
+			
+			gsl_vector_free(tmpVec);
+		} // end parallel block
+	}
 }
 
 void BetaGrpPEX::save(){
@@ -7392,30 +7403,18 @@ void BetaGrpPEX::save(const string &outFlNam){
 void BetaGrpPEX::update(const Grp &dat, const SigmaI &SigIm, const SigmaI &SigIp){
 	gsl_blas_dsymm(CblasRight, CblasLower, 1.0, SigIm.getMat(), _A.getMat(), 0.0, _tSigIAt);
 	
-	if (_lowLevel) {
-		MuGrp datMnI = dat.mean(*_lowLevel);
-		Grp &datMn   = datMnI;
 #pragma omp parallel for num_threads(_nThr)
-		for (int iEl = 0; iEl < _theta.size(); iEl++) {
-			_theta[iEl]->update(datMn, SigIm, SigIp, _rV[omp_get_thread_num()]);
-		}
-		
-		// Fitted() funcitons have to go before the _A.update()
-		_updateFitted();
-		_finishFitted();
-		_updateAfitted();
-		_A.update(datMn, _fittedAll, SigIm);
-		
+	for (int iEl = 0; iEl < _theta.size(); iEl++) {
+		_theta[iEl]->update(dat, SigIm, SigIp, _rV[omp_get_thread_num()]);
 	}
-	else{
-#pragma omp parallel for num_threads(_nThr)
-		for (int iEl = 0; iEl < _theta.size(); iEl++) {
-			_theta[iEl]->update(dat, SigIm, SigIp, _rV[omp_get_thread_num()]);
-		}
-		
-		_updateFitted();
-		_finishFitted();
-		_updateAfitted();
+	
+	_updateFitted();
+	_finishFitted();
+	_updateAfitted();
+	if (_lowLevel) {
+		_A.update(dat, _fittedAll, SigIm, *_lowLevel);
+	}
+	else {
 		_A.update(dat, _fittedAll, SigIm);
 	}
 
@@ -7423,29 +7422,18 @@ void BetaGrpPEX::update(const Grp &dat, const SigmaI &SigIm, const SigmaI &SigIp
 void BetaGrpPEX::update(const Grp &dat, const SigmaI &SigIm, const Qgrp &qPr, const SigmaI &SigIp){
 	gsl_blas_dsymm(CblasRight, CblasLower, 1.0, SigIm.getMat(), _A.getMat(), 0.0, _tSigIAt);
 	
-	if (_lowLevel) {
-		MuGrp datMnI = dat.mean(*_lowLevel);
-		Grp &datMn   = datMnI;
 #pragma omp parallel for num_threads(_nThr)
-		for (int iEl = 0; iEl < _theta.size(); iEl++) {
-			_theta[iEl]->update(datMn, SigIm, qPr[iEl], SigIp, _rV[omp_get_thread_num()]);
-		}
-		
-		_updateFitted();
-		_finishFitted();
-		_updateAfitted();
-		_A.update(datMn, _fittedAll, SigIm);
-		
+	for (int iEl = 0; iEl < _theta.size(); iEl++) {
+		_theta[iEl]->update(dat, SigIm, qPr[iEl], SigIp, _rV[omp_get_thread_num()]);
 	}
-	else{
-#pragma omp parallel for num_threads(_nThr)
-		for (int iEl = 0; iEl < _theta.size(); iEl++) {
-			_theta[iEl]->update(dat, SigIm, qPr[iEl], SigIp, _rV[omp_get_thread_num()]);
-		}
-		
-		_updateFitted();
-		_finishFitted();
-		_updateAfitted();
+	
+	_updateFitted();
+	_finishFitted();
+	_updateAfitted();
+	if (_lowLevel) {
+		_A.update(dat, _fittedAll, SigIm, *_lowLevel);
+	}
+	else {
 		_A.update(dat, _fittedAll, SigIm);
 	}
 }
@@ -7453,58 +7441,36 @@ void BetaGrpPEX::update(const Grp &dat, const SigmaI &SigIm, const Qgrp &qPr, co
 void BetaGrpPEX::update(const Grp &dat, const SigmaI &SigIm, const Grp &muPr, const SigmaI &SigIp){
 	gsl_blas_dsymm(CblasRight, CblasLower, 1.0, SigIm.getMat(), _A.getMat(), 0.0, _tSigIAt);
 	
-	if (_lowLevel) {
-		MuGrp datMnI = dat.mean(*_lowLevel);
-		Grp &datMn   = datMnI;
 #pragma omp parallel for num_threads(_nThr)
-		for (int iEl = 0; iEl < _theta.size(); iEl++) {
-			_theta[iEl]->update(datMn, SigIm, muPr, SigIp, _rV[omp_get_thread_num()]);
-		}
-		
-		_updateFitted();
-		_finishFitted();
-		_updateAfitted();
-		_A.update(datMn, _fittedAll, SigIm);
-
+	for (int iEl = 0; iEl < _theta.size(); iEl++) {
+		_theta[iEl]->update(dat, SigIm, muPr, SigIp, _rV[omp_get_thread_num()]);
 	}
-	else{
-#pragma omp parallel for num_threads(_nThr)
-		for (int iEl = 0; iEl < _theta.size(); iEl++) {
-			_theta[iEl]->update(dat, SigIm, muPr, SigIp, _rV[omp_get_thread_num()]);
-		}
-		
-		_updateFitted();
-		_finishFitted();
-		_updateAfitted();
+	
+	_updateFitted();
+	_finishFitted();
+	_updateAfitted();
+	if (_lowLevel) {
+		_A.update(dat, _fittedAll, SigIm, *_lowLevel);
+	}
+	else {
 		_A.update(dat, _fittedAll, SigIm);
 	}
 }
 void BetaGrpPEX::update(const Grp &dat, const SigmaI &SigIm, const Grp &muPr, const Qgrp &qPr, const SigmaI &SigIp){
 	gsl_blas_dsymm(CblasRight, CblasLower, 1.0, SigIm.getMat(), _A.getMat(), 0.0, _tSigIAt);
 	
-	if (_lowLevel) {
-		MuGrp datMnI = dat.mean(*_lowLevel);
-		Grp &datMn   = datMnI;
 #pragma omp parallel for num_threads(_nThr)
-		for (int iEl = 0; iEl < _theta.size(); iEl++) {
-			_theta[iEl]->update(datMn, SigIm, muPr, qPr[iEl], SigIp, _rV[omp_get_thread_num()]);
-		}
-		
-		_updateFitted();
-		_finishFitted();
-		_updateAfitted();
-		_A.update(datMn, _fittedAll, SigIm);
-		
+	for (int iEl = 0; iEl < _theta.size(); iEl++) {
+		_theta[iEl]->update(dat, SigIm, muPr, qPr[iEl], SigIp, _rV[omp_get_thread_num()]);
 	}
-	else{
-#pragma omp parallel for num_threads(_nThr)
-		for (int iEl = 0; iEl < _theta.size(); iEl++) {
-			_theta[iEl]->update(dat, SigIm, muPr, qPr[iEl], SigIp, _rV[omp_get_thread_num()]);
-		}
-		
-		_updateFitted();
-		_finishFitted();
-		_updateAfitted();
+	
+	_updateFitted();
+	_finishFitted();
+	_updateAfitted();
+	if (_lowLevel) {
+		_A.update(dat, _fittedAll, SigIm, *_lowLevel);
+	}
+	else {
 		_A.update(dat, _fittedAll, SigIm);
 	}
 }
@@ -7579,7 +7545,7 @@ BetaGrpPC::BetaGrpPC(const Grp &rsp, const string &predFlNam, const string &evFl
 	_fittedEach.resize(Npred);
 	_fittedAll  = gsl_matrix_calloc(low.getNgrp(), rsp.phenD());
 	_nThr       = nThr;
-	_Xmat       = gsl_matrix_alloc(low.getNgrp(), Npred);
+	_Xmat       = gsl_matrix_alloc(low.getNtot(), Npred);
 	gsl_matrix_free(_valueMat);
 	_valueMat   = gsl_matrix_alloc(Npred, rsp.phenD());
 	_lowLevel   = &low;
@@ -7605,9 +7571,16 @@ BetaGrpPC::BetaGrpPC(const Grp &rsp, const string &predFlNam, const string &evFl
 	_theta.resize(Npred);
 	
 	FILE *prdIn = fopen(predFlNam.c_str(), "r");
-	gsl_matrix_fread(prdIn, _Xmat);
+	gsl_vector *tmpRow = gsl_vector_alloc(Npred);
+	for (size_t iGrp = 0; iGrp < _lowLevel->getNgrp(); iGrp++) {
+		gsl_vector_fread(prdIn, tmpRow);
+		for (vector<size_t>::iterator grpIt = (*_lowLevel)[iGrp].begin(); grpIt != (*_lowLevel)[iGrp].end(); ++grpIt) {
+			gsl_matrix_set_row(_Xmat, *grpIt, tmpRow);
+		}
+	}
+	gsl_vector_free(tmpRow);
 	fclose(prdIn);
-	// no centering of eigenvectors necessary
+	colCenter(_Xmat);  // centering may be necessary if the design is unbalanced
 	
 	FILE *evIn = fopen(evFlNam.c_str(), "r");
 	gsl_vector_fread(evIn, ev);
@@ -7619,11 +7592,10 @@ BetaGrpPC::BetaGrpPC(const Grp &rsp, const string &predFlNam, const string &evFl
 	}
 	
 	gsl_matrix *y = gsl_matrix_alloc(_Xmat->size1, rsp.dMat()->size2);
-	MuGrp yMn = rsp.mean(*_lowLevel);
-	colCenter(yMn.dMat(), y);
+	colCenter(rsp.dMat(), y);
 	
 	for (size_t Xj = 0; Xj < Npred; Xj++) {
-		_fittedEach[Xj].resize(low.getNgrp()*rsp.phenD());
+		_fittedEach[Xj].resize(low.getNtot()*rsp.phenD());
 		_theta[Xj] = new MVnormBetaFt(y, _Xmat, Xj, _fittedEach[Xj], Sig, _rV[0], _upLevel->priorInd(Xj), _valueMat, Xj);
 	}
 	
@@ -7701,7 +7673,7 @@ BetaGrpPC::BetaGrpPC(const Grp &rsp, const string &predFlNam, const string &evFl
 	_fittedEach.resize(Npred);
 	_fittedAll  = gsl_matrix_calloc(low.getNgrp(), rsp.phenD());
 	_nThr       = nThr;
-	_Xmat       = gsl_matrix_alloc(low.getNgrp(), Npred);
+	_Xmat       = gsl_matrix_alloc(low.getNtot(), Npred);
 	gsl_matrix_free(_valueMat);
 	_valueMat   = gsl_matrix_alloc(Npred, rsp.phenD());
 	_lowLevel   = &low;
@@ -7729,9 +7701,16 @@ BetaGrpPC::BetaGrpPC(const Grp &rsp, const string &predFlNam, const string &evFl
 	_theta.resize(Npred);
 	
 	FILE *prdIn = fopen(predFlNam.c_str(), "r");
-	gsl_matrix_fread(prdIn, _Xmat);
+	gsl_vector *tmpRow = gsl_vector_alloc(Npred);
+	for (size_t iGrp = 0; iGrp < _lowLevel->getNgrp(); iGrp++) {
+		gsl_vector_fread(prdIn, tmpRow);
+		for (vector<size_t>::iterator grpIt = (*_lowLevel)[iGrp].begin(); grpIt != (*_lowLevel)[iGrp].end(); ++grpIt) {
+			gsl_matrix_set_row(_Xmat, *grpIt, tmpRow);
+		}
+	}
+	gsl_vector_free(tmpRow);
 	fclose(prdIn);
-	// no centering of eigenvectors necessary
+	colCenter(_Xmat);  // centering may be necessary if the design is unbalanced
 	
 	FILE *evIn = fopen(evFlNam.c_str(), "r");
 	gsl_vector_fread(evIn, ev);
@@ -7743,11 +7722,10 @@ BetaGrpPC::BetaGrpPC(const Grp &rsp, const string &predFlNam, const string &evFl
 	}
 	
 	gsl_matrix *y = gsl_matrix_alloc(_Xmat->size1, rsp.dMat()->size2);
-	MuGrp yMn = rsp.mean(*_lowLevel);
-	colCenter(yMn.dMat(), y);
+	colCenter(rsp.dMat(), y);
 	
 	for (size_t Xj = 0; Xj < Npred; Xj++) {
-		_fittedEach[Xj].resize(low.getNgrp()*rsp.phenD());
+		_fittedEach[Xj].resize(low.getNtot()*rsp.phenD());
 		_theta[Xj] = new MVnormBetaFt(y, _Xmat, Xj, _fittedEach[Xj], Sig, _rV[0], _upLevel->priorInd(Xj), _valueMat, Xj);
 	}
 	
@@ -7843,12 +7821,10 @@ BetaGrpPC & BetaGrpPC::operator=(const BetaGrpPC &bG){
 BetaGrpSnp::BetaGrpSnp() : _numSaves(0.0), _nThr(1), _Npred(1), _priorVar(0.0), MuGrp(){
 	_Xmat    = gsl_matrix_calloc(1, 1);
 	_Ystore  = gsl_matrix_calloc(1, 1);
-	_CVstore = gsl_matrix_calloc(1, 1);
 }
 BetaGrpSnp::BetaGrpSnp(const string &predFlNam, const string &outFlNam, const size_t &Ndat, const size_t &Npred, const size_t &d, const int &Nthr) : _numSaves(0.0), _nThr(Nthr), _Npred(Npred), _priorVar(0.0), _inPredFl(predFlNam), MuGrp(){
 	_fakeFmat = gsl_matrix_calloc(Ndat, d);       // will be all zero, so we can use it for addition and subtraction without any consequences other than loss of efficiency
 	_Ystore   = gsl_matrix_calloc(Ndat, d);
-	_CVstore  = gsl_matrix_calloc(Ndat, d);
 	
 	_outFlNam = outFlNam;
 	remove(_outFlNam.c_str());
@@ -7862,7 +7838,6 @@ BetaGrpSnp::BetaGrpSnp(const string &predFlNam, const string &outFlNam, RanIndex
 	
 	//_Ystore  = gsl_matrix_calloc(low.getNgrp(), d);
 	_Ystore  = gsl_matrix_calloc(low.getNtot(), d);
-	_CVstore = gsl_matrix_calloc(low.getNgrp(), d);
 	
 	_outFlNam = outFlNam;
 	remove(_outFlNam.c_str());
@@ -7874,7 +7849,6 @@ BetaGrpSnp::BetaGrpSnp(const string &predFlNam, const string &outFlNam, RanIndex
 BetaGrpSnp::BetaGrpSnp(const string &predFlNam, const string &outFlNam, const size_t &Ndat, const size_t &Npred, const size_t &d, const int &Nthr, const double &prVar) : _numSaves(0.0), _nThr(Nthr), _Npred(Npred), _priorVar(prVar), _inPredFl(predFlNam), MuGrp(){
 	_fakeFmat = gsl_matrix_calloc(Ndat, d);       // will be all zero, so we can use it for addition and subtraction without any consequences other than loss of efficiency
 	_Ystore   = gsl_matrix_calloc(Ndat, d);
-	_CVstore  = gsl_matrix_calloc(Ndat, d);
 	
 	_outFlNam = outFlNam;
 	remove(_outFlNam.c_str());
@@ -7888,7 +7862,6 @@ BetaGrpSnp::BetaGrpSnp(const string &predFlNam, const string &outFlNam, RanIndex
 	
 	//_Ystore   = gsl_matrix_calloc(low.getNgrp(), d);
 	_Ystore  = gsl_matrix_calloc(low.getNtot(), d);
-	_CVstore  = gsl_matrix_calloc(low.getNgrp(), d);
 	
 	_outFlNam = outFlNam;
 	remove(_outFlNam.c_str());
@@ -7900,7 +7873,6 @@ BetaGrpSnp::BetaGrpSnp(const string &predFlNam, const string &outFlNam, RanIndex
 BetaGrpSnp::BetaGrpSnp(const BetaGrpSnp &mG){
 	gsl_matrix_free(_valueMat);
 	_Ystore  = gsl_matrix_calloc((mG._Ystore)->size1, (mG._Ystore)->size2);
-	_CVstore  = gsl_matrix_calloc((mG._CVstore)->size1, (mG._CVstore)->size2);
 	
 	_lowLevel = mG._lowLevel;
 	_upLevel  = mG._upLevel;
@@ -7919,7 +7891,6 @@ BetaGrpSnp::BetaGrpSnp(const BetaGrpSnp &mG){
 BetaGrpSnp & BetaGrpSnp::operator=(const BetaGrpSnp &mG){
 	gsl_matrix_free(_valueMat);
 	_Ystore  = gsl_matrix_calloc((mG._Ystore)->size1, (mG._Ystore)->size2);
-	_CVstore  = gsl_matrix_calloc((mG._CVstore)->size1, (mG._CVstore)->size2);
 	
 	_lowLevel = mG._lowLevel;
 	_upLevel  = mG._upLevel;
@@ -7943,183 +7914,50 @@ BetaGrpSnp::~BetaGrpSnp(){
 	}
 	gsl_matrix_free(_fakeFmat);
 	gsl_matrix_free(_Ystore);
-	gsl_matrix_free(_CVstore);
 	
 }
 
-/*
- void BetaGrpSnp::dump(){
-	if (_numSaves) {
- gsl_matrix_free(_valueMat);
- 
- _Xmat     = gsl_matrix_alloc(_Ystore->size1, _Npred);
- _valueMat = gsl_matrix_calloc(_Npred, _Ystore->size2 + 1);  // the extra column will have the Hotelling-type statistic for all the traits
- 
- FILE *prdIn = fopen(_inPredFl.c_str(), "r");
- gsl_matrix_fread(prdIn, _Xmat);
- fclose(prdIn);
- colCenter(_Xmat); // essential to mimic an intercept
- 
- gsl_matrix_scale(_Ystore, 1.0/_numSaves);
- if (_lowLevel) {
- gsl_vector *rowTmp = gsl_vector_alloc(_Ystore->size2);
- gsl_matrix_scale(_CVstore, -1.0/_numSaves);
- for (size_t iHi = 0; _lowLevel->getNgrp(); iHi++) {
- gsl_vector_set_zero(rowTmp);
- for (vector<size_t>::iterator lowIt = (*_lowLevel)[iHi].begin(); lowIt != (*_lowLevel)[iHi].end(); ++lowIt) {
- gsl_vector_view yRow = gsl_matrix_row(_Ystore, *lowIt);
- gsl_vector_add(rowTmp, &yRow.vector);
- }
- gsl_vector_scale(rowTmp, 1.0/static_cast<double>((*_lowLevel)[iHi].size()));
- gsl_vector_view cvRow = gsl_matrix_row(_CVstore, iHi);
- gsl_vector_add(&cvRow.vector, rowTmp);
- 
- }
- gsl_vector_free(rowTmp);
- }
- 
- gsl_matrix_scale(_CVstore, 1.0/_numSaves);
- gsl_matrix_sub(_Ystore, _CVstore);
- colCenter(_Ystore);
- 
- #pragma omp parallel num_threads(_nThr)
- {
- double XtX;
- gsl_vector *bTmp  = gsl_vector_alloc(_Ystore->size2);
- gsl_matrix *S     = gsl_matrix_alloc(_Ystore->size2, _Ystore->size2);
- gsl_matrix *VW    = gsl_matrix_alloc(_Ystore->size2, _Ystore->size2);
- gsl_matrix *resd  = gsl_matrix_alloc(_Ystore->size1, _Ystore->size2);
- if (_priorVar) {  // if we have a prior variance, then we are doing approximate Bayes factors as God intended
- #pragma omp for
- for (int iSnp = 0; iSnp < _Npred; iSnp++) {
- gsl_vector_view Xtmp = gsl_matrix_column(_Xmat, iSnp);
- gsl_blas_ddot(&Xtmp.vector, &Xtmp.vector, &XtX);
- XtX = 1.0/XtX;
- 
- gsl_blas_dgemv(CblasTrans, XtX, _Ystore, &Xtmp.vector, 0.0, bTmp);
- 
- gsl_matrix_memcpy(resd, _Ystore);
- gsl_blas_dger(-1.0, &Xtmp.vector, bTmp, resd);  // subtracting the Xb
- 
- gsl_blas_dsyrk(CblasLower, CblasTrans, XtX/static_cast<double>(_Ystore->size1 - 1), resd, 0.0, S);
- for (int iPh = 0; iPh < _Ystore->size2; iPh++) {
- double V  = gsl_matrix_get(S, iPh, iPh);
- double r  = _priorVar/(V + _priorVar);  // W/(V+W) of Wakefield (2007)
- double pV = 0.5*(log(1.0 - r) + gsl_pow_2(gsl_vector_get(bTmp, iPh))*r/V) ;
- gsl_matrix_set(_valueMat, iSnp, iPh, pV);
- 
- }
- gsl_matrix_memcpy(VW, S);
- gsl_vector_view VWdiag = gsl_matrix_diagonal(VW);
- gsl_vector_add_constant(&VWdiag.vector, _priorVar);
- gsl_linalg_cholesky_decomp(S);
- gsl_linalg_cholesky_decomp(VW);
- double lnSrSdet = 0.0;  // ln of the square root of the determinant
- double lnSrVWdet = 0.0;
- for (size_t iPh = 0; iPh < _Ystore->size2; iPh++) {
- lnSrSdet  += log(gsl_matrix_get(S, iPh, iPh));
- lnSrVWdet += log(gsl_matrix_get(VW, iPh, iPh));
- }
- gsl_linalg_cholesky_invert(S);
- gsl_linalg_cholesky_invert(VW);
- gsl_matrix_sub(S, VW);
- double m = mhl(bTmp, S);
- double pV = lnSrSdet - lnSrVWdet + 0.5*m;
- gsl_matrix_set(_valueMat, iSnp, _Ystore->size2, pV);
- 
- }
- 
- }
- else {
- #pragma omp for
- for (int iSnp = 0; iSnp < _Npred; iSnp++) {
- gsl_vector_view Xtmp = gsl_matrix_column(_Xmat, iSnp);
- gsl_blas_ddot(&Xtmp.vector, &Xtmp.vector, &XtX);
- XtX = 1.0/XtX;
- 
- gsl_blas_dgemv(CblasTrans, XtX, _Ystore, &Xtmp.vector, 0.0, bTmp);
- 
- gsl_matrix_memcpy(resd, _Ystore);
- gsl_blas_dger(-1.0, &Xtmp.vector, bTmp, resd);  // subtracting the Xb
- 
- gsl_blas_dsyrk(CblasLower, CblasTrans, XtX, resd, 0.0, S);
- 
- for (int iPh = 0; iPh < _Ystore->size2; iPh++) {
- double seB  = sqrt(gsl_matrix_get(S, iPh, iPh)/static_cast<double>(_Ystore->size1 - 1));
- double tVal = fabs(gsl_vector_get(bTmp, iPh))/seB;
- double pV   = -log10(gsl_cdf_tdist_Q(tVal, _Ystore->size1 - 1)*2.0);
- gsl_matrix_set(_valueMat, iSnp, iPh, pV);
- 
- }
- 
- 
- gsl_linalg_cholesky_decomp(S);
- gsl_linalg_cholesky_invert(S);
- double m = mhl(bTmp, S);
- m = (static_cast<double>(_Ystore->size1) - static_cast<double>(_Ystore->size2))/static_cast<double>(_Ystore->size2)*m;
- double pV = -log10(gsl_cdf_fdist_Q(m, static_cast<double>(_Ystore->size2), static_cast<double>(_Ystore->size1) - static_cast<double>(_Ystore->size2)));
- 
- gsl_matrix_set(_valueMat, iSnp, _Ystore->size2, pV);
- 
- }
- 
- }
- gsl_vector_free(bTmp);
- gsl_matrix_free(S);
- gsl_matrix_free(resd);
- }//end omp block
- 
- FILE *btOut = fopen(_outFlNam.c_str(), "w");
- gsl_matrix_fwrite(btOut, _valueMat);
- fclose(btOut);
- 
- 
-	}
-	else {
- cout << "BetaGrpSnp: nothing to dump" << endl;
-	}
- }
-
- */
 
 void BetaGrpSnp::dump(){
 	if (_numSaves) {
 		gsl_matrix_free(_valueMat);
-		
-		_Xmat     = gsl_matrix_alloc(_CVstore->size1, _Npred);
+		if (_lowLevel) {
+			_Xmat = gsl_matrix_alloc(_lowLevel->getNgrp(), _Npred);
+		}
+		else {
+			_Xmat = gsl_matrix_alloc(_Ystore->size1, _Npred);
+		}
 		_valueMat = gsl_matrix_calloc(_Npred, _Ystore->size2 + 1);  // the extra column will have the Hotelling-type statistic for all the traits
 		
 		FILE *prdIn = fopen(_inPredFl.c_str(), "r");
 		gsl_matrix_fread(prdIn, _Xmat);
 		fclose(prdIn);
-		colCenter(_Xmat); // essential to mimic an intercept
+		colCenter(_Xmat); // essential to mimic an intercept; predictor should be centered by construction of the sampler
 		
 		gsl_matrix_scale(_Ystore, 1.0/_numSaves);
-		//colCenter(_Ystore);
-		gsl_matrix_scale(_CVstore, -1.0/_numSaves);
 		if (_lowLevel) {
+			gsl_matrix *tmpY = gsl_matrix_calloc(_Xmat->size1, _Ystore->size2);
 			for (size_t iHi = 0; iHi < _lowLevel->getNgrp(); iHi++) {
 				double scale = 1.0/static_cast<double>((*_lowLevel)[iHi].size());
-				gsl_vector_view cvRow = gsl_matrix_row(_CVstore, iHi);
+				gsl_vector_view cvRow = gsl_matrix_row(tmpY, iHi);
 				for (vector<size_t>::iterator lowIt = (*_lowLevel)[iHi].begin(); lowIt != (*_lowLevel)[iHi].end(); ++lowIt) {
 					gsl_vector_view yRow = gsl_matrix_row(_Ystore, *lowIt);
-					gsl_blas_daxpy(scale, &yRow.vector, &cvRow.vector); // calculating the Y mean on the fly and adding to -CV
+					gsl_blas_daxpy(scale, &yRow.vector, &cvRow.vector); // calculating the Y mean on the fly
 				}
 			}
+			gsl_matrix_free(_Ystore);
+			_Ystore = gsl_matrix_alloc(tmpY->size1, tmpY->size2);
+			gsl_matrix_memcpy(_Ystore, tmpY);
+			gsl_matrix_free(tmpY);
 		}
-		else {
-			gsl_matrix_add(_CVstore, _Ystore);
-		}
-		
-		//colCenter(_CVstore);
 		
 #pragma omp parallel num_threads(_nThr)
 		{
 			double XtX;
-			gsl_vector *bTmp  = gsl_vector_alloc(_CVstore->size2);
-			gsl_matrix *S     = gsl_matrix_alloc(_CVstore->size2, _CVstore->size2);
-			gsl_matrix *VW    = gsl_matrix_alloc(_CVstore->size2, _CVstore->size2);
-			gsl_matrix *resd  = gsl_matrix_alloc(_CVstore->size1, _CVstore->size2);
+			gsl_vector *bTmp  = gsl_vector_alloc(_Ystore->size2);
+			gsl_matrix *S     = gsl_matrix_alloc(_Ystore->size2, _Ystore->size2);
+			gsl_matrix *VW    = gsl_matrix_alloc(_Ystore->size2, _Ystore->size2);
+			gsl_matrix *resd  = gsl_matrix_alloc(_Ystore->size1, _Ystore->size2);
 			if (_priorVar) {  // if we have a prior variance, then we are doing approximate Bayes factors as God intended
 #pragma omp for
 				for (int iSnp = 0; iSnp < _Npred; iSnp++) {
@@ -8127,13 +7965,13 @@ void BetaGrpSnp::dump(){
 					gsl_blas_ddot(&Xtmp.vector, &Xtmp.vector, &XtX);
 					XtX = 1.0/XtX;
 					
-					gsl_blas_dgemv(CblasTrans, XtX, _CVstore, &Xtmp.vector, 0.0, bTmp);
+					gsl_blas_dgemv(CblasTrans, XtX, _Ystore, &Xtmp.vector, 0.0, bTmp);
 					
-					gsl_matrix_memcpy(resd, _CVstore);
+					gsl_matrix_memcpy(resd, _Ystore);
 					gsl_blas_dger(-1.0, &Xtmp.vector, bTmp, resd);  // subtracting the Xb
 					
-					gsl_blas_dsyrk(CblasLower, CblasTrans, XtX/static_cast<double>(_CVstore->size1 - 1), resd, 0.0, S);
-					for (int iPh = 0; iPh < _CVstore->size2; iPh++) {
+					gsl_blas_dsyrk(CblasLower, CblasTrans, XtX/static_cast<double>(_Ystore->size1 - 1), resd, 0.0, S);
+					for (int iPh = 0; iPh < _Ystore->size2; iPh++) {
 						double V  = gsl_matrix_get(S, iPh, iPh);
 						double r  = _priorVar/(V + _priorVar);  // W/(V+W) of Wakefield (2007)
 						double pV = 0.5*(log(1.0 - r) + gsl_pow_2(gsl_vector_get(bTmp, iPh))*r/V) ;
@@ -8145,9 +7983,9 @@ void BetaGrpSnp::dump(){
 					gsl_vector_add_constant(&VWdiag.vector, _priorVar);
 					gsl_linalg_cholesky_decomp(S);
 					gsl_linalg_cholesky_decomp(VW);
-					double lnSrSdet = 0.0;  // ln of the square root of the determinant
+					double lnSrSdet  = 0.0;  // ln of the square root of the determinant
 					double lnSrVWdet = 0.0;
-					for (size_t iPh = 0; iPh < _CVstore->size2; iPh++) {
+					for (size_t iPh = 0; iPh < _Ystore->size2; iPh++) {
 						lnSrSdet  += log(gsl_matrix_get(S, iPh, iPh));
 						lnSrVWdet += log(gsl_matrix_get(VW, iPh, iPh));
 					}
@@ -8156,7 +7994,7 @@ void BetaGrpSnp::dump(){
 					gsl_matrix_sub(S, VW);
 					double m = mhl(bTmp, S);
 					double pV = lnSrSdet - lnSrVWdet + 0.5*m;
-					gsl_matrix_set(_valueMat, iSnp, _CVstore->size2, pV);
+					gsl_matrix_set(_valueMat, iSnp, _Ystore->size2, pV);
 					
 				}
 
@@ -8168,17 +8006,17 @@ void BetaGrpSnp::dump(){
 					gsl_blas_ddot(&Xtmp.vector, &Xtmp.vector, &XtX);
 					XtX = 1.0/XtX;
 					
-					gsl_blas_dgemv(CblasTrans, XtX, _CVstore, &Xtmp.vector, 0.0, bTmp);
+					gsl_blas_dgemv(CblasTrans, XtX, _Ystore, &Xtmp.vector, 0.0, bTmp);
 					
-					gsl_matrix_memcpy(resd, _CVstore);
+					gsl_matrix_memcpy(resd, _Ystore);
 					gsl_blas_dger(-1.0, &Xtmp.vector, bTmp, resd);  // subtracting the Xb
 					
 					gsl_blas_dsyrk(CblasLower, CblasTrans, XtX, resd, 0.0, S);
 					
-					for (int iPh = 0; iPh < _CVstore->size2; iPh++) {
-						double seB  = sqrt(gsl_matrix_get(S, iPh, iPh)/static_cast<double>(_CVstore->size1 - 1));
+					for (int iPh = 0; iPh < _Ystore->size2; iPh++) {
+						double seB  = sqrt(gsl_matrix_get(S, iPh, iPh)/static_cast<double>(_Ystore->size1 - 1));
 						double tVal = fabs(gsl_vector_get(bTmp, iPh))/seB;
-						double pV   = -log10(gsl_cdf_tdist_Q(tVal, _CVstore->size1 - 1)*2.0);
+						double pV   = -log10(gsl_cdf_tdist_Q(tVal, _Ystore->size1 - 1)*2.0);
 						gsl_matrix_set(_valueMat, iSnp, iPh, pV);
 					
 					}
@@ -8187,10 +8025,10 @@ void BetaGrpSnp::dump(){
 					gsl_linalg_cholesky_decomp(S);
 					gsl_linalg_cholesky_invert(S);
 					double m = mhl(bTmp, S);
-					m = (static_cast<double>(_CVstore->size1) - static_cast<double>(_CVstore->size2))/static_cast<double>(_CVstore->size2)*m;
-					double pV = -log10(gsl_cdf_fdist_Q(m, static_cast<double>(_CVstore->size2), static_cast<double>(_CVstore->size1) - static_cast<double>(_CVstore->size2)));
+					m = (static_cast<double>(_Ystore->size1) - static_cast<double>(_Ystore->size2))/static_cast<double>(_Ystore->size2)*m;
+					double pV = -log10(gsl_cdf_fdist_Q(m, static_cast<double>(_Ystore->size2), static_cast<double>(_Ystore->size1) - static_cast<double>(_Ystore->size2)));
 					
-					gsl_matrix_set(_valueMat, iSnp, _CVstore->size2, pV);
+					gsl_matrix_set(_valueMat, iSnp, _Ystore->size2, pV);
 					
 				}
 				
@@ -8211,54 +8049,12 @@ void BetaGrpSnp::dump(){
 	}
 }
 
-/*
- void BetaGrpSnp::update(const Grp &dat, const SigmaI &SigIm){
-	// Sigma ignored
-	if (_lowLevel) {
- MuGrp datMnI = dat.mean(*_lowLevel);
- gsl_matrix_add(_Ystore, datMnI.fMat());
-	}
-	else {
- gsl_matrix_add(_Ystore, dat.fMat());
-	}
-	_numSaves += 1.0;
- }
-
- */
 void BetaGrpSnp::update(const Grp &dat, const SigmaI &SigIm){
 	// Sigma ignored
 	gsl_matrix_add(_Ystore, dat.fMat());
 	_numSaves += 1.0;
 }
 
-/*
- void BetaGrpSnp::update(const Grp &dat, const SigmaI &SigIm, const Grp &muPr, const SigmaI &SigIp){
-	// both Sigmas ignored; muPr stores the covariate
-	if (_lowLevel) {
- MuGrp datMnI = dat.mean(*_lowLevel);
- gsl_matrix_add(_Ystore, datMnI.fMat());
- if (_lowLevel->getNtot() == muPr.fMat()->size1) {
- MuGrp cvMnI = muPr.mean(*_lowLevel);
- gsl_matrix_add(_CVstore, cvMnI.fMat());
- }
- else {
- gsl_matrix_add(_CVstore, muPr.fMat()); // assuming that the # of rows is either the same as X or the same as lowLevel; otherwise will crash
- }
-	}
-	else {
- gsl_matrix_add(_Ystore, dat.fMat());
- gsl_matrix_add(_CVstore, muPr.fMat());
-	}
-	_numSaves += 1.0;
- }
-
- */
-void BetaGrpSnp::update(const Grp &dat, const SigmaI &SigIm, const Grp &muPr, const SigmaI &SigIp){
-	// both Sigmas ignored; muPr stores the covariate
-	gsl_matrix_add(_Ystore, dat.fMat());
-	gsl_matrix_add(_CVstore, muPr.fMat()); // assuming that the # of rows is the same as X, otherwise will crash
-	_numSaves += 1.0;
-}
 /*
  * BetaGrpPSR methods
  */
@@ -8331,8 +8127,21 @@ void BetaGrpPSR::dump(){
 		fclose(prdIn);
 		colCenter(_Xmat); // essential to mimic an intercept
 		
-		gsl_matrix_scale(_Ystore, 1.0/_numSaves);
-		colCenter(_Ystore);
+		if (_lowLevel) {
+			gsl_matrix *tmpY = gsl_matrix_calloc(_Xmat->size1, _Ystore->size2);
+			for (size_t iHi = 0; iHi < _lowLevel->getNgrp(); iHi++) {
+				double scale = 1.0/static_cast<double>((*_lowLevel)[iHi].size());
+				gsl_vector_view cvRow = gsl_matrix_row(tmpY, iHi);
+				for (vector<size_t>::iterator lowIt = (*_lowLevel)[iHi].begin(); lowIt != (*_lowLevel)[iHi].end(); ++lowIt) {
+					gsl_vector_view yRow = gsl_matrix_row(_Ystore, *lowIt);
+					gsl_blas_daxpy(scale, &yRow.vector, &cvRow.vector); // calculating the Y mean on the fly
+				}
+			}
+			gsl_matrix_free(_Ystore);
+			_Ystore = gsl_matrix_alloc(tmpY->size1, tmpY->size2);
+			gsl_matrix_memcpy(_Ystore, tmpY);
+			gsl_matrix_free(tmpY);
+		}
 		
 #pragma omp parallel num_threads(_nThr)
 		{
@@ -8546,8 +8355,21 @@ void BetaGrpSnpMiss::dump(){
 		fclose(prdIn);
 		gsl_vector_free(tmpX);
 
-		gsl_matrix_scale(_Ystore, 1.0/_numSaves);
-		colCenter(_Ystore);
+		if (_lowLevel) {
+			gsl_matrix *tmpY = gsl_matrix_calloc(_lowLevel->getNgrp(), _Ystore->size2);
+			for (size_t iHi = 0; iHi < _lowLevel->getNgrp(); iHi++) {
+				double scale = 1.0/static_cast<double>((*_lowLevel)[iHi].size());
+				gsl_vector_view cvRow = gsl_matrix_row(tmpY, iHi);
+				for (vector<size_t>::iterator lowIt = (*_lowLevel)[iHi].begin(); lowIt != (*_lowLevel)[iHi].end(); ++lowIt) {
+					gsl_vector_view yRow = gsl_matrix_row(_Ystore, *lowIt);
+					gsl_blas_daxpy(scale, &yRow.vector, &cvRow.vector); // calculating the Y mean on the fly
+				}
+			}
+			gsl_matrix_free(_Ystore);
+			_Ystore = gsl_matrix_alloc(tmpY->size1, tmpY->size2);
+			gsl_matrix_memcpy(_Ystore, tmpY);
+			gsl_matrix_free(tmpY);
+		}
 		
 #pragma omp parallel num_threads(_nThr)
 		{
@@ -8686,13 +8508,7 @@ void BetaGrpSnpMiss::dump(){
 }
 
 void BetaGrpSnpMiss::update(const Grp &dat, const SigmaI &SigIm){
-	if (_lowLevel) {
-		MuGrp datMnI = dat.mean(*_lowLevel);
-		gsl_matrix_add(_Ystore, datMnI.fMat());
-	}
-	else {
-		gsl_matrix_add(_Ystore, dat.fMat());
-	}
+	gsl_matrix_add(_Ystore, dat.fMat());
 	_numSaves += 1.0;
 }
 
@@ -8771,8 +8587,21 @@ void BetaGrpPSRmiss::dump(){
 		fclose(prdIn);
 		gsl_vector_free(tmpX);
 		
-		gsl_matrix_scale(_Ystore, 1.0/_numSaves);
-		colCenter(_Ystore);
+		if (_lowLevel) {
+			gsl_matrix *tmpY = gsl_matrix_calloc(_lowLevel->getNgrp(), _Ystore->size2);
+			for (size_t iHi = 0; iHi < _lowLevel->getNgrp(); iHi++) {
+				double scale = 1.0/static_cast<double>((*_lowLevel)[iHi].size());
+				gsl_vector_view cvRow = gsl_matrix_row(tmpY, iHi);
+				for (vector<size_t>::iterator lowIt = (*_lowLevel)[iHi].begin(); lowIt != (*_lowLevel)[iHi].end(); ++lowIt) {
+					gsl_vector_view yRow = gsl_matrix_row(_Ystore, *lowIt);
+					gsl_blas_daxpy(scale, &yRow.vector, &cvRow.vector); // calculating the Y mean on the fly
+				}
+			}
+			gsl_matrix_free(_Ystore);
+			_Ystore = gsl_matrix_alloc(tmpY->size1, tmpY->size2);
+			gsl_matrix_memcpy(_Ystore, tmpY);
+			gsl_matrix_free(tmpY);
+		}
 		
 #pragma omp parallel num_threads(_nThr)
 		{
@@ -9942,7 +9771,7 @@ void MuBlk::update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, const Grp
 }
 
 /*
-	BetaBlk methods
+ *	BetaBlk methods
  */
 
 BetaBlk::BetaBlk(const Grp &dat, const string &predFlName, const size_t &Npred, const string &blkIndFileNam, const int &nThr) : BetaGrpFt(){
