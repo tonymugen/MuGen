@@ -7949,6 +7949,8 @@ void BetaGrpSnp::dump(){
 			_Ystore = gsl_matrix_alloc(tmpY->size1, tmpY->size2);
 			gsl_matrix_memcpy(_Ystore, tmpY);
 			gsl_matrix_free(tmpY);
+			
+			colCenter(_Ystore); // only strictly necessary when there is an unbalanced design
 		}
 		
 #pragma omp parallel num_threads(_nThr)
@@ -8119,8 +8121,13 @@ void BetaGrpPSR::dump(){
 		
 		gsl_matrix_free(_valueMat);
 		
-		_Xmat     = gsl_matrix_alloc(_Ystore->size1, _Npred);
-		_valueMat = gsl_matrix_calloc(_Npred, _Ystore->size2);  // no extra column.  Get the full multi-trait test though the BetaGrpSnp.dump()
+		if (_lowLevel) {
+			_Xmat = gsl_matrix_alloc(_lowLevel->getNgrp(), _Npred);
+		}
+		else {
+			_Xmat = gsl_matrix_alloc(_Ystore->size1, _Npred);
+		}
+		_valueMat = gsl_matrix_calloc(_Npred, _Ystore->size2);  // no extra column.  Get the full multi-trait test through the BetaGrpSnp.dump()
 		
 		FILE *prdIn = fopen(_inPredFl.c_str(), "r");
 		gsl_matrix_fread(prdIn, _Xmat);
@@ -8141,6 +8148,8 @@ void BetaGrpPSR::dump(){
 			_Ystore = gsl_matrix_alloc(tmpY->size1, tmpY->size2);
 			gsl_matrix_memcpy(_Ystore, tmpY);
 			gsl_matrix_free(tmpY);
+			
+			colCenter(_Ystore);
 		}
 		
 #pragma omp parallel num_threads(_nThr)
