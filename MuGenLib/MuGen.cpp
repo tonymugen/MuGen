@@ -1,13 +1,13 @@
 /*
-*  libMuGen.cpp
-*  libMuGen
-*
-*  Created by ajg67 on 10/30/12.
-*  Copyright (c) 2012 SEELE. All rights reserved.
-*  
-*  Methods for the MuGenLib classes.  Using gsl_vector and gsl_matrix pointers to store vectors and matrices,
-*  which enables linear algebra etc manipulations
-*/
+ *  libMuGen.cpp
+ *  libMuGen
+ *
+ *  Created by ajg67 on 10/30/12.
+ *  Copyright (c) 2012 SEELE. All rights reserved.
+ *
+ *  Methods for the MuGenLib classes.  Using gsl_vector and gsl_matrix pointers to store vectors and matrices,
+ *  which enables linear algebra etc manipulations
+ */
 #include <gsl/gsl_errno.h>
 #include <gsl/gsl_matrix.h>
 #include <gsl/gsl_vector.h>
@@ -43,9 +43,9 @@ using std::max;
 using std::remove;
 
 /*
-	Sampling functions
-	IMPORTANT: Once started using CblasLower (required for MVgauss), have to use it everywhere.  Otherwise, matrix estimates diverge
-*/
+ *	Sampling functions
+ *	IMPORTANT: Once started using CblasLower (required for MVgauss), have to use it everywhere.  Otherwise, matrix estimates diverge
+ */
 
 void MVgauss(const gsl_vector *mn, const gsl_matrix *SigChl, const gsl_rng *r, gsl_vector *samp){
 	for (size_t iV = 0; iV < mn->size; iV++) {
@@ -241,7 +241,7 @@ unsigned long long rdtsc(){
 }
 
 /*
-	MVnorm methods
+ *	MVnorm methods
  */
 
 MVnorm::MVnorm(gsl_vector *mn){
@@ -8058,6 +8058,182 @@ void BetaGrpSnp::update(const Grp &dat, const SigmaI &SigIm){
 }
 
 /*
+ * BetaGrpSnpCV methods
+ */
+
+BetaGrpSnpCV::BetaGrpSnpCV(const BetaGrpSnpCV &mG) {
+	gsl_matrix_free(_valueMat);
+	_Ystore  = gsl_matrix_calloc((mG._Ystore)->size1, (mG._Ystore)->size2);
+	
+	_lowLevel = mG._lowLevel;
+	_upLevel  = mG._upLevel;
+	_nThr     = mG._nThr;
+	_Npred    = mG._Npred;
+	_inPredFl = mG._inPredFl;
+	_priorVar = mG._priorVar;
+	
+	_Xmat = gsl_matrix_alloc((mG._Xmat)->size1, (mG._Xmat)->size2);
+	gsl_matrix_memcpy(_Xmat, mG._Xmat);
+	
+	_valueMat = gsl_matrix_alloc((mG._valueMat)->size1, (mG._valueMat)->size2);
+	gsl_matrix_memcpy(_valueMat, mG._valueMat);
+}
+BetaGrpSnpCV & BetaGrpSnpCV::operator=(const BetaGrpSnpCV &mG){
+	gsl_matrix_free(_valueMat);
+	_Ystore  = gsl_matrix_calloc((mG._Ystore)->size1, (mG._Ystore)->size2);
+	
+	_lowLevel = mG._lowLevel;
+	_upLevel  = mG._upLevel;
+	_nThr     = mG._nThr;
+	_Npred    = mG._Npred;
+	_inPredFl = mG._inPredFl;
+	_priorVar = mG._priorVar;
+	
+	_Xmat = gsl_matrix_alloc((mG._Xmat)->size1, (mG._Xmat)->size2);
+	gsl_matrix_memcpy(_Xmat, mG._Xmat);
+	
+	_valueMat = gsl_matrix_alloc((mG._valueMat)->size1, (mG._valueMat)->size2);
+	gsl_matrix_memcpy(_valueMat, mG._valueMat);
+	
+	return *this;
+}
+
+
+void BetaGrpSnpCV::dump(){
+	if (_numSaves) {
+		gsl_matrix_free(_valueMat);
+		if (_lowLevel) {
+			_Xmat = gsl_matrix_alloc(_lowLevel->getNgrp(), _Npred);
+		}
+		else {
+			_Xmat = gsl_matrix_alloc(_Ystore->size1, _Npred);
+		}
+		_valueMat = gsl_matrix_calloc(_Npred, _Ystore->size2 + 1);  // the extra column will have the Hotelling-type statistic for all the traits
+		
+		FILE *prdIn = fopen(_inPredFl.c_str(), "r");
+		gsl_matrix_fread(prdIn, _Xmat);
+		fclose(prdIn);
+		colCenter(_Xmat); // essential to mimic an intercept; predictor should be centered by construction of the sampler
+		
+		gsl_matrix_scale(_Ystore, 1.0/_numSaves);
+		if (_lowLevel) {
+			gsl_matrix *tmpY = gsl_matrix_calloc(_Xmat->size1, _Ystore->size2);
+			for (size_t iHi = 0; iHi < _lowLevel->getNgrp(); iHi++) {
+				double scale = 1.0/static_cast<double>((*_lowLevel)[iHi].size());
+				gsl_vector_view cvRow = gsl_matrix_row(tmpY, iHi);
+				for (vector<size_t>::iterator lowIt = (*_lowLevel)[iHi].begin(); lowIt != (*_lowLevel)[iHi].end(); ++lowIt) {
+					gsl_vector_view yRow = gsl_matrix_row(_Ystore, *lowIt);
+					gsl_blas_daxpy(scale, &yRow.vector, &cvRow.vector); // calculating the Y mean on the fly
+				}
+			}
+			gsl_matrix_free(_Ystore);
+			_Ystore = gsl_matrix_alloc(tmpY->size1, tmpY->size2);
+			gsl_matrix_memcpy(_Ystore, tmpY);
+			gsl_matrix_free(tmpY);
+			
+			colCenter(_Ystore); // only strictly necessary when there is an unbalanced design
+		}
+		
+#pragma omp parallel num_threads(_nThr)
+		{
+			double XtX;
+			gsl_vector *bTmp  = gsl_vector_alloc(_Ystore->size2);
+			gsl_matrix *S     = gsl_matrix_alloc(_Ystore->size2, _Ystore->size2);
+			gsl_matrix *VW    = gsl_matrix_alloc(_Ystore->size2, _Ystore->size2);
+			gsl_matrix *resd  = gsl_matrix_alloc(_Ystore->size1, _Ystore->size2);
+			if (_priorVar) {  // if we have a prior variance, then we are doing approximate Bayes factors as God intended
+#pragma omp for
+				for (int iSnp = 0; iSnp < _Npred; iSnp++) {
+					gsl_vector_view Xtmp = gsl_matrix_column(_Xmat, iSnp);
+					gsl_blas_ddot(&Xtmp.vector, &Xtmp.vector, &XtX);
+					XtX = 1.0/XtX;
+					
+					gsl_blas_dgemv(CblasTrans, XtX, _Ystore, &Xtmp.vector, 0.0, bTmp);
+					
+					gsl_matrix_memcpy(resd, _Ystore);
+					gsl_blas_dger(-1.0, &Xtmp.vector, bTmp, resd);  // subtracting the Xb
+					
+					gsl_blas_dsyrk(CblasLower, CblasTrans, XtX/static_cast<double>(_Ystore->size1 - 1), resd, 0.0, S);
+					gsl_matrix_memcpy(VW, S);
+					gsl_vector_view VWdiag = gsl_matrix_diagonal(VW);
+					gsl_vector_add_constant(&VWdiag.vector, _priorVar);
+					gsl_linalg_cholesky_decomp(S);
+					gsl_linalg_cholesky_decomp(VW);
+					double lnSrSdet  = 0.0;  // ln of the square root of the determinant
+					double lnSrVWdet = 0.0;
+					for (size_t iPh = 0; iPh < _Ystore->size2; iPh++) {
+						lnSrSdet  += log(gsl_matrix_get(S, iPh, iPh));
+						lnSrVWdet += log(gsl_matrix_get(VW, iPh, iPh));
+					}
+					gsl_linalg_cholesky_invert(S);
+					gsl_linalg_cholesky_invert(VW);
+					
+					for (int iPh = 0; iPh < _Ystore->size2; iPh++) {
+						double invV  = gsl_matrix_get(S, iPh, iPh);
+						double r  = _priorVar * gsl_matrix_get(VW, iPh, iPh);  // W/(V+W) of Wakefield (2007)
+						double pV = 0.5*(log(1.0 - r) + gsl_pow_2(gsl_vector_get(bTmp, iPh))*r * invV) ;
+						gsl_matrix_set(_valueMat, iSnp, iPh, pV);
+						
+					}
+					gsl_matrix_sub(S, VW);
+					double m = mhl(bTmp, S);
+					double pV = lnSrSdet - lnSrVWdet + 0.5*m;
+					gsl_matrix_set(_valueMat, iSnp, _Ystore->size2, pV);
+					
+				}
+				
+			}
+			else {
+#pragma omp for
+				for (int iSnp = 0; iSnp < _Npred; iSnp++) {
+					gsl_vector_view Xtmp = gsl_matrix_column(_Xmat, iSnp);
+					gsl_blas_ddot(&Xtmp.vector, &Xtmp.vector, &XtX);
+					XtX = 1.0/XtX;
+					
+					gsl_blas_dgemv(CblasTrans, XtX, _Ystore, &Xtmp.vector, 0.0, bTmp);
+					
+					gsl_matrix_memcpy(resd, _Ystore);
+					gsl_blas_dger(-1.0, &Xtmp.vector, bTmp, resd);  // subtracting the Xb
+					
+					gsl_blas_dsyrk(CblasLower, CblasTrans, XtX, resd, 0.0, S);
+					gsl_linalg_cholesky_decomp(S);
+					gsl_linalg_cholesky_invert(S);
+					
+					for (int iPh = 0; iPh < _Ystore->size2; iPh++) {
+						double invSeB  = sqrt(gsl_matrix_get(S, iPh, iPh) * static_cast<double>(_Ystore->size1 - 1));
+						double tVal = fabs(gsl_vector_get(bTmp, iPh)) * invSeB;
+						double pV   = -log10(gsl_cdf_tdist_Q(tVal, _Ystore->size1 - 1)*2.0);
+						gsl_matrix_set(_valueMat, iSnp, iPh, pV);
+						
+					}
+					
+					
+					double m = mhl(bTmp, S);
+					m = (static_cast<double>(_Ystore->size1) - static_cast<double>(_Ystore->size2))/static_cast<double>(_Ystore->size2)*m;
+					double pV = -log10(gsl_cdf_fdist_Q(m, static_cast<double>(_Ystore->size2), static_cast<double>(_Ystore->size1) - static_cast<double>(_Ystore->size2)));
+					
+					gsl_matrix_set(_valueMat, iSnp, _Ystore->size2, pV);
+					
+				}
+				
+			}
+			gsl_vector_free(bTmp);
+			gsl_matrix_free(S);
+			gsl_matrix_free(resd);
+		}//end omp block
+		
+		FILE *btOut = fopen(_outFlNam.c_str(), "w");
+		gsl_matrix_fwrite(btOut, _valueMat);
+		fclose(btOut);
+		
+		
+	}
+	else {
+		cout << "BetaGrpSnpCV: nothing to dump" << endl;
+	}
+}
+
+/*
  * BetaGrpPSR methods
  */
 
@@ -8187,7 +8363,7 @@ void BetaGrpPSR::dump(){
 						
 						gsl_blas_dgemv(CblasNoTrans, -1.0, Xplus, bHat, 1.0, y);  // y is now the residual; only interested in the last element of bHat (the regression on X)
 						gsl_blas_ddot(y, y, &sig);
-						sig = sig*gsl_matrix_get(XtX, XtX->size1 - 1, XtX->size2 - 1)/static_cast<double>(_Ystore->size1 - 1);
+						sig = sig*gsl_matrix_get(XtX, XtX->size1 - 1, XtX->size2 - 1)/static_cast<double>(_Ystore->size1 - _Ystore->size2);
 						double r = _priorVar/(sig + _priorVar);  // W/(V+W) of Wakefield (2007)
 						double pV = 0.5*(log(1.0 - r) + gsl_pow_2(gsl_vector_get(bHat, bHat->size - 1))*r/sig);
 						gsl_matrix_set(_valueMat, iSnp, iTr, pV);
@@ -8223,7 +8399,7 @@ void BetaGrpPSR::dump(){
 						
 						gsl_blas_dgemv(CblasNoTrans, -1.0, Xplus, bHat, 1.0, y);  // y is now the residual; only interested in the last element of bHat (the regression on X)
 						sig = gsl_blas_dnrm2(y);
-						sig = sig*sqrt(gsl_matrix_get(XtX, XtX->size1 - 1, XtX->size2 - 1))/sqrt(static_cast<double>(_Ystore->size1 - 1));
+						sig = sig*sqrt(gsl_matrix_get(XtX, XtX->size1 - 1, XtX->size2 - 1))/sqrt(static_cast<double>(_Ystore->size1 - _Ystore->size2));
 						double tVal = fabs(gsl_vector_get(bHat, bHat->size - 1))/sig;
 						double pV   = -log10(gsl_cdf_tdist_Q(tVal, _Ystore->size1 - 1)*2.0);
 						gsl_matrix_set(_valueMat, iSnp, iTr, pV);
@@ -8307,10 +8483,6 @@ BetaGrpSnpMiss::BetaGrpSnpMiss(const BetaGrpSnpMiss &mG){
 	_valueMat = gsl_matrix_alloc((mG._valueMat)->size1, (mG._valueMat)->size2);
 	gsl_matrix_memcpy(_valueMat, mG._valueMat);
 	
-	_theta.resize(_valueMat->size1);
-	for (size_t iVrw = 0; iVrw < _valueMat->size1; iVrw++) {
-		_theta[iVrw] = new MVnormMu(_valueMat, iVrw, *(mG._theta[iVrw])->down(), *(mG._theta[iVrw])->up());
-	}
 	
 }
 BetaGrpSnpMiss & BetaGrpSnpMiss::operator=(const BetaGrpSnpMiss &mG){
@@ -8328,10 +8500,6 @@ BetaGrpSnpMiss & BetaGrpSnpMiss::operator=(const BetaGrpSnpMiss &mG){
 	_valueMat = gsl_matrix_alloc((mG._valueMat)->size1, (mG._valueMat)->size2);
 	gsl_matrix_memcpy(_valueMat, mG._valueMat);
 	
-	_theta.resize(_valueMat->size1);
-	for (size_t iVrw = 0; iVrw < _valueMat->size1; iVrw++) {
-		_theta[iVrw] = new MVnormMu(_valueMat, iVrw, *(mG._theta[iVrw])->down(), *(mG._theta[iVrw])->up());
-	}
 	
 	return *this;
 }
@@ -8522,6 +8690,222 @@ void BetaGrpSnpMiss::update(const Grp &dat, const SigmaI &SigIm){
 }
 
 /*
+ * BetaGrpSnpMissCV methods
+ */
+
+BetaGrpSnpMissCV::BetaGrpSnpMissCV(const BetaGrpSnpMissCV &mG){
+	gsl_matrix_free(_valueMat);
+	_Ystore  = gsl_matrix_calloc((mG._Ystore)->size1, (mG._Ystore)->size2);
+	
+	_lowLevel = mG._lowLevel;
+	_upLevel  = mG._upLevel;
+	_nThr     = mG._nThr;
+	_Npred    = mG._Npred;
+	_absLab   = mG._absLab;
+	_priorVar = mG._priorVar;
+	_inPredFl = mG._inPredFl;
+	
+	_valueMat = gsl_matrix_alloc((mG._valueMat)->size1, (mG._valueMat)->size2);
+	gsl_matrix_memcpy(_valueMat, mG._valueMat);
+	
+}
+BetaGrpSnpMissCV & BetaGrpSnpMissCV::operator=(const BetaGrpSnpMissCV &mG){
+	gsl_matrix_free(_valueMat);
+	_Ystore  = gsl_matrix_calloc((mG._Ystore)->size1, (mG._Ystore)->size2);
+	
+	_lowLevel = mG._lowLevel;
+	_upLevel  = mG._upLevel;
+	_nThr     = mG._nThr;
+	_Npred    = mG._Npred;
+	_absLab   = mG._absLab;
+	_priorVar = mG._priorVar;
+	_inPredFl = mG._inPredFl;
+	
+	_valueMat = gsl_matrix_alloc((mG._valueMat)->size1, (mG._valueMat)->size2);
+	gsl_matrix_memcpy(_valueMat, mG._valueMat);
+	
+	
+	return *this;
+}
+
+void BetaGrpSnpMissCV::dump(){
+	if (_numSaves) {
+		_Xmat.resize(_Npred);
+		
+		gsl_matrix_free(_valueMat);
+		_valueMat = gsl_matrix_calloc(_Npred, _Ystore->size2 + 1);
+		
+		gsl_vector *tmpX = gsl_vector_alloc(_Npred);
+		FILE *prdIn = fopen(_inPredFl.c_str(), "r");
+		vector< vector<size_t> > presInd(_Npred);
+		
+		for (size_t XiRw = 0; XiRw < _Ystore->size1; XiRw++) { // reading in one row (line of predictor) at a time so that two whole SNP matrix worth of stuff is not in memory at once;  remember that SNPs are saved in row-major
+			gsl_vector_fread(prdIn, tmpX);
+			for (size_t XjCl = 0; XjCl < _Npred; XjCl++) {
+				if (gsl_vector_get(tmpX, XjCl) > _absLab) { // absLab labels the missing data, has to be smaller than the smallest real value
+					presInd[XjCl].push_back(XiRw);
+					_Xmat[XjCl].push_back(gsl_vector_get(tmpX, XjCl));
+				}
+			}
+		}
+		fclose(prdIn);
+		gsl_vector_free(tmpX);
+		
+		if (_lowLevel) {
+			gsl_matrix *tmpY = gsl_matrix_calloc(_lowLevel->getNgrp(), _Ystore->size2);
+			for (size_t iHi = 0; iHi < _lowLevel->getNgrp(); iHi++) {
+				double scale = 1.0/static_cast<double>((*_lowLevel)[iHi].size());
+				gsl_vector_view cvRow = gsl_matrix_row(tmpY, iHi);
+				for (vector<size_t>::iterator lowIt = (*_lowLevel)[iHi].begin(); lowIt != (*_lowLevel)[iHi].end(); ++lowIt) {
+					gsl_vector_view yRow = gsl_matrix_row(_Ystore, *lowIt);
+					gsl_blas_daxpy(scale, &yRow.vector, &cvRow.vector); // calculating the Y mean on the fly
+				}
+			}
+			gsl_matrix_free(_Ystore);
+			_Ystore = gsl_matrix_alloc(tmpY->size1, tmpY->size2);
+			gsl_matrix_memcpy(_Ystore, tmpY);
+			gsl_matrix_free(tmpY);
+		}
+		
+#pragma omp parallel num_threads(_nThr)
+		{
+			double XtX;
+			gsl_vector *bTmp  = gsl_vector_alloc(_Ystore->size2);
+			gsl_matrix *S     = gsl_matrix_alloc(_Ystore->size2, _Ystore->size2);
+			gsl_matrix *VW    = gsl_matrix_alloc(_Ystore->size2, _Ystore->size2);
+			if (_priorVar) {  // if we have a prior variance, then we are doing approximate Bayes factors as God intended
+#pragma omp for
+				for (int iSnp = 0; iSnp < _Npred; iSnp++) {
+					gsl_matrix *resd;
+					if (presInd[iSnp].size() == 0) { // i.e., no data at all.  Shouldn't happen, but who knows
+						resd = gsl_matrix_alloc(1, 1); // just so the freeing of the matrix later works
+						gsl_vector_view pVrow = gsl_matrix_row(_valueMat, iSnp);
+						gsl_vector_set_zero(&pVrow.vector);
+					}
+					else if (presInd[iSnp].size() < _Ystore->size1) {  // i.e., some missing SNP data
+						resd = gsl_matrix_alloc(presInd.size(), _Ystore->size2);
+						int ind = 0;
+						for (vector<size_t>::const_iterator it = presInd[iSnp].begin(); it != presInd[iSnp].end(); ++it) {
+							gsl_vector_view rspRw = gsl_matrix_row(_Ystore, *it);
+							gsl_matrix_set_row(resd, ind, &rspRw.vector);
+							ind++;
+						}
+						colCenter(resd);
+						
+					}
+					else {
+						resd = gsl_matrix_alloc(_Ystore->size1, _Ystore->size2);
+						gsl_matrix_memcpy(resd, _Ystore);
+					}
+					gsl_vector_view Xtmp = gsl_vector_view_array(_Xmat[iSnp].data(), _Xmat[iSnp].size());
+					gsl_blas_ddot(&Xtmp.vector, &Xtmp.vector, &XtX);
+					XtX = 1.0/XtX;
+					
+					gsl_blas_dgemv(CblasTrans, XtX, resd, &Xtmp.vector, 0.0, bTmp);
+					
+					gsl_blas_dger(-1.0, &Xtmp.vector, bTmp, resd);  // subtracting the Xb
+					
+					gsl_blas_dsyrk(CblasLower, CblasTrans, XtX/static_cast<double>(presInd[iSnp].size() - 1), resd, 0.0, S);
+					gsl_matrix_memcpy(VW, S);
+					gsl_vector_view VWdiag = gsl_matrix_diagonal(VW);
+					gsl_vector_add_constant(&VWdiag.vector, _priorVar);
+					gsl_linalg_cholesky_decomp(S);
+					gsl_linalg_cholesky_decomp(VW);
+					
+					double lnSrSdet = 0.0;  // ln of the square root of the determinant
+					double lnSrVWdet = 0.0;
+					for (size_t iPh = 0; iPh < _Ystore->size2; iPh++) {
+						lnSrSdet  += log(gsl_matrix_get(S, iPh, iPh));
+						lnSrVWdet += log(gsl_matrix_get(VW, iPh, iPh));
+					}
+					gsl_linalg_cholesky_invert(S);
+					gsl_linalg_cholesky_invert(VW);
+					
+					for (int iPh = 0; iPh < _Ystore->size2; iPh++) {
+						double invV  = gsl_matrix_get(S, iPh, iPh);
+						double r  = _priorVar * gsl_matrix_get(VW, iPh, iPh);  // W/(V+W) of Wakefield (2007)
+						double pV = 0.5*(log(1.0 - r) + gsl_pow_2(gsl_vector_get(bTmp, iPh))*r*invV) ;
+						gsl_matrix_set(_valueMat, iSnp, iPh, pV);
+						
+					}
+					gsl_matrix_sub(S, VW);
+					double m = mhl(bTmp, S);
+					double pV = lnSrSdet - lnSrVWdet + 0.5*m;
+					gsl_matrix_set(_valueMat, iSnp, _Ystore->size2, pV);
+					
+					gsl_matrix_free(resd);
+				}
+				
+			}
+			else {
+#pragma omp for
+				for (int iSnp = 0; iSnp < _Npred; iSnp++) {
+					gsl_matrix *resd;
+					if (presInd[iSnp].size() == 0) { // i.e., no data at all.  Shouldn't happen, but who knows
+						resd = gsl_matrix_alloc(1, 1); // just so the freeing of the matrix later works
+						gsl_vector_view pVrow = gsl_matrix_row(_valueMat, iSnp);
+						gsl_vector_set_zero(&pVrow.vector);
+					}
+					else if (presInd[iSnp].size() < _Ystore->size1) {  // i.e., some missing data for this SNP
+						resd = gsl_matrix_alloc(presInd.size(), _Ystore->size2);
+						int ind = 0;
+						for (vector<size_t>::const_iterator it = presInd[iSnp].begin(); it != presInd[iSnp].end(); ++it) {
+							gsl_vector_view rspRw = gsl_matrix_row(_Ystore, *it);
+							gsl_matrix_set_row(resd, ind, &rspRw.vector);
+							ind++;
+						}
+						colCenter(resd);
+						
+					}
+					else {
+						resd = gsl_matrix_alloc(_Ystore->size1, _Ystore->size2);
+						gsl_matrix_memcpy(resd, _Ystore);
+					}
+					gsl_vector_view Xtmp = gsl_vector_view_array(_Xmat[iSnp].data(), _Xmat[iSnp].size());
+					gsl_blas_ddot(&Xtmp.vector, &Xtmp.vector, &XtX);
+					XtX = 1.0/XtX;
+					
+					gsl_blas_dgemv(CblasTrans, XtX, resd, &Xtmp.vector, 0.0, bTmp);
+					gsl_blas_dger(-1.0, &Xtmp.vector, bTmp, resd);  // subtracting the Xb
+					
+					gsl_blas_dsyrk(CblasLower, CblasTrans, XtX, resd, 0.0, S);
+					gsl_linalg_cholesky_decomp(S);
+					gsl_linalg_cholesky_invert(S);
+					
+					for (int iPh = 0; iPh < _Ystore->size2; iPh++) {
+						double invSeB  = sqrt(gsl_matrix_get(S, iPh, iPh)/static_cast<double>(presInd[iSnp].size() - 1));
+						double tVal = fabs(gsl_vector_get(bTmp, iPh))*invSeB;
+						double pV   = -log10(gsl_cdf_tdist_Q(tVal, _Ystore->size1 - 1)*2.0);
+						gsl_matrix_set(_valueMat, iSnp, iPh, pV);
+						
+					}
+					
+					
+					double m = mhl(bTmp, S);
+					m = (static_cast<double>(presInd[iSnp].size()) - static_cast<double>(_Ystore->size2))/static_cast<double>(_Ystore->size2)*m;
+					double pV = -log10(gsl_cdf_fdist_Q(m, static_cast<double>(_Ystore->size2), static_cast<double>(presInd[iSnp].size()) - static_cast<double>(_Ystore->size2)));
+					
+					gsl_matrix_set(_valueMat, iSnp, _Ystore->size2, pV);
+					gsl_matrix_free(resd);
+				}
+				
+			}
+			gsl_vector_free(bTmp);
+			gsl_matrix_free(S);
+			
+		}//end omp block
+		
+		FILE *btOut = fopen(_outFlNam.c_str(), "w");
+		gsl_matrix_fwrite(btOut, _valueMat);
+		fclose(btOut);
+	}
+	else {
+		cout << "BetaGrpSnpMissCV: nothing to dump" << endl;
+	}
+}
+
+
+/*
  *  BetaGrpPSRmiss methods
  */
 
@@ -8662,7 +9046,7 @@ void BetaGrpPSRmiss::dump(){
 							
 							gsl_blas_dgemv(CblasNoTrans, -1.0, Xplus, bHat, 1.0, y);  // y is now the residual; only interested in the last element of bHat (the regression on X)
 							gsl_blas_ddot(y, y, &sig);
-							sig = sig*gsl_matrix_get(XtX, XtX->size1 - 1, XtX->size2 - 1)/static_cast<double>(presInd[iSnp].size() - 1);
+							sig = sig*gsl_matrix_get(XtX, XtX->size1 - 1, XtX->size2 - 1)/static_cast<double>(presInd[iSnp].size() - _Ystore->size2);
 							double r = _priorVar/(sig + _priorVar);  // W/(V+W) of Wakefield (2007)
 							double pV = 0.5*(log(1.0 - r) + gsl_pow_2(gsl_vector_get(bHat, bHat->size - 1))*r/sig);
 							gsl_matrix_set(_valueMat, iSnp, iTr, pV);
@@ -8696,7 +9080,7 @@ void BetaGrpPSRmiss::dump(){
 							
 							gsl_blas_dgemv(CblasNoTrans, -1.0, Xplus, bHat, 1.0, y);  // y is now the residual; only interested in the last element of bHat (the regression on X)
 							gsl_blas_ddot(y, y, &sig);
-							sig = sig*gsl_matrix_get(XtX, XtX->size1 - 1, XtX->size2 - 1)/static_cast<double>(_Ystore->size1 - 1);
+							sig = sig*gsl_matrix_get(XtX, XtX->size1 - 1, XtX->size2 - 1)/static_cast<double>(_Ystore->size1 - _Ystore->size2);
 							double r = _priorVar/(sig + _priorVar);  // W/(V+W) of Wakefield (2007)
 							double pV = 0.5*(log(1.0 - r) + gsl_pow_2(gsl_vector_get(bHat, bHat->size - 1))*r/sig);
 							gsl_matrix_set(_valueMat, iSnp, iTr, pV);
@@ -8753,7 +9137,7 @@ void BetaGrpPSRmiss::dump(){
 							
 							gsl_blas_dgemv(CblasNoTrans, -1.0, Xplus, bHat, 1.0, y);  // y is now the residual; only interested in the last element of bHat (the regression on X)
 							sig = gsl_blas_dnrm2(y);
-							sig = sig*sqrt(gsl_matrix_get(XtX, XtX->size1 - 1, XtX->size2 - 1))/sqrt(static_cast<double>(_Ystore->size1 - 1));
+							sig = sig*sqrt(gsl_matrix_get(XtX, XtX->size1 - 1, XtX->size2 - 1))/sqrt(static_cast<double>(_Ystore->size1 - _Ystore->size2));
 							double tVal = fabs(gsl_vector_get(bHat, bHat->size - 1))/sig;
 							double pV   = -log10(gsl_cdf_tdist_Q(tVal, _Ystore->size1 - 1)*2.0);
 							gsl_matrix_set(_valueMat, iSnp, iTr, pV);
@@ -8787,7 +9171,7 @@ void BetaGrpPSRmiss::dump(){
 							
 							gsl_blas_dgemv(CblasNoTrans, -1.0, Xplus, bHat, 1.0, y);  // y is now the residual; only interested in the last element of bHat (the regression on X)
 							sig = gsl_blas_dnrm2(y);
-							sig = sig*sqrt(gsl_matrix_get(XtX, XtX->size1 - 1, XtX->size2 - 1))/sqrt(static_cast<double>(_Ystore->size1 - 1));
+							sig = sig*sqrt(gsl_matrix_get(XtX, XtX->size1 - 1, XtX->size2 - 1))/sqrt(static_cast<double>(_Ystore->size1 - _Ystore->size2));
 							double tVal = fabs(gsl_vector_get(bHat, bHat->size - 1))/sig;
 							double pV   = -log10(gsl_cdf_tdist_Q(tVal, _Ystore->size1 - 1)*2.0);
 							gsl_matrix_set(_valueMat, iSnp, iTr, pV);

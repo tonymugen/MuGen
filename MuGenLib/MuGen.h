@@ -12,7 +12,7 @@
 
 /// C++ classes for Hierarchical Bayesian Multi-trait quantitative-genetic models.
 /** \file
- * \author Anthony Greenberg
+ * \author Anthony J. Greenberg
  * \copyright GNU public license
  * \version 0.9.0
  * 
@@ -74,9 +74,9 @@ class Qgrp;
 class QgrpPEX;
 class MixP;
 
-/** \defgroup sampFun Various distribution functions
+/** \defgroup distributions Various distribution functions
  *
- * Sampling functions for distributions not already in GSL
+ * Sampling functions for distributions not already in GSL.
  *
  * \warning These are internal functions that are invoked from within classes. Because they need to be as efficient as possible, no range-checking is performed (especially if GSL range checking is turned off at compilation).  They rely on the user to keep track of dimensions.
  *
@@ -86,7 +86,7 @@ class MixP;
 
 /** \brief Multivariate Gaussian sampling function
  * 
- * This function gives a sample from the MV Gaussian distribution with a given mean and covariance matrix
+ * This function gives a sample from the MV Gaussian distribution with a given mean and covariance matrix.
  *
  * \param[in] gsl_vector* pointer to a vector of means
  * \param[in] gsl_matrix* pointer to a matrix with the Cholesky-decomposed covariance matrix
@@ -98,7 +98,7 @@ void MVgauss(const gsl_vector*, const gsl_matrix*, const gsl_rng*, gsl_vector*);
 
 /** \defgroup Overloaded Wishart sampling functions
  *
- * These functions give samples from the Wishart distribution, the only difference between them is the type of the degrees of freedom paramter
+ * These functions give samples from the Wishart distribution, the only difference between them is the type of the degrees of freedom paramter.
  *
  * \param[in] gsl_matrix* pointer to a matrix with the Cholesky-transformed covariance matrix parameter
  * \param[in] int/size_t& degrees of freedom parameter
@@ -113,12 +113,12 @@ void Wishart(const gsl_matrix*, const size_t&, const gsl_rng*, gsl_matrix*);
 
 /** \brief Truncated geometric distribution
  *
- * Sampling from the truncated geometric distribution, returning a size_t type index value
+ * Sampling from the truncated geometric distribution, returning a size_t type index value.
  *
  * \param[in] double& probability of success
  * \param[in] size_t& maximum value
  * \param[in] gsl_rng* pointer to a PNG
- * \return a value of the type size_t that is a sample from the distribution
+ * \return a value of the type size_t that is a sample from the distribution.
  *
  */
 size_t rtgeom(const double&, const size_t&, const gsl_rng*);
@@ -126,23 +126,23 @@ size_t rtgeom(const double&, const size_t&, const gsl_rng*);
 
 /** \defgroup auxFun Auxiliary functions
  *	 
- * Various functions that are needed internally
+ * Various functions that are needed internally.
  *
  * @{
  */
 /** \brief Mahalanobis distance
  *
- * Calculates the Mahalonobis distance of a vector from zero
+ * Calculates the Mahalanobis distance of a vector from zero.
  *
  * \param[in] gsl_vector* the vector
  * \param[in] gsl_matrix* the corresponding inverse-covariance matrix
- * \return a scalar value of type double
+ * \return a scalar value of type double.
  *
  */
 double mhl(const gsl_vector *beta, const gsl_matrix *SigI);
-/** \defgroup clCen Centering functions
+/** \defgroup centerFun Centering functions
  *
- * Functions that center matrix columns and vectors
+ * Functions that center matrix columns and vectors.
  *
  * @{
  */
@@ -154,7 +154,7 @@ double mhl(const gsl_vector *beta, const gsl_matrix *SigI);
 void colCenter(gsl_matrix *inplace);
 /** \brief Matrix centering with copy
  *
- * \param[in] gsl_matrix* the matrix to be centered.  It is not modified
+ * \param[in] gsl_matrix* the matrix to be centered, left unmodified
  * \param[out] gsl_matrix* the modified matrix
  *
  */
@@ -168,7 +168,7 @@ void colCenter(const gsl_matrix *source, gsl_matrix *res);
 void colCenter(gsl_matrix *inplace, const double &absLab);
 /** \brief Matrix centering with copy and missing values
  *
- *	In addition to centering does mean-imputation of missing values
+ *	In addition to centering does mean-imputation of missing values.
  *
  * \param[in] gsl_matrix* matrix to be centered, but not changed
  * \param[out] gsl_matrix* centered matrix
@@ -179,6 +179,7 @@ void colCenter(const gsl_matrix *source, gsl_matrix *res, const double &absLab);
 /** \brief Vector centering in-place
  *
  * \param[in,out] gsl_vector* vector to be modified
+ * \param[in] double& label for missing values
  *
  */
 void vecCenter(gsl_vector *inplace);
@@ -199,119 +200,639 @@ void meanImpute(gsl_matrix *inplace, const double &absLab);
 /** @} */
 /** \brief Print matrix to screen
  *
- * Printing a GSL matrix to screen, with each row on a line, values seprated by spaces
+ * Printing a GSL matrix to screen, with each row on a line, values seprated by spaces.
  *
  * \param[in] gsl_matrix* matrix to be displayed
+ * \param[in] double& label for missing data
  *
  */
-void printMat(const gsl_matrix *);
+void printMat(const gsl_matrix *m);
 /** \brief Accessing the processor RTDSC instruction
  *
- * \return a value of type unsigned long long
+ * \return a value of type unsigned long long.
  *
- * This function outputs the processor RTDSC instruction for use in seeding random number generators
- * \warning this function is unlikely to work under Windows
+ * This function outputs the processor RTDSC instruction for use in seeding random number generators using assembly code.
+ * \warning this function is unlikely to work under Windows.
  *
  */
 unsigned long long rdtsc();
 /** @} */
 
-/** \defgroup lineLoc Individual location parameters
+/** \defgroup rowLocParam Individual location parameters
  *
- * A hierarchy of classes that refer to rows of location parameter matrices. These classes are internal to Grp classes and are not directly declared by the user of the library.  They are typically updated with samples from the multivariate normal distribution
+ * A hierarchy of classes that refer to rows of location parameter matrices. These classes are internal to Grp classes and are not directly declared by the user of the library.  
+ * They are typically updated with samples from the multivariate normal distribution.  Because the methods are used for much of the computation, they are implemented for speed and almost no chacking for errors is done.
+ * The assumption is that the encapsualting classes will do all of that correctly. Constructors are used to set initial values.
  *
  * @{
  */
+/** \brief The abstract base class for location parameter rows
+ *
+ * This is the generic location parameter class and cannot be envoked directly.  All the constructors are protected.
+ */
 class MVnorm {
 protected:
-	gsl_vector_view _vec; // the vector of values
-	size_t _d;	          // dimension, needs to be the same for all objects in a given program
+	/** \brief Data vector
+	 * 
+	 * This is actually a pointer (implemented as a GSL *vector_view*) to a row in the corresponding matrix of location parameters.
+	 *
+	 */
+	gsl_vector_view _vec;
 	
-	// constructors
+	/** \brief Length of the data vector */
+	size_t _d;
+	
+	/** \brief Default constructor
+	 *
+	 * This is a deterministic constructor that results in a pointer to nowhere and the dimension member set to zero.
+	 */
 	MVnorm() : _d(0) {};
+	/** \brief Dimension-only constructor
+	 *
+	 * Sets the dimension to a value, but the *vector_view* is not assigned a target.
+	 * 
+	 * \param[in] size_t& dimension value
+	 */
 	MVnorm(const size_t &d) : _d(d) {};
-	MVnorm(gsl_vector *mn);  // deterministic constructor
+	/** \brief Dimension and vector value constructor
+	 *
+	 * A deterministic constructor that sets the _vec member to point to the provided *gsl_vector* and the dimension member to the size of the provided *gsl_vector*.
+	 *
+	 * \param[in] gsl_vector* target vector
+	 */
+	MVnorm(gsl_vector *mn);
+	/** \brief Univariate Gaussian constructor
+	 *
+	 * Sets the _vec member to point to the provided *gsl_vector* and ads univariate Gaussian noise independtly to each element, modifying the target.
+	 *
+	 * \param[in,out] gsl_vector* vector of means
+	 * \param[in] gsl_vector* vector of standard deviations for the univariate Gaussian, has to be no shorter than the mean vector.  If it is longer, the extra values are ignored.
+	 * \param[in] gsl_rng* pointer to a PNG
+	 *
+	 */
 	MVnorm(gsl_vector *mn, const gsl_vector *sd, const gsl_rng *r);
+	/** \brief Multivariate Gaussian constructor
+	 *
+	 * Sets the _vec member to point to the provided *gsl_vector* and ads multivariate Gaussian noise, modifying the target.
+	 *
+	 * \param[in,out] gsl_vector* vector of means
+	 * \param[in] gsl_matrix* covariance matrix for the multivariate Gaussian, has to match the mean vector in dimensions and has to be symmetric positive-definite
+	 * \param[in] gsl_rng* pointer to a PNG
+	 *
+	 */
 	MVnorm(gsl_vector *mn, const gsl_matrix *Sig, const gsl_rng *r);
-	MVnorm(gsl_matrix *mn, const size_t &iRw);  // deterministic constructor
+	/** \brief Dimension and vector value constructor
+	 *
+	 * A deterministic constructor that sets the _vec member to point to a row (indicated by the row index) of the provided *gsl_matrix* and the dimension member to the number of columns in the provided *gsl_matrix*.
+	 *
+	 * \param[in] gsl_matrix* target matrix
+	 * \param[in] size_t& row index of the matrix
+	 */
+	MVnorm(gsl_matrix *mn, const size_t &iRw);
+	/** \brief Univariate Gaussian constructor with a matrix
+	 *
+	 * Sets the _vec member to point to a row (indicated by the row index) of the provided *gsl_matrix* and ads univariate Gaussian noise independtly to each element, modifying the target.
+	 *
+	 * \param[in,out] gsl_matrix* target matrix
+	 * \param[in] size_t& row index of the target matrix
+	 * \param[in] gsl_vector* vector of standard deviations for the univariate Gaussian, has to be no shorter than a row of the mean matrix.  If it is longer, the extra values are ignored.
+	 * \param[in] gsl_rng* pointer to a PNG
+	 *
+	 */
 	MVnorm(gsl_matrix *mn, const size_t &iRw, const gsl_vector *sd, const gsl_rng *r);
+	/** \brief Multivariate Gaussian constructor with a matrix
+	 *
+	 * Sets the _vec member to point to a row (indicated by the row index) of the provided *gsl_matrix* and ads multivariate Gaussian noise, modifying the target.
+	 *
+	 * \param[in,out] gsl_matrix* target matrix
+	 * \param[in] size_t& row index of the target matrix
+	 * \param[in] gsl_matrix* covariance matrix for the multivariate Gaussian, has to be symmetric positive-definite, with diemsions equal to the number of columns in the target matrix
+	 * \param[in] gsl_rng* pointer to a PNG
+	 *
+	 */
 	MVnorm(gsl_matrix *mn, const size_t &iRw, const gsl_matrix *Sig, const gsl_rng *r);
 	
 public:
-	MVnorm(const MVnorm &); // copy constructor
+	/** \brief Copy constructor
+	 *
+	 * Provided for completeness and has not been extensively tested.  The constructor is deterministic, i.e.\ the values are copied exactly, with no stochastic perturbation.
+	 *
+	 * \param[in] MVnorm& object to be copied
+	 * \return object of class _MVnorm_.
+	 */
+	MVnorm(const MVnorm &);
+	/** \brief Assignement operator
+	 *
+	 * Provided for completeness and has not been extensively tested.  The operator is deterministic, i.e.\ the values are copied exactly, with no stochastic perturbation.
+	 *
+	 * \param[in] MVnorm& object to be assigned
+	 * \return reference to an object of class _MVnorm_.
+	 */
 	MVnorm & operator=(const MVnorm &);
 	
-	virtual ~MVnorm() {}; // necessary virtual destructor
+	/** \brief Virtual destructor
+	 *
+	 * The destructor has nothing to do since members of this class cannot be de-allocated.
+	 */
+	virtual ~MVnorm() {};
 	
-	//	overloaded update() methods; prior q values are the const double &
-	
-	// improper prior methods
+	/** \defgroup updateFun Overloaded update functions
+	 *
+	 * These functions generate updated values of the corresponding lines in the location matrix via Gibbs sampling, given the current states of the parameters listed as arguments. 
+	 * In this class, these are all pure virtual functions.
+	 *
+	 * @{
+	 */
+	/** \defgroup locIP Improper prior methods
+	 *
+	 * @{
+	 */
+	/** \brief Gaussian likelihood
+	 *
+	 * \param[in] Grp& data
+	 * \param[in] SigmaI& inverse-covariance matrix for the likelihood
+	 * \param[in] gsl_rng* pointer to a PNG
+	 */
 	virtual void update(const Grp &, const SigmaI &, const gsl_rng *) = 0;
+	/** \brief Sudent-\f$t\f$ likelihood
+	 *
+	 * \param[in] Grp& data
+	 * \param[in] Qgrp& vector of Student-\f$t\f$ covariance scale parameters for the likelihood covariance
+	 * \param[in] SigmaI& inverse-covariance matrix for the likelihood
+	 * \param[in] gsl_rng* pointer to a PNG
+	 */
 	virtual void update(const Grp &, const Qgrp &, const SigmaI &, const gsl_rng *) = 0;
-	// 0-mean prior methods
-	virtual void update(const Grp &, const SigmaI &, const SigmaI &, const gsl_rng *) = 0; // G data, G prior
-	virtual void update(const Grp &, const SigmaI &, const double &, const SigmaI &, const gsl_rng *) = 0; // G data, t prior
-	virtual void update(const Grp &, const Qgrp &, const SigmaI &, const SigmaI &, const gsl_rng *) = 0; // t data, G prior
-	virtual void update(const Grp &, const Qgrp &, const SigmaI &, const double &, const SigmaI &, const gsl_rng *) = 0; // t data, t prior
-	// non-zero mean prrior methods
-	virtual void update(const Grp &, const SigmaI &, const Grp &, const SigmaI &, const gsl_rng *) = 0; // G data, G prior
-	virtual void update(const Grp &, const SigmaI &, const Grp &, const double &, const SigmaI &, const gsl_rng *) = 0; // G data, t prior
-	virtual void update(const Grp &, const Qgrp &, const SigmaI &, const Grp &, const SigmaI &, const gsl_rng *) = 0; // t data, G prior
-	virtual void update(const Grp &, const Qgrp &, const SigmaI &, const Grp &, const double &, const SigmaI &, const gsl_rng *) = 0; // t data, t prior
+	/** @} */
+	/** \addtogroup locZMn 0-mean prior methods
+	 *
+	 * @{
+	 */
+	/** \brief Gaussian likelihood, Gaussian prior
+	 *
+	 * \param[in] Grp& data for the likelihood
+	 * \param[in] SigmaI& inverse-covariance matrix for the likelihood
+	 * \param[in] SigmaI& prior inverse-covariance matrix
+	 * \param[in] gsl_rng* pointer to a PNG
+	 */
+	virtual void update(const Grp &, const SigmaI &, const SigmaI &, const gsl_rng *) = 0;
+	/** \brief Gaussian likelihood, Student-\f$t\f$ prior
+	 *
+	 * \param[in] Grp& data for the likelihood
+	 * \param[in] SigmaI& inverse-covariance matrix for the likelihood
+	 * \param[in] double& Student-\f$t\f$ scale parameter for the prior covariance
+	 * \param[in] SigmaI& prior inverse-covariance matrix
+	 * \param[in] gsl_rng* pointer to a PNG
+	 */
+	virtual void update(const Grp &, const SigmaI &, const double &, const SigmaI &, const gsl_rng *) = 0;
+	/** \brief Student-\f$t\f$ likelihood, Gaussian prior
+	 *
+	 * \param[in] Grp& data for the likelihood
+	 * \param[in] Qgrp& vector of Student-\f$t\f$ covariance scale parameters for the likelihood covariance
+	 * \param[in] SigmaI& inverse-covariance matrix for the likelihood
+	 * \param[in] SigmaI& prior inverse-covariance matrix
+	 * \param[in] gsl_rng* pointer to a PNG
+	 */
+	virtual void update(const Grp &, const Qgrp &, const SigmaI &, const SigmaI &, const gsl_rng *) = 0;
+	/** \brief Student-\f$t\f$ likelihood, Student-\f$t\f$ prior
+	 *
+	 * \param[in] Grp& data for the likelihood
+	 * \param[in] Qgrp& vector Student-\f$t\f$ covariance scale parameter for the likelihood covariance
+	 * \param[in] SigmaI& inverse-covariance matrix for the likelihood
+	 * \param[in] double& Student-\f$t\f$ scale parameter for the prior covariance
+	 * \param[in] SigmaI& prior inverse-covariance matrix
+	 * \param[in] gsl_rng* pointer to a PNG
+	 */
+	virtual void update(const Grp &, const Qgrp &, const SigmaI &, const double &, const SigmaI &, const gsl_rng *) = 0;
+	/** @} */
+	/** \addtogroup locNZMn non-0-mean prior methods
+	 *
+	 * @{
+	 */
+	/** \brief Gaussian likelihood, Gaussian prior
+	 *
+	 * \param[in] Grp& data for the likelihood
+	 * \param[in] SigmaI& inverse-covariance matrix for the likelihood
+	 * \param[in] Grp& prior mean
+	 * \param[in] SigmaI& prior inverse-covariance matrix
+	 * \param[in] gsl_rng* pointer to a PNG
+	 */
+	virtual void update(const Grp &, const SigmaI &, const Grp &, const SigmaI &, const gsl_rng *) = 0;
+	/** \brief Gaussian likelihood, Student-\f$t\f$ prior
+	 *
+	 * \param[in] Grp& data for the likelihood
+	 * \param[in] SigmaI& inverse-covariance matrix for the likelihood
+	 * \param[in] Grp& prior mean
+	 * \param[in] double& Student-\f$t\f$ scale parameter for the prior covariance
+	 * \param[in] SigmaI& prior inverse-covariance matrix
+	 * \param[in] gsl_rng* pointer to a PNG
+	 */
+	virtual void update(const Grp &, const SigmaI &, const Grp &, const double &, const SigmaI &, const gsl_rng *) = 0;
+	/** \brief Student-\f$t\f$ likelihood, Gaussian prior
+	 *
+	 * \param[in] Grp& data for the likelihood
+	 * \param[in] Qgrp& vector Student-\f$t\f$ covariance scale parameter for the likelihood covariance
+	 * \param[in] SigmaI& inverse-covariance matrix for the likelihood
+	 * \param[in] Grp& prior mean
+	 * \param[in] SigmaI& prior inverse-covariance matrix
+	 * \param[in] gsl_rng* pointer to a PNG
+	 */
+	virtual void update(const Grp &, const Qgrp &, const SigmaI &, const Grp &, const SigmaI &, const gsl_rng *) = 0;
+	/** \brief Student-\f$t\f$ likelihood, Student-\f$t\f$ prior
+	 *
+	 * \param[in] Grp& data for the likelihood
+	 * \param[in] Qgrp& vector Student-\f$t\f$ covariance scale parameter for the likelihood covariance
+	 * \param[in] SigmaI& inverse-covariance matrix for the likelihood
+	 * \param[in] Grp& prior mean
+	 * \param[in] double& Student-\f$t\f$ scale parameter for the prior covariance
+	 * \param[in] SigmaI& prior inverse-covariance matrix
+	 * \param[in] gsl_rng* pointer to a PNG
+	 */
+	virtual void update(const Grp &, const Qgrp &, const SigmaI &, const Grp &, const double &, const SigmaI &, const gsl_rng *) = 0;
+	/** @} */
+	/** @} */
+	// end of the update group
 	
+	/** \defgroup mahal Mahalanobis distance functions
+	 *
+	 * Overloaded functions to calculate the Mahalanobis distance of the vector of location parameters stored in the class to another vector or to zero.
+	 *
+	 * @{
+	 */
+	/** \brief Mahalanobis distance to a vector
+	 *
+	 * Calculates the Mahalanobis distance between the vector stored in the class and the provided vector of class MVnorm.
+	 *
+	 * \param[in] MVnorm& vector to calculate the distance from
+	 * \param[in] SigmaI& inverse covariance matrix for scaling
+	 * \return the distance value of type _double_.
+	 *
+	 */
 	virtual double mhl(const MVnorm *x, const SigmaI &SigI);
-	virtual double mhl(const SigmaI &SigI); // distance from 0
-	virtual double mhl(const gsl_vector *x, const SigmaI &SigI);
+	/** \brief Mahalanobis distance to a vector
+	 *
+	 * Calculates the Mahalanobis distance between the vector stored in the class and the provided vector of class MVnorm.  The const version of the above function.
+	 *
+	 * \param[in] MVnorm& vector to calculate the distance from
+	 * \param[in] SigmaI& inverse covariance matrix for scaling
+	 * \return the distance value of type _double_.
+	 *
+	 */
 	virtual double mhl(const MVnorm *x, const SigmaI &SigI) const;
-	virtual double mhl(const SigmaI &SigI) const; // distance from 0
+	/** \brief Mahalanobis distance to a vector
+	 *
+	 * Calculates the Mahalanobis distance between the vector stored in the class and the provided GSL vector.
+	 *
+	 * \param[in] MVnorm& vector to calculate the distance from
+	 * \param[in] SigmaI& inverse covariance matrix for scaling
+	 * \return the distance value of type _double_.
+	 *
+	 */
+	virtual double mhl(const gsl_vector *x, const SigmaI &SigI);
+	/** \brief Mahalanobis distance to a vector
+	 *
+	 * Calculates the Mahalanobis distance between the vector stored in the class and the provided GSL vector. The const version of the above function.
+	 *
+	 * \param[in] MVnorm& vector to calculate the distance from
+	 * \param[in] SigmaI& inverse covariance matrix for scaling
+	 * \return the distance value of type _double_.
+	 *
+	 */
 	virtual double mhl(const gsl_vector *x, const SigmaI &SigI) const;
-	
+	/** \brief Mahalanobis distance to zero
+	 *
+	 * Calculates the Mahalanobis distance between the vector stored in the class zero.
+	 *
+	 * \param[in] SigmaI& inverse covariance matrix for scaling
+	 * \return the distance value of type _double_.
+	 *
+	 */
+	virtual double mhl(const SigmaI &SigI); // distance from 0
+	/** \brief Mahalanobis distance to zero
+	 *
+	 * Calculates the Mahalanobis distance between the vector stored in the class zero.  The const version of the above function.
+	 *
+	 * \param[in] SigmaI& inverse covariance matrix for scaling
+	 * \return the distance value of type _double_.
+	 *
+	 */
+	virtual double mhl(const SigmaI &SigI) const; // distance from 0
+	/** @} */
+	/** \defgroup MVnormDens Multivariate Gaussian density functions
+	 *
+	 * These functions calculate multivariate Gaussian density given the mean and inverse-covariance provided and the vector of values stored in the class as data.
+	 *
+	 * @{
+	 */
+	/** \brief Multivariate Gaussian density
+	 *
+	 * \param[in] gsl_vector* vector of means
+	 * \param[in] SigmaI& inverse-covariance matrix
+	 * \return density value of type _double_.
+	 *
+	 */
 	double density(const gsl_vector *theta, const SigmaI &SigI);
-	double density(const MVnorm *theta, const SigmaI &SigI);
+	/** \brief Multivariate Gaussian density
+	 *
+	 * \note A const version of the above function.
+	 *
+	 * \param[in] gsl_vector* vector of means
+	 * \param[in] SigmaI& inverse-covariance matrix
+	 * \return density value of type _double_.
+	 *
+	 */
 	double density(const gsl_vector *theta, const SigmaI &SigI) const;
+	/** \brief Multivariate Gaussian density
+	 *
+	 * \param[in] MVnorm* vector of means
+	 * \param[in] SigmaI& inverse-covariance matrix
+	 * \return density value of type _double_
+	 *
+	 */
+	double density(const MVnorm *theta, const SigmaI &SigI);
+	/** \brief Multivariate Gaussian density
+	 *
+	 * \note A const version of the above function.
+	 *
+	 * \param[in] MVnorm* vector of means
+	 * \param[in] SigmaI& inverse-covariance matrix
+	 * \return density value of type _double_.
+	 *
+	 */
 	double density(const MVnorm *theta, const SigmaI &SigI) const;
+	/** @} */
 	
+	/** \brief Save function
+	 *
+	 * Saves the current value of the location parameter to a file, appending by default.
+	 *
+	 * \param[in] string& file name
+	 * \param[in] char* save mode, "a" for append by default. The allowable values are as for a standard C file stream
+	 *
+	 */
 	void save(const string &fileNam, const char *how = "a");
+	/** \brief Save function
+	 *
+	 * Saves the current value of the location parameter to a file.
+	 *
+	 * \param[in] FILE* C file stream
+	 *
+	 */
 	void save(FILE *fileStr);
 	
+	/** \brief Subscript operator
+	 *
+	 * Overloaded subscript operator for the vector of location parameter values.
+	 *
+	 * \param[in] size_t index value
+	 * \return value of the member vector corresponding to the index value, of type _double_.
+	 *
+	 */
 	double operator[](const size_t i) const{return gsl_vector_get(&_vec.vector, i); };
+	/** \brief Setting an element to a value
+	 *
+	 * Sets the _i_-th element of the location vector to a value deterministically
+	 *
+	 * \param[in] size_t index
+	 * \param[in] double new value of the element
+	 *
+	 */
 	void valSet(const size_t i, const double x){gsl_vector_set(&_vec.vector, i, x); };
+	/** \brief Access the location vector
+	 *
+	 * Provides access to the internal parameter vector.
+	 *
+	 * \return GSL vector pointing to the corresponding location parameter.
+	 */
 	const gsl_vector *getVec() const{return &_vec.vector;};
+	/** \brief Length of the location vector
+	 *
+	 * \return Length of the parameter vector, of type _size_t_. Corresponds to the number of traits.
+	 *
+	 */
 	size_t len() const{return _d; };
+	/** \brief Number of missing values
+	 *
+	 * Accesses the  number of missing phenotype values.  Non-zero only for classes that implement treatment of missing values.
+	 *
+	 * \return Number of missing phenotypes, of type _size_t_.
+	 */
 	virtual size_t nMissP() const{return 0; };
+	/** \brief Indexes of missing values
+	 *
+	 * Accesses a vector with indexes of missing phenotypes.
+	 *
+	 * \return Vector of _size_t_ that contains indexes that correspond to missing values. For classes that do not allow missing values it is empty.
+	 *
+	 */
 	virtual const vector<size_t> getMisPhen() const{ return vector<size_t>(0); };
+	/** \brief Points to the corresponding data
+	 *
+	 * Access to the pointer to a vector that indexes the data used to update an instance of the class.  Is non-zero only for classes which can be part of a hierarchical model.
+	 *
+	 * \return Pointer to a vector of _size_t_.
+	 *
+	 */
 	virtual const vector<size_t> *down() const{return 0; };
+	/** \brief Points to the prior
+	 *
+	 * Access to the pointer to the correspoding vector of priors.  Is non-zero only for classes where a prior is implemented.
+	 *
+	 * \return Pointer to _size_t_.
+	 *
+	 */
 	virtual const size_t *up() const{return 0; };
+	/** \brief Scale parameter
+	 *
+	 * Access to a scale parameter member, defined only for some derived regression-type classes.  If not defined, returns 1.0.
+	 *
+	 * \return Scale paramter value of type _double_.
+	 *
+	 */
 	virtual double scalePar() const {return 1.0; };
 };
 
+/** \brief Individual vector of means
+ *
+ * Refers to a row of a matrix of location parameters that are updated with a likelihood that is an inverse-covariance weighted mean of the data. Variables of this class are typically imbedded in a model hierarchy, and in that case are updated with non-0-mean priors. 
+ * This class allows us to keep track of which rows in data and prior matrices to use through pointers to index vectors (for data, where there may be more than one row) and to a single index (for the prior mean, since there is only one).  
+ * We use pointers because they allow us to modify the indexes in other parts of the model, thus allowing for things like mixture models and model selection schemes.
+ *
+ */
 class MVnormMu : public MVnorm {
 protected:
-	const vector<size_t> *_lowLevel; // pointer to a vector of lower level (data) indexes; pointers are const to make sure they are not used to modify the indexes, but the indexes themselves may change (as in the mixture model)
-	const size_t *_upLevel;          // pointer to the upper-level (prior) index
+	/** \brief Data indexes
+	 *
+	 * A pointer to a vector of _size_t_. The elements are row indexes of the data matrix.  Means among these rows are used in the likelihood of the _udpate_ functions.
+	 * The pointer is _const_ to make sure we are not modifying it from this class.
+	 *
+	 */
+	const vector<size_t> *_lowLevel;
+	
+	/** \brief Prior index
+	 *
+	 * Pointer to a value of type _size_t_ that is a row index of the prior location matrix. The pointer is _const_ to make sure we are not modifying it from this class.
+	 *
+	 */
+	const size_t *_upLevel;
 	
 public:
-	// constructors
-	MVnormMu();								   // default constructor, necessary if a user plans to allocate arrays of MVnormMu on the heap
-	MVnormMu(const size_t &d) : MVnorm(d) {};  // constructor for a vague 0-mean prior
+	/** \brief Default constructor
+	 *
+	 * The _vec member is unassigned and the low-level and upper-level pointers are set to zero.
+	 *
+	 */
+	MVnormMu();
+	/** \brief Zero vector constructor
+	 *
+	 * Sets _vec to point to a vector of zeros, of length *d*.
+	 *
+	 * \param[in] size_t& size of the vector
+	 */
+	MVnormMu(const size_t &d) : MVnorm(d) {};
+	/** \brief Zero vector with pointers
+	 *
+	 * Sets _vec to point to a vector of zeros, of length *d*.  Pointers to the lower and upper level of the model hierarchy are set.
+	 *
+	 * \param[in] size_t& size of the vector
+	 * \param[in] vector<size_t>& vector of indexes of rows in the data matrix
+	 * \param[in] size_t& index in the matrix of priors
+	 *
+	 */
 	MVnormMu(const size_t &d, const vector<size_t> &low, const size_t &up);
-	MVnormMu(gsl_vector *mn, const vector<size_t> &low, const size_t &up); // deterministic constructor
-	MVnormMu(gsl_vector *mn, const size_t &up); // deterministic constructor for the lowest hierarchy level: *_lowLevel will be set to 0
-	MVnormMu(gsl_matrix *mn, const size_t &iRw); // deterministic constructor for, e.g., a sum. Both *_lowLevel and  *_upLevel will be set to 0
-	MVnormMu(gsl_matrix *mn, const size_t &iRw, const vector<size_t> &low); // deterministic constructor for the highest hierarchy level: *_upLevel will be set to 0
+	/** \brief Deterministic constructor
+	 *
+	 * Sets _vec to point to a GSL vector of values, without modifying the target during the invocation of the constructor. The pointers to the data and the prior indexes are set.
+	 *
+	 * \param[in] gsl_vector* vector of values
+	 * \param[in] vector<size_t>& vector of indexes of rows in the data matrix
+	 * \param[in] size_t& index in the matrix of priors
+	 *
+	 */
+	MVnormMu(gsl_vector *mn, const vector<size_t> &low, const size_t &up);
+	/** \brief Deterministic constructor, prior index only
+	 *
+	 * Sets _vec to point to a GSL vector of values, without modifying the target during the invocation of the constructor. Only the pointer to the prior index is set. This constructor can be used for the lowest hierarchy level.
+	 *
+	 * \param[in] gsl_vector* vector of values
+	 * \param[in] size_t& index in the matrix of priors
+	 *
+	 */
+	MVnormMu(gsl_vector *mn, const size_t &up);
+	/** \brief Deterministic constructor with a matrix
+	 *
+	 * Sets _vec to point to a row of the GSL matrix of values, without modifying the target during the invocation of the constructor.
+	 *
+	 * \param[in] gsl_matrix* matrix of values
+	 * \param[in] size_t& row index of the matrix of values, has to be no smaller than 0 and strictly smaller than the number of rows in _mn_
+	 *
+	 */
+	MVnormMu(gsl_matrix *mn, const size_t &iRw);
+	/** \brief Deterministic constructor with a matrix and an index to data
+	 *
+	 * Sets _vec to point to a row of the GSL matrix of values, without modifying the target during the invocation of the constructor.  None of the index pointers are set.
+	 *
+	 * \param[in] gsl_matrix* matrix of values
+	 * \param[in] size_t& row index of the matrix of values, has to be no smaller than 0 and strictly smaller than the number of rows in _mn_
+	 * \param[in] vector<size_t>& vector of indexes of rows in the data matrix
+	 *
+	 */
+	MVnormMu(gsl_matrix *mn, const size_t &iRw, const vector<size_t> &low);
+	/** \brief Deterministic constructor with a matrix and indexes to data and a prior
+	 *
+	 * Sets _vec to point to a row of the GSL matrix of values, without modifying the target during the invocation of the constructor.
+	 *
+	 * \param[in] gsl_matrix* vector of values
+	 * \param[in] size_t& row index of the matrix of values, has to be no smaller than 0 and strictly smaller than the number of rows in _mn_
+	 * \param[in] vector<size_t>& vector of indexes of rows in the data matrix
+	 * \param[in] size_t& index in the matrix of priors
+	 *
+	 */
+	MVnormMu(gsl_matrix *mn, const size_t &iRw, const vector<size_t> &low, const size_t &up);
+	/** \brief Deterministic constructor with a matrix and an index to a prior
+	 *
+	 * Sets _vec to point to a row of the GSL matrix of values, without modifying the target during the invocation of the constructor.
+	 *
+	 * \param[in] gsl_matrix* vector of values
+	 * \param[in] size_t& row index of the matrix of values, has to be no smaller than 0 and strictly smaller than the number of rows in _mn_
+	 * \param[in] size_t& index in the matrix of priors
+	 *
+	 */
+	MVnormMu(gsl_matrix *mn, const size_t &iRw, const size_t &up);
+	/** \brief Univariate random constructor with a vector and indexes to data and a prior
+	 *
+	 * Sets _vec to point to a GSL vector of values, modifying the target during the invocation of the constructor. Modification is by adding independent samples from a univariate normal distribution with the provided standard deviations.
+	 *
+	 * \param[in] gsl_vector* vector of values
+	 * \param[in] gsl_vector* vector of standard deviations
+	 * \param[in] gsl_rng* pointer to a PNG
+	 * \param[in] vector<size_t>& vector of indexes of rows in the data matrix
+	 * \param[in] size_t& row index of the matrix of values, has to be no smaller than 0 and strictly smaller than the number of rows in _mn_
+	 *
+	 */
 	MVnormMu(gsl_vector *mn, const gsl_vector *sd, const gsl_rng *r, const vector<size_t> &low, const size_t &up);
+	/** \brief Multivariate random constructor with a vector and indexes to data and a prior
+	 *
+	 * Sets _vec to point to a GSL vector of values, modifying the target during the invocation of the constructor. Modification is by adding samples from a multivariate normal distribution with the provided covariance matrix.
+	 *
+	 * \param[in] gsl_vector* vector of values
+	 * \param[in] gsl_matrix* covariance matrix
+	 * \param[in] gsl_rng* pointer to a PNG
+	 * \param[in] vector<size_t>& vector of indexes of rows in the data matrix
+	 * \param[in] size_t& index in the matrix of priors
+	 *
+	 */
 	MVnormMu(gsl_vector *mn, const gsl_matrix *Sig, const gsl_rng *r, const vector<size_t> &low, const size_t &up);
-	MVnormMu(gsl_matrix *mn, const size_t &iRw, const vector<size_t> &low, const size_t &up); // deterministic constructor
-	MVnormMu(gsl_matrix *mn, const size_t &iRw, const size_t &up); // deterministic constructor for the lowest hierarchy level: *_lowLevel will be set to 0
+	/** \brief Univariate random constructor with a matrix and indexes to data and a prior
+	 *
+	 * Sets _vec to point to a row of the GSL matrix of values, modifying the target during the invocation of the constructor. Modification is by adding independent samples from a univariate normal distribution with the provided standard deviations.
+	 *
+	 * \param[in] gsl_matrix* matrix of values
+	 * \param[in] size_t& row index of the matrix of values, has to be no smaller than 0 and strictly smaller than the number of rows in _mn_
+	 * \param[in] gsl_vector* vector of standard deviations
+	 * \param[in] gsl_rng* pointer to a PNG
+	 * \param[in] vector<size_t>& vector of indexes of rows in the data matrix
+	 * \param[in] size_t& index in the matrix of priors
+	 *
+	 */
 	MVnormMu(gsl_matrix *mn, const size_t &iRw, const gsl_vector *sd, const gsl_rng *r, const vector<size_t> &low, const size_t &up);
+	/** \brief Multivariate random constructor with a matrix and indexes to data and a prior
+	 *
+	 * Sets _vec to point to a row of the GSL matrix of values, modifying the target during the invocation of the constructor. Modification is by adding samples from a multivariate normal distribution with the provided covariance matrix.
+	 *
+	 * \param[in] gsl_matrix* matrix of values
+	 * \param[in] size_t& row index of the matrix of values, has to be no smaller than 0 and strictly smaller than the number of rows in _mn_
+	 * \param[in] gsl_matrix* covariance matrix
+	 * \param[in] gsl_rng* pointer to a PNG
+	 * \param[in] vector<size_t>& vector of indexes of rows in the data matrix
+	 * \param[in] size_t& index in the matrix of priors
+	 *
+	 */
 	MVnormMu(gsl_matrix *mn, const size_t &iRw, const gsl_matrix *Sig, const gsl_rng *r, const vector<size_t> &low, const size_t &up);
 	
-	MVnormMu(const MVnormMu &); // copy constructor
+	/** \brief Copy constructor
+	 *
+	 * Deterministic copy constructor
+	 *
+	 * \param[in] MVnormMu& object of type MVnormMu
+	 *
+	 */
+	MVnormMu(const MVnormMu &);
+	/** \brief Assignment operator
+	 *
+	 * Deterministic assignement operator
+	 *
+	 * \param[in] MVnormMu& object of type MVnormMu
+	 *
+	 * \return A reference to an object of type MVnormMu
+	 *
+	 */
 	MVnormMu & operator=(const MVnormMu &);
 	
-	virtual ~MVnormMu(); // destructor
+	/** \brief Destructor
+	 *
+	 */
+	virtual ~MVnormMu();
 	
-	//	overloaded update() methods
 	// improper prior methods
 	virtual void update(const Grp &dat, const SigmaI &SigIm, const gsl_rng *r);
 	virtual void update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, const gsl_rng *r);
@@ -328,23 +849,92 @@ public:
 	
 	virtual size_t nMissP() const{return 0; };
 	virtual const vector<size_t> getMisPhen() const{ return vector<size_t>(0); };
+	/** \brief Points to the corresponding data
+	 *
+	 * Access to the pointer to a vector that indexes the data used to update an instance of the class.  Is implemented for this class.
+	 *
+	 * \return Pointer to a vector of _size_t_.
+	 *
+	 */
 	const vector<size_t> *down() const{return _lowLevel; };
+	/** \brief Points to the prior
+	 *
+	 * Access to the pointer to the correspoding vector of priors.  Is implemented for this class.
+	 *
+	 * \return Pointer to _size_t_.
+	 *
+	 */
 	const size_t *up() const{return _upLevel; };
 };
 
+/** \brief Individual vector of means with parameter expansion
+ *
+ * This class is the same as MVnormMu, but implements multivariate parameter expansion for updating (Greenberg, in prep.)
+ *
+ */
 class MVnormMuPEX : public MVnormMu {
 protected:
+	/** \brief Pointer to the redundant parameter
+	 *
+	 * A pointer to an object of class Apex, that stores the matrix of redundant parameters.
+	 *
+	 */
 	Apex *_A;
+	/** \brief Pre-computed auxiliary matrix
+	 *
+	 * Vector view of a matrix that stores a pre-computed \f$ (SA)^{\textsc{t}} \f$ matrix that is common for all members of the encapsulating Grp class.
+	 *
+	 */
 	gsl_matrix_view _tSAprod;
 	
 public:
+	/** \brief Default constructor
+	 *
+	 */
 	MVnormMuPEX() : MVnormMu() {_A = 0; };
-	MVnormMuPEX(gsl_matrix *mn, const size_t &iRw, const vector<size_t> &low, const size_t &up, Apex &A, gsl_matrix *tSigIAt); // deterministic constructor
+	/** \brief Deterministic constructor
+	 *
+	 * \param[in] gsl_matrix* matrix of values
+	 * \param[in] size_t& row index of the matrix of values
+	 * \param[in] vector<size_t>& vector of indexes of rows in the data matrix
+	 * \param[in] size_t& index in the matrix of priors
+	 * \param[in] Apex& object storing the redundant parameter matrix
+	 * \param[in] gsl_matrix* pre-computed auxiliary matrix
+	 *
+	 */
+	MVnormMuPEX(gsl_matrix *mn, const size_t &iRw, const vector<size_t> &low, const size_t &up, Apex &A, gsl_matrix *tSigIAt);
+	/** \brief Univariate random constructor
+	 *
+	 * \param[in] gsl_matrix* matrix of values
+	 * \param[in] size_t& row index of the matrix of values
+	 * \param[in] gsl_vector* vector of standard deviations for the univariate Gaussian
+	 * \param[in] gsl_rng* pointer to a PNG
+	 * \param[in] vector<size_t>& vector of indexes of rows in the data matrix
+	 * \param[in] size_t& index in the matrix of priors
+	 * \param[in] Apex& object storing the redundant parameter matrix
+	 * \param[in] gsl_matrix* pre-computed auxiliary matrix
+	 *
+	 */
 	MVnormMuPEX(gsl_matrix *mn, const size_t &iRw, const gsl_vector *sd, const gsl_rng *r, const vector<size_t> &low, const size_t &up, Apex &A, gsl_matrix *tSigIAt);
 	
-	MVnormMuPEX(const MVnormMuPEX &mu); // copy constructor
+	/** \brief Deterministic copy constructor
+	 *
+	 * \param[in] MVnormMuPEX& object of type MVnormMuPEX
+	 *
+	 */
+	MVnormMuPEX(const MVnormMuPEX &mu);
+	/** \brief Assignment operator
+	 *
+	 * Deterministic assignement operator
+	 *
+	 * \param[in] MVnormMuPEX& object of type MVnormMuPEX
+	 *
+	 * \return A reference to an object of type MVnormMuPEX
+	 *
+	 */
 	MVnormMuPEX & operator=(const MVnormMuPEX &mu);
 	
+	/** \brief Destructor */
 	virtual ~MVnormMuPEX() {};
 	
 	virtual void update(const Grp &dat, const SigmaI &SigIm, const SigmaI &SigIp, const gsl_rng *r);
@@ -354,21 +944,90 @@ public:
 	virtual void update(const Grp &dat, const SigmaI &SigIm, const Grp &muPr, const double &qPr, const SigmaI &SigIp, const gsl_rng *r);
 };
 
-class MVnormBetaPEX : public MVnormMuPEX {  // derived method to include regression in the PEX scheme
+/** \brief Individual regression with parameter expansion
+ *
+ * Implements handling of one-at-a-time regressions, as in MVnormBetaFt but with parameter expansion.
+ *
+ */
+class MVnormBetaPEX : public MVnormMuPEX {
 protected:
-	gsl_vector_view _X; // vector view of predictor values (typically column of a predictor matrix that is in the encapsulating group class).  The matrix this points to can be modified through this, as when I scale the predictor
-	double _scale;      // Scale -- typically XtX, but not always (special cases dealt with in derived classes)
-	size_t _N;          // length of &_X.vector
+	/** \brief Predictor
+	 *
+	 * Points to a vector of predictor values, typically a column of the predictor matrix that is in the encapsulating Grp class.
+	 *
+	 */
+	gsl_vector_view _X;
+	/** \brief Scale parameter
+	 *
+	 * Typically \f$ x^{\textsc{t}}x \f$, but some exceptions exist in special cases.
+	 *
+	 */
+	double _scale;
+	/** \brief Length of the predictor */
+	size_t _N;
+	/** \brief Fitted values
+	 *
+	 * Points to a matrix of partial fitted values that exclude the current regression (\f$ \boldsymbol{X}_{\cdot -i}\boldsymbol{B}_{-i \cdot} \f$).
+	 *
+	 */
 	gsl_matrix_view _fitted;
 	
 public:
+	/** \brief Default constructor */
 	MVnormBetaPEX() : MVnormMuPEX() {};
+	/** \brief Random constructor
+	 *
+	 * Calculates initial values for the regression using the provided responce and covariance matrix.  The initial values modify the corresponding row of the value matrix, stored in the encapsulating class.
+	 *
+	 * \param[in] gsl_matrix* response matrix
+	 * \param[in] gsl_matrix* predictor matrix
+	 * \param[in] size_t& column index of the current predictor in the predictor matrix
+	 * \param[in] vector<double>& vectorized partial fitted matrix
+	 * \param[in] gsl_matrix* covariance matrix
+	 * \param[in] gsl_rng* pointer to a PNG
+	 * \param[in] size_t& row index for the prior matrix
+	 * \param[in] gsl_matrix* value matrix
+	 * \param[in] size_t& row index of the value matrix
+	 * \param[in] Apex& object storing the redundant parameter matrix
+	 * \param[in] gsl_matrix* pre-computed auxiliary matrix
+	 *
+	 */
 	MVnormBetaPEX(const gsl_matrix *resp, gsl_matrix *pred, const size_t &iCl, vector<double> &eaFt, const gsl_matrix *Sig, const gsl_rng *r, const size_t &up, gsl_matrix *bet, const size_t &iRw, Apex &A, gsl_matrix *tSigIAt);
+	/** \brief Deterministic constructor
+	 *
+	 * Sets up the proper pointers to parameters of the regression that have already been calculated in the encapsulating class.  The corresponding value matrix is not modified.
+	 *
+	 * \param[in] gsl_matrix* response matrix
+	 * \param[in] gsl_matrix* predictor matrix
+	 * \param[in] size_t& column index of the current predictor in the predictor matrix
+	 * \param[in] vector<double>& vectorized partial fitted matrix
+	 * \param[in] size_t& row index for the prior matrix
+	 * \param[in] gsl_matrix* value matrix
+	 * \param[in] size_t& row index of the value matrix
+	 * \param[in] Apex& object storing the redundant parameter matrix
+	 * \param[in] gsl_matrix* pre-computed auxiliary matrix
+	 *
+	 */
 	MVnormBetaPEX(const size_t &d, gsl_matrix *pred, const size_t &iCl, vector<double> &eaFt, const size_t &up, gsl_matrix *bet, const size_t &iRw, Apex &A, gsl_matrix *tSigIAt);
 	
+	/** \brief Deterministic copy constructor
+	 *
+	 * \param[in] MVnormBetaPEX& object of type MVnormBetaPEX
+	 *
+	 */
 	MVnormBetaPEX(const MVnormBetaPEX &bet);
+	/** \brief Assignment operator
+	 *
+	 * Deterministic assignement operator
+	 *
+	 * \param[in] MVnormBetaPEX& object of type MVnormBetaPEX
+	 *
+	 * \return A reference to an object of type MVnormBetaPEX
+	 *
+	 */
 	MVnormBetaPEX & operator=(const MVnormBetaPEX &bet);
 	
+	/** \brief Destructor */
 	~MVnormBetaPEX() {};
 	
 	void update(const Grp &dat, const SigmaI &SigIm, const SigmaI &SigIp, const gsl_rng *r);
@@ -379,62 +1038,254 @@ public:
 	
 };
 
-class MVnormMuMiss : public MVnormMu { // further modifies MVnormMu to account for missing phenotypes
+/** \brief Individual vector of means with missing data
+ *
+ * Implements missing phenotype data imputation.  Some parameters for update methods have a different meaning than for other MVnorm classes.
+ *
+ */
+class MVnormMuMiss : public MVnormMu {
 protected:
-	vector<size_t> _misPhenInd; // vector of indexes tagging missing data
-	size_t _myInd;              // it's own index; defined only for instances that take iRw
+	/** \brief Missing data index
+	 *
+	 * Vector of indexes tagging missing data.
+	 *
+	 */
+	vector<size_t> _misPhenInd;
+	/** \brief own index
+	 *
+	 * Index of the row the current instance of this class is pointing to.  Only defined with constructors that take _iRw_.
+	 *
+	 */
+	size_t _myInd;
 	
 public:
-	// constructors
-	MVnormMuMiss() : MVnormMu(){};                   // default constructor, necessary if a user plans to allocate arrays of MVnormMuMiss on the heap
-	MVnormMuMiss(const size_t &d) : MVnormMu(d) {};  // constructor for a vague 0-mean prior
+	/** \brief Default constructor */
+	MVnormMuMiss() : MVnormMu(){};
+	/** \brief 0-mean deterministic constructor
+	 *
+	 * Sets up the instance to point to a vector of zeros
+	 *
+	 * \param[in] size_t& dimension of the vector
+	 *
+	 */
+	MVnormMuMiss(const size_t &d) : MVnormMu(d) {};
+	/** \brief Deterministic constructor
+	 *
+	 * \param[in] size_t& dimension of the vector
+	 * \param[in] vector<size_t>& vector of row indexes for data
+	 * \param[in] size_t& row index for the prior matrix
+	 * \param[in] vector<size_t>& indexes of missing data
+	 *
+	 */
 	MVnormMuMiss(const size_t &d, const vector<size_t> &low, const size_t &up, const vector<size_t> &mis);
-	MVnormMuMiss(gsl_vector *mn, const vector<size_t> &low, const size_t &up, const vector<size_t> &mis); // deterministic constructor
-	MVnormMuMiss(gsl_vector *mn, const size_t &up, const vector<size_t> &mis); // deterministic constructor
+	/** \brief Deterministic constructor with a vector
+	 *
+	 * \param[in] gsl_vector* vector of values
+	 * \param[in] size_t& dimension of the vector
+	 * \param[in] vector<size_t>& vector of row indexes for data
+	 * \param[in] size_t& row index for the prior matrix
+	 * \param[in] vector<size_t>& indexes of missing data
+	 *
+	 */
+	MVnormMuMiss(gsl_vector *mn, const vector<size_t> &low, const size_t &up, const vector<size_t> &mis);
+	/** \brief Deterministic constructor with a vector
+	 *
+	 * \param[in] gsl_vector* vector of values
+	 * \param[in] size_t& row index for the prior matrix
+	 * \param[in] vector<size_t>& indexes of missing data
+	 *
+	 */
+	MVnormMuMiss(gsl_vector *mn, const size_t &up, const vector<size_t> &mis);
+	/** \brief Univariate random constructor with a vector
+	 *
+	 * \param[in] gsl_vector* vector of values
+	 * \param[in] gsl_vector* vector of standard deviations
+	 * \param[in] gsl_rng* pointer to a PNG
+	 * \param[in] size_t& dimension of the vector
+	 * \param[in] vector<size_t>& vector of row indexes for data
+	 * \param[in] size_t& row index for the prior matrix
+	 * \param[in] vector<size_t>& indexes of missing data
+	 *
+	 */
 	MVnormMuMiss(gsl_vector *mn, const gsl_vector *sd, const gsl_rng *r, const vector<size_t> &low, const size_t &up, const vector<size_t> &mis);
+	/** \brief Multivariate random constructor with a vector
+	 *
+	 * \param[in] gsl_vector* vector of values
+	 * \param[in] gsl_matrix* covariance matrix
+	 * \param[in] gsl_rng* pointer to a PNG
+	 * \param[in] size_t& dimension of the vector
+	 * \param[in] vector<size_t>& vector of row indexes for data
+	 * \param[in] size_t& row index for the prior matrix
+	 * \param[in] vector<size_t>& indexes of missing data
+	 *
+	 */
 	MVnormMuMiss(gsl_vector *mn, const gsl_matrix *Sig, const gsl_rng *r, const vector<size_t> &low, const size_t &up, const vector<size_t> &mis);
-	MVnormMuMiss(gsl_matrix *mn, const size_t &iRw, const vector<size_t> &low, const size_t &up, const vector<size_t> &mis); // deterministic constructor
-	MVnormMuMiss(gsl_matrix *mn, const size_t &iRw, const size_t &up, const vector<size_t> &mis); // deterministic constructor
+	/** \brief Deterministic constructor with a matrix
+	 *
+	 * \param[in] gsl_matrix* vector of values
+	 * \param[in] size_t& row index of the matrix of values
+	 * \param[in] vector<size_t>& vector of row indexes for data
+	 * \param[in] size_t& row index for the prior matrix
+	 * \param[in] vector<size_t>& indexes of missing data
+	 *
+	 */
+	MVnormMuMiss(gsl_matrix *mn, const size_t &iRw, const vector<size_t> &low, const size_t &up, const vector<size_t> &mis);
+	/** \brief Deterministic constructor with a matrix
+	 *
+	 * \param[in] gsl_matrix* vector of values
+	 * \param[in] size_t& row index of the matrix of values
+	 * \param[in] size_t& row index for the prior matrix
+	 * \param[in] vector<size_t>& indexes of missing data
+	 *
+	 */
+	MVnormMuMiss(gsl_matrix *mn, const size_t &iRw, const size_t &up, const vector<size_t> &mis);
+	/** \brief Univariate random constructor with a matrix
+	 *
+	 * \param[in] gsl_matrix* matrix of values
+	 * \param[in] size_t& row index of the matrix of values
+	 * \param[in] gsl_vector* vector of standard deviations
+	 * \param[in] gsl_rng* pointer to a PNG
+	 * \param[in] size_t& dimension of the vector
+	 * \param[in] vector<size_t>& vector of row indexes for data
+	 * \param[in] size_t& row index for the prior matrix
+	 * \param[in] vector<size_t>& indexes of missing data
+	 *
+	 */
 	MVnormMuMiss(gsl_matrix *mn, const size_t &iRw, const gsl_vector *sd, const gsl_rng *r, const vector<size_t> &low, const size_t &up, const vector<size_t> &mis);
+	/** \brief Multivariate random constructor with a matrix
+	 *
+	 * \param[in] gsl_matrix* matrix of values
+	 * \param[in] size_t& row index of the matrix of values
+	 * \param[in] gsl_matrix* covariance matrix
+	 * \param[in] gsl_rng* pointer to a PNG
+	 * \param[in] size_t& dimension of the vector
+	 * \param[in] vector<size_t>& vector of row indexes for data
+	 * \param[in] size_t& row index for the prior matrix
+	 * \param[in] vector<size_t>& indexes of missing data
+	 *
+	 */
 	MVnormMuMiss(gsl_matrix *mn, const size_t &iRw, const gsl_matrix *Sig, const gsl_rng *r, const vector<size_t> &low, const size_t &up, const vector<size_t> &mis);
 	
+	/** \brief Deterministic copy constructor
+	 *
+	 * \param[in] MVnormMuMiss& object of type MVnormMuMiss
+	 *
+	 */
 	MVnormMuMiss(const MVnormMuMiss &); // copy constructor
+	/** \brief Assignment operator
+	 *
+	 * Deterministic assignement operator
+	 *
+	 * \param[in] MVnormMuMiss& object of type MVnormMuMiss
+	 *
+	 * \return A reference to an object of type MVnormMuMiss
+	 *
+	 */
 	MVnormMuMiss & operator=(const MVnormMuMiss &);
 	
-	~MVnormMuMiss() {}; 	// destructor
+	/** \brief Destructor */
+	~MVnormMuMiss() {};
 	
-	
-	// Phenotype imputation (Gaussian model only -- Student-t crashes due to a correlation of q and x_imp), improper prior
+	/** \brief Gaussian likelihood
+	 *
+	 * Here, the Grp variable contains the means for imputation rather than the data
+	 *
+	 * \param[in] Grp& data
+	 * \param[in] SigmaI& inverse-covariance matrix for the likelihood
+	 * \param[in] gsl_rng* pointer to a PNG
+	 */
 	void update(const Grp &mu, const SigmaI &SigIm, const gsl_rng *r);
-	// imputation with a proper Gaussian prior
+	/** \brief Gaussian likelihood, Gaussian 0-mean prior
+	 *
+	 * Here, the Grp variable contains the means for imputation rather than the data
+	 *
+	 * \param[in] Grp& data
+	 * \param[in] SigmaI& inverse-covariance matrix for the likelihood
+	 * \param[in] SigmaI& inverse-covariance matrix for the prior
+	 * \param[in] gsl_rng* pointer to a PNG
+	 */
 	void update(const Grp &mu, const SigmaI &SigIm, const SigmaI &SigIp, const gsl_rng *r);
 	
+	/** \brief Number of missing values
+	 *
+	 * Accesses the  number of missing phenotype values.  Implemented in this class.
+	 *
+	 * \return Number of missing phenotypes, of type _size_t_.
+	 */
 	size_t nMissP() const{return _misPhenInd.size(); };
+	/** \brief Indexes of missing values
+	 *
+	 * Accesses a vector with indexes of missing phenotypes.  Implemented for this class.
+	 *
+	 * \return Vector of _size_t_ that contains indexes that correspond to missing values.
+	 *
+	 */
 	const vector<size_t> getMisPhen() const{ return _misPhenInd; };
 };
 
-class MVnormBeta : public MVnorm { // by itself to be used strictly for regressions with a single predictor (or ignoring the effects of other predictors)
+/** \brief Generic regression
+ *
+ * Generic implementation of a regression. By itself to be used strictly for regressions with a single predictor because it ignores the effects of other predictors.
+ *
+ */
+class MVnormBeta : public MVnorm {
 protected:
-	gsl_vector_view _X; // vector view of predictor values (typically column of a predictor matrix that is in the encapsulating group class).  The matrix this points to can be modified through this, as when I scale the predictor
-	double _scale;      // Scale -- typically XtX, but not always (special cases dealt with in derived classes)
-	size_t _N;          // length of &_X.vector
+	/** \brief Predictor
+	 *
+	 * Points to a vector of predictor values, typically a column of the predictor matrix that is in the encapsulating Grp class.
+	 *
+	 */
+	gsl_vector_view _X;
+	/** \brief Scale parameter
+	 *
+	 * Typically \f$ x^{\textsc{t}}x \f$, but some exceptions exist in special cases.
+	 *
+	 */
+	double _scale;
+	/** \brief Length of the predictor */
+	size_t _N;
 	
+	/** \brief Row index of the prior
+	 *
+	 * Points to the index of a row in the prior matrix
+	 *
+	 */
 	const size_t *_upLevel; // index into the vector of priors
 	
 public:
-	//	constructors, similar to MVnormMu
+	/** \brief Default constructor */
 	MVnormBeta();
+	/** \brief Dimension-only constructor
+	 *
+	 * Sets the dimension to a value, but the _vec is not assigned a target.
+	 *
+	 */
 	MVnormBeta(const size_t d);
-	MVnormBeta(gsl_vector *b, const gsl_vector *sd, gsl_matrix *pred, const size_t &iCl, const gsl_rng *r);
-	MVnormBeta(gsl_vector *b, const gsl_matrix *Sig, gsl_matrix *pred, const size_t &iCl, const gsl_rng *r);
-	MVnormBeta(const gsl_matrix *resp, gsl_matrix *pred, const size_t &iCl, const gsl_matrix *Sig, const gsl_rng *r, gsl_matrix *bet, const size_t &iRw);
-	MVnormBeta(const Grp &resp, gsl_matrix *pred, const size_t &iCl, const gsl_matrix *Sig, const gsl_rng *r, gsl_matrix *bet, const size_t &iRw);
-	MVnormBeta(gsl_matrix *pred, const size_t &iCl, gsl_matrix *bet, const size_t &iRw); // deterministic constructor that just points to whatever is already in *bet
 	
+	/** \brief Univariate random constructor with vector
+	 *
+	 * Sets up _vec to point to the provided vector of values, and the predictor to a column in the provided matrix of predictors.
+	 *
+	 * \param[in] gsl_vector* vector of values
+	 * \param[in] gsl_vector* vector of standard deviations
+	 * \param[in] gsl_matrix* matrix of predictors
+	 * \param[in] size_t& column index for the predictor matrix
+	 * \param[in] gsl_rng* pointer to a PNG
+	 *
+	 */
+	MVnormBeta(gsl_vector *b, const gsl_vector *sd, gsl_matrix *pred, const size_t &iCl, const gsl_rng *r);
 	MVnormBeta(gsl_vector *b, const gsl_vector *sd, gsl_matrix *pred, const size_t &iCl, const gsl_rng *r, const size_t &up);
+	
+	MVnormBeta(gsl_vector *b, const gsl_matrix *Sig, gsl_matrix *pred, const size_t &iCl, const gsl_rng *r);
 	MVnormBeta(gsl_vector *b, const gsl_matrix *Sig, gsl_matrix *pred, const size_t &iCl, const gsl_rng *r, const size_t &up);
+	
+	MVnormBeta(const gsl_matrix *resp, gsl_matrix *pred, const size_t &iCl, const gsl_matrix *Sig, const gsl_rng *r, gsl_matrix *bet, const size_t &iRw);
 	MVnormBeta(const gsl_matrix *resp, gsl_matrix *pred, const size_t &iCl, const gsl_matrix *Sig, const gsl_rng *r, const size_t &up, gsl_matrix *bet, const size_t &iRw);
+	
+	MVnormBeta(const Grp &resp, gsl_matrix *pred, const size_t &iCl, const gsl_matrix *Sig, const gsl_rng *r, gsl_matrix *bet, const size_t &iRw);
 	MVnormBeta(const Grp &resp, gsl_matrix *pred, const size_t &iCl, const gsl_matrix *Sig, const gsl_rng *r, const size_t &up, gsl_matrix *bet, const size_t &iRw);
+	
+	MVnormBeta(gsl_matrix *pred, const size_t &iCl, gsl_matrix *bet, const size_t &iRw); // deterministic constructor that just points to whatever is already in *bet
 	MVnormBeta(gsl_matrix *pred, const size_t &iCl, const size_t &up, gsl_matrix *bet, const size_t &iRw);  // deterministic constructor that just points to whatever is already in *bet
 	
 	MVnormBeta(const MVnormBeta &); // copy constructor
@@ -1086,6 +1937,28 @@ public:
 	void update(const Grp &dat, const SigmaI &SigIm);
 };
 
+/** \brief Regression with conditional variance
+ *
+ */
+class BetaGrpSnpCV : public BetaGrpSnp {
+protected:
+	
+public:
+	BetaGrpSnpCV() : BetaGrpSnp() {};
+	BetaGrpSnpCV(const string &predFlNam, const string &outFlNam, const size_t &Ndat, const size_t &Npred, const size_t &d, const int &Nthr) : BetaGrpSnp(predFlNam, outFlNam, Ndat, Npred, d, Nthr) {};
+	BetaGrpSnpCV(const string &predFlNam, const string &outFlNam, RanIndex &low, const size_t &Npred, const size_t &d, const int &Nthr) : BetaGrpSnp(predFlNam, outFlNam, low, Npred, d, Nthr) {};
+	BetaGrpSnpCV(const string &predFlNam, const string &outFlNam, const size_t &Ndat, const size_t &Npred, const size_t &d, const int &Nthr, const double &prVar) : BetaGrpSnp(predFlNam, outFlNam, Ndat, Npred, d, Nthr, prVar) {};
+	BetaGrpSnpCV(const string &predFlNam, const string &outFlNam, RanIndex &low, const size_t &Npred, const size_t &d, const int &Nthr, const double &prVar) : BetaGrpSnp(predFlNam, outFlNam, low, Npred, d, Nthr, prVar) {};
+	
+	~BetaGrpSnpCV() {};
+	
+	BetaGrpSnpCV(const BetaGrpSnpCV &mG); // copy constructor
+	BetaGrpSnpCV & operator=(const BetaGrpSnpCV &mG);
+	
+	void dump();
+	
+};
+
 /** \brief regressions on a single SNP controlling for other traits
  *
  */
@@ -1140,6 +2013,28 @@ public:
 	const gsl_matrix *fMat() const{return _fakeFmat; };
 	
 	void update(const Grp &dat, const SigmaI &SigIm);
+	
+};
+
+/** \brief Missing-data regression with conditional variance
+ *
+ */
+class BetaGrpSnpMissCV : public BetaGrpSnpMiss {
+protected:
+	
+public:
+	BetaGrpSnpMissCV() : BetaGrpSnpMiss() {};
+	BetaGrpSnpMissCV(const string &predFlNam, const string &outFlNam, const size_t &Ndat, const size_t &Npred, const size_t &d, const int &Nthr, const double &absLab) : BetaGrpSnpMiss(predFlNam, outFlNam, Ndat, Npred, d, Nthr, absLab) {};
+	BetaGrpSnpMissCV(const string &predFlNam, const string &outFlNam, RanIndex &low, const size_t &Npred, const size_t &d, const int &Nthr, const double &absLab) : BetaGrpSnpMiss(predFlNam, outFlNam, low, Npred, d, Nthr, absLab) {};
+	BetaGrpSnpMissCV(const string &predFlNam, const string &outFlNam, const size_t &Ndat, const size_t &Npred, const size_t &d, const int &Nthr, const double &prVar, const double &absLab) : BetaGrpSnpMiss(predFlNam, outFlNam, Ndat, Npred, d, Nthr, prVar, absLab) {};
+	BetaGrpSnpMissCV(const string &predFlNam, const string &outFlNam, RanIndex &low, const size_t &Npred, const size_t &d, const int &Nthr, const double &prVar, const double &absLab) : BetaGrpSnpMiss(predFlNam, outFlNam, low, Npred, d, Nthr, prVar, absLab) {};
+	
+	~BetaGrpSnpMissCV(){};
+	
+	BetaGrpSnpMissCV(const BetaGrpSnpMissCV &mG); // copy constructor
+	BetaGrpSnpMissCV & operator=(const BetaGrpSnpMissCV &mG);
+	
+	void dump();
 	
 };
 
