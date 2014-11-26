@@ -38,8 +38,11 @@ using std::cout;
 using std::endl;
 using std::flush;
 using std::ofstream;
+using std::ifstream;
 using std::ios;
 using std::max;
+using std::max_element;
+using std::min_element;
 using std::remove;
 
 /*
@@ -2375,6 +2378,9 @@ MVnormMuBlk::MVnormMuBlk(gsl_matrix *mn, const size_t &iRw, const gsl_vector *sd
 
 void MVnormMuBlk::update(const Grp &dat, const SigmaI &SigIm, const gsl_rng *r){
 	for (size_t iElm = 0; iElm < _eachVec.size(); iElm++) {
+		if ((*_eachLL)[iElm].empty()) { // this is for situations where the number of levels is not the same for all blocks
+			continue;
+		}
 		gsl_vector *smVec  = gsl_vector_calloc(_eachVec[iElm].vector.size);
 		gsl_matrix *SigSum = gsl_matrix_alloc(_eachVec[iElm].vector.size, _eachVec[iElm].vector.size);
 		gsl_matrix_const_view SigIsub = gsl_matrix_const_submatrix(SigIm.getMat(), (*_blkStart)[iElm], (*_blkStart)[iElm], _eachVec[iElm].vector.size, _eachVec[iElm].vector.size);
@@ -2400,6 +2406,9 @@ void MVnormMuBlk::update(const Grp &dat, const SigmaI &SigIm, const gsl_rng *r){
 }
 void MVnormMuBlk::update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, const gsl_rng *r){
 	for (size_t iElm = 0; iElm < _eachVec.size(); iElm++) {
+		if ((*_eachLL)[iElm].empty()) { // this is for situations where the number of levels is not the same for all blocks
+			continue;
+		}
 		gsl_vector *smVec  = gsl_vector_calloc(_eachVec[iElm].vector.size);
 		gsl_matrix *SigSum = gsl_matrix_alloc(_eachVec[iElm].vector.size, _eachVec[iElm].vector.size);
 		gsl_matrix_const_view SigIsub = gsl_matrix_const_submatrix(SigIm.getMat(), (*_blkStart)[iElm], (*_blkStart)[iElm], _eachVec[iElm].vector.size, _eachVec[iElm].vector.size);
@@ -2431,6 +2440,9 @@ void MVnormMuBlk::update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, con
 
 void MVnormMuBlk::update(const Grp &dat, const SigmaI &SigIm, const SigmaI &SigIp, const gsl_rng *r){
 	for (size_t iElm = 0; iElm < _eachVec.size(); iElm++) {
+		if ((*_eachLL)[iElm].empty()) { // this is for situations where the number of levels is not the same for all blocks
+			continue;
+		}
 		gsl_vector *smVec  = gsl_vector_calloc(_eachVec[iElm].vector.size);
 		gsl_vector *tmpV   = gsl_vector_alloc(_eachVec[iElm].vector.size);
 		gsl_matrix *SigSum = gsl_matrix_alloc(_eachVec[iElm].vector.size, _eachVec[iElm].vector.size);
@@ -2466,6 +2478,9 @@ void MVnormMuBlk::update(const Grp &dat, const SigmaI &SigIm, const SigmaI &SigI
 }
 void MVnormMuBlk::update(const Grp &dat, const SigmaI &SigIm, const double &qPr, const SigmaI &SigIp, const gsl_rng *r){
 	for (size_t iElm = 0; iElm < _eachVec.size(); iElm++) {
+		if ((*_eachLL)[iElm].empty()) { // this is for situations where the number of levels is not the same for all blocks
+			continue;
+		}
 		gsl_vector *smVec  = gsl_vector_calloc(_eachVec[iElm].vector.size);
 		gsl_vector *tmpV   = gsl_vector_alloc(_eachVec[iElm].vector.size);
 		gsl_matrix *SigSum = gsl_matrix_alloc(_eachVec[iElm].vector.size, _eachVec[iElm].vector.size);
@@ -2504,6 +2519,9 @@ void MVnormMuBlk::update(const Grp &dat, const SigmaI &SigIm, const double &qPr,
 }
 void MVnormMuBlk::update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, const SigmaI &SigIp, const gsl_rng *r){
 	for (size_t iElm = 0; iElm < _eachVec.size(); iElm++) {
+		if ((*_eachLL)[iElm].empty()) { // this is for situations where the number of levels is not the same for all blocks
+			continue;
+		}
 		gsl_vector *smVec  = gsl_vector_calloc(_eachVec[iElm].vector.size);
 		gsl_vector *tmpV   = gsl_vector_alloc(_eachVec[iElm].vector.size);
 		gsl_matrix *SigSum = gsl_matrix_alloc(_eachVec[iElm].vector.size, _eachVec[iElm].vector.size);
@@ -2542,6 +2560,9 @@ void MVnormMuBlk::update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, con
 }
 void MVnormMuBlk::update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, const double &qPr, const SigmaI &SigIp, const gsl_rng *r){
 	for (size_t iElm = 0; iElm < _eachVec.size(); iElm++) {
+		if ((*_eachLL)[iElm].empty()) { // this is for situations where the number of levels is not the same for all blocks
+			continue;
+		}
 		gsl_vector *smVec  = gsl_vector_calloc(_eachVec[iElm].vector.size);
 		gsl_vector *tmpV   = gsl_vector_alloc(_eachVec[iElm].vector.size);
 		gsl_matrix *SigSum = gsl_matrix_alloc(_eachVec[iElm].vector.size, _eachVec[iElm].vector.size);
@@ -2585,6 +2606,9 @@ void MVnormMuBlk::update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, con
 
 void MVnormMuBlk::update(const Grp &dat, const SigmaI &SigIm, const Grp &muPr, const SigmaI &SigIp, const gsl_rng *r){
 	for (size_t iElm = 0; iElm < _eachVec.size(); iElm++) {
+		if ((*_eachLL)[iElm].empty()) { // this is for situations where the number of levels is not the same for all blocks
+			continue;
+		}
 		gsl_vector *smVec  = gsl_vector_calloc(_eachVec[iElm].vector.size);
 		gsl_vector *tmpV   = gsl_vector_alloc(_eachVec[iElm].vector.size);
 		gsl_matrix *SigSum = gsl_matrix_alloc(_eachVec[iElm].vector.size, _eachVec[iElm].vector.size);
@@ -2620,6 +2644,9 @@ void MVnormMuBlk::update(const Grp &dat, const SigmaI &SigIm, const Grp &muPr, c
 }
 void MVnormMuBlk::update(const Grp &dat, const SigmaI &SigIm, const Grp &muPr, const double &qPr, const SigmaI &SigIp, const gsl_rng *r){
 	for (size_t iElm = 0; iElm < _eachVec.size(); iElm++) {
+		if ((*_eachLL)[iElm].empty()) { // this is for situations where the number of levels is not the same for all blocks
+			continue;
+		}
 		gsl_vector *smVec  = gsl_vector_calloc(_eachVec[iElm].vector.size);
 		gsl_vector *tmpV   = gsl_vector_alloc(_eachVec[iElm].vector.size);
 		gsl_matrix *SigSum = gsl_matrix_alloc(_eachVec[iElm].vector.size, _eachVec[iElm].vector.size);
@@ -2660,6 +2687,9 @@ void MVnormMuBlk::update(const Grp &dat, const SigmaI &SigIm, const Grp &muPr, c
 }
 void MVnormMuBlk::update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, const Grp &muPr, const SigmaI &SigIp, const gsl_rng *r){
 	for (size_t iElm = 0; iElm < _eachVec.size(); iElm++) {
+		if ((*_eachLL)[iElm].empty()) { // this is for situations where the number of levels is not the same for all blocks
+			continue;
+		}
 		gsl_vector *smVec  = gsl_vector_calloc(_eachVec[iElm].vector.size);
 		gsl_vector *tmpV   = gsl_vector_alloc(_eachVec[iElm].vector.size);
 		gsl_matrix *SigSum = gsl_matrix_alloc(_eachVec[iElm].vector.size, _eachVec[iElm].vector.size);
@@ -2700,6 +2730,9 @@ void MVnormMuBlk::update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, con
 }
 void MVnormMuBlk::update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, const Grp &muPr, const double &qPr, const SigmaI &SigIp, const gsl_rng *r){
 	for (size_t iElm = 0; iElm < _eachVec.size(); iElm++) {
+		if ((*_eachLL)[iElm].empty()) { // this is for situations where the number of levels is not the same for all blocks
+			continue;
+		}
 		gsl_vector *smVec  = gsl_vector_calloc(_eachVec[iElm].vector.size);
 		gsl_vector *tmpV   = gsl_vector_alloc(_eachVec[iElm].vector.size);
 		gsl_matrix *SigSum = gsl_matrix_alloc(_eachVec[iElm].vector.size, _eachVec[iElm].vector.size);
@@ -3299,7 +3332,7 @@ void MVnormBetaBlk::update(const Grp &dat, const Qgrp &q, const SigmaI &SigIb, c
 }
 
 /*
-	MVnormBetaFtBlk methods
+ *	MVnormBetaFtBlk methods
  */
 
 void MVnormBetaFtBlk::update(const Grp &dat, const SigmaI &SigIb, const gsl_rng *r){
@@ -3698,7 +3731,7 @@ void MVnormBetaFtBlk::update(const Grp &dat, const Qgrp &q, const SigmaI &SigIb,
 }
 
 /*
-	RanIndex methods
+ *	RanIndex methods
  */
 
 // Constructors
@@ -3750,6 +3783,10 @@ RanIndex::RanIndex(const size_t &Ntot, const size_t &Nup, const string &fileNam)
 	gsl_vector_int *tmp = gsl_vector_int_alloc(Ntot);
 	
 	FILE *indIn = fopen(fileNam.c_str(), "r");
+	if (indIn == NULL) {
+		cerr << "ERROR: cannot open index file " << fileNam << " in RanIndex" << endl;
+		exit(-1);
+	}
 	gsl_vector_int_fread(indIn, tmp);
 	fclose(indIn);
 	int mnVal = gsl_vector_int_min(tmp);
@@ -4899,6 +4936,10 @@ MuGrp::MuGrp(const string &datFlNam, RanIndex &low, RanIndex &up, const size_t &
 	gsl_vector *tmpSd = gsl_vector_alloc(d);
 	
 	FILE *datIn = fopen(datFlNam.c_str(), "r");
+	if (datIn == NULL) {
+		cerr << "ERROR: cannot open data file " << datIn << " in MuGrp" << endl;
+		exit(-1);
+	}
 	gsl_matrix_fread(datIn, tmpIn);
 	fclose(datIn);
 	
@@ -4932,6 +4973,10 @@ MuGrp::MuGrp(const string &datFlNam, RanIndex &up, const size_t d){
 	_upLevel  = &up;
 	
 	FILE *datIn = fopen(datFlNam.c_str(), "r");
+	if (datIn == NULL) {
+		cerr << "ERROR: cannot open data file " << datIn << " in MuGrp" << endl;
+		exit(-1);
+	}
 	gsl_matrix_fread(datIn, _valueMat);
 	fclose(datIn);
 	
@@ -5662,14 +5707,26 @@ MuGrpMiss::MuGrpMiss(const string &datFlNam, const string &misMatFlNam, const st
 	vector<vector<size_t> > misPhenID;
 	
 	FILE *datIn = fopen(datFlNam.c_str(), "r");
+	if (datIn == NULL) {
+		cerr << "ERROR: cannot open data file " << datIn << " in MuGrpMiss" << endl;
+		exit(-1);
+	}
 	gsl_matrix_fread(datIn, _valueMat);
 	fclose(datIn);
 	
 	FILE *mmIn = fopen(misMatFlNam.c_str(), "r");
+	if (mmIn == NULL) {
+		cerr << "ERROR: cannot missing data index file " << misMatFlNam << " in MuGrpMiss" << endl;
+		exit(-1);
+	}
 	gsl_matrix_int_fread(mmIn, tmpMisMat);
 	fclose(mmIn);
 	
 	FILE *mvIn = fopen(misVecFlNam.c_str(), "r"); // this has the number of missing phenotypes
+	if (datIn == NULL) {
+		cerr << "ERROR: cannot open number of missing values file " << misVecFlNam << " in MuGrpMiss" << endl;
+		exit(-1);
+	}
 	gsl_vector_int_fread(mvIn, tmpMisVec);
 	fclose(mvIn);
 	
@@ -5724,7 +5781,6 @@ MuGrpMiss::MuGrpMiss(const MuGrpMiss &mG){
 	_valueMat   = gsl_matrix_alloc((mG._valueMat)->size1, (mG._valueMat)->size2);
 	gsl_matrix_memcpy(_valueMat, mG._valueMat);
 	
-	_lowLevel = mG._lowLevel;
 	_upLevel  = mG._upLevel;
 	
 	_theta.resize(_valueMat->size1);
@@ -5749,7 +5805,6 @@ MuGrpMiss & MuGrpMiss::operator=(const MuGrpMiss &mG){
 	_valueMat   = gsl_matrix_alloc((mG._valueMat)->size1, (mG._valueMat)->size2);
 	gsl_matrix_memcpy(_valueMat, mG._valueMat);
 	
-	_lowLevel = mG._lowLevel;
 	_upLevel  = mG._upLevel;
 	
 	_theta.resize(_valueMat->size1);
@@ -5781,6 +5836,327 @@ void MuGrpMiss::update(const Grp &mu, const SigmaI &SigIm, const SigmaI &SigIp){
 		_theta[*msIt]->update(mu, SigIm, SigIp, _rV[0]);
 	}
 }
+
+/*
+ * MuGrpEE methods
+ */
+MuGrpEE::MuGrpEE(const string &datFlNam, const string &varFlNam, const string &indFlNam, RanIndex &up, const size_t &d) : MuGrp(datFlNam, up, d){
+	
+	ifstream varIn(varFlNam.c_str());
+	
+	if (!varIn) {
+		cerr << "ERROR: cannot open file " << varFlNam << " for reading error variance index in MuGrpEE initialization" << endl;
+		exit(-1);
+	}
+	int tmpIn;
+	while (varIn) {
+		varIn >> tmpIn;
+		if (tmpIn < 0) {
+			cerr << "ERROR: negative indexes not alllowed when reading error variance index from file " << varFlNam << " on initialization of MuGrpEE" << endl;
+			exit(-1);
+		} else if (tmpIn > d){
+			cerr << "ERROR: value of the index (" << tmpIn << ") exceeds the number of variables (" << d << "). Check if you saved a base-0 index for MuGrpEE" << endl;
+			exit(-1);
+		}
+		_errInd.push_back(tmpIn);
+	}
+	if (_errInd.size() > d) {
+		cerr << "ERROR: length of index of error variances (" << _errInd.size() << ") exceeds the total number of variables (" << d << ") while initializing MuGrpEE" << endl;
+		exit(-1);
+	}
+	
+	varIn.close();
+	_errorVar = gsl_matrix_alloc(_valueMat->size1, _errInd.size());
+	FILE *errIn = fopen(varFlNam.c_str(), "r");
+	if (errIn == NULL) {
+		cerr << "ERROR: Failed to open file " << varFlNam << " when inititializing MuGrpEE" << endl;
+		exit(-1);
+	}
+	gsl_matrix_fread(errIn, _errorVar);
+	fclose(errIn);
+	
+}
+
+MuGrpEE::MuGrpEE(const string &datFlNam, const string &varFlNam, const vector<size_t> &varInd, RanIndex &up, const size_t &d) : MuGrp(datFlNam, up, d){
+	if (varInd.size() > d) {
+		cerr << "ERROR: more elements in the experimenatl error index (" << varInd.size() << ") than overall variables (" << d << ") in MuGrpEE initialization" << endl;
+		exit(-1);
+	}
+	if (varInd[*max_element(varInd.begin(), varInd.end())] > d) {
+		cerr << "ERROR: largest element in the experimenatl error index (" << varInd.size() << ") is larger than the number of overall variables (" << d << ") in MuGrpEE initialization" << endl;
+		exit(-1);
+	}
+	_errorVar = gsl_matrix_alloc(_valueMat->size1, varInd.size());
+	_errInd   = varInd;
+	
+	
+	FILE *errIn = fopen(varFlNam.c_str(), "r");
+	if (errIn == NULL) {
+		cerr << "ERROR: Failed to open file " << varFlNam << " when inititializing MuGrpEE" << endl;
+		exit(-1);
+	}
+	gsl_matrix_fread(errIn, _errorVar);
+	fclose(errIn);
+	
+	
+}
+
+MuGrpEE::MuGrpEE(const MuGrpEE &mG){
+	gsl_matrix_free(_valueMat);
+	gsl_matrix_free(_errorVar);
+	_valueMat = gsl_matrix_alloc((mG._valueMat)->size1, (mG._valueMat)->size2);
+	gsl_matrix_memcpy(_valueMat, mG._valueMat);
+	_errorVar = gsl_matrix_alloc((mG._errorVar)->size1, (mG._errorVar)->size2);
+	gsl_matrix_memcpy(_errorVar, mG._errorVar);
+	_upLevel  = mG._upLevel;
+	
+	_theta.resize(_valueMat->size1);
+	for (size_t iVrw = 0; iVrw < _valueMat->size1; iVrw++) {
+		delete _theta[iVrw];
+		_theta[iVrw] = new MVnormMu(_valueMat, iVrw, *(mG._theta[iVrw])->down(), *(mG._theta[iVrw])->up()); // can't simply copy _theta: not guaranteed that the elements will point to the right thing);
+	}
+}
+MuGrpEE & MuGrpEE::operator=(const MuGrpEE &mG){
+	gsl_matrix_free(_valueMat);
+	gsl_matrix_free(_errorVar);
+	_valueMat = gsl_matrix_alloc((mG._valueMat)->size1, (mG._valueMat)->size2);
+	gsl_matrix_memcpy(_valueMat, mG._valueMat);
+	_errorVar = gsl_matrix_alloc((mG._errorVar)->size1, (mG._errorVar)->size2);
+	gsl_matrix_memcpy(_errorVar, mG._errorVar);
+	_upLevel  = mG._upLevel;
+	
+	_theta.resize(_valueMat->size1);
+	for (size_t iVrw = 0; iVrw < _valueMat->size1; iVrw++) {
+		delete _theta[iVrw];
+		_theta[iVrw] = new MVnormMu(_valueMat, iVrw, *(mG._theta[iVrw])->down(), *(mG._theta[iVrw])->up()); // can't simply copy _theta: not guaranteed that the elements will point to the right thing);
+	}
+	
+	return *this;
+}
+
+// all of these are actually priors
+void MuGrpEE::update(const Grp &muPr, const SigmaI &SigIm){
+	for (size_t iRw = 0; iRw < _valueMat->size1; iRw++) {
+		for (size_t jECl = 0; jECl < _errInd.size(); jECl++) {
+			double var = 1.0/(1.0/gsl_matrix_get(_errorVar, iRw, jECl) + gsl_matrix_get(SigIm.getMat(), _errInd[jECl], _errInd[jECl]));
+			double mn     = var * (gsl_matrix_get(_valueMat, iRw, _errInd[jECl])/gsl_matrix_get(_errorVar, iRw, jECl) +  gsl_matrix_get(SigIm.getMat(), _errInd[jECl], _errInd[jECl]) * gsl_matrix_get(muPr.fMat(), _upLevel->priorInd(iRw), _errInd[jECl]) );
+			gsl_matrix_set(_valueMat, iRw, _errInd[jECl], mn + gsl_ran_gaussian_ziggurat(_rV[0], sqrt(var)));
+		}
+	}
+}
+void MuGrpEE::update(const Grp &muPr, const Qgrp &q, const SigmaI &SigIm){
+	for (size_t iRw = 0; iRw < _valueMat->size1; iRw++) {
+		for (size_t jECl = 0; jECl < _errInd.size(); jECl++) {
+			double var = 1.0/(1.0/gsl_matrix_get(_errorVar, iRw, jECl) + q[iRw] * gsl_matrix_get(SigIm.getMat(), _errInd[jECl], _errInd[jECl]));
+			double mn     = var * (gsl_matrix_get(_valueMat, iRw, _errInd[jECl])/gsl_matrix_get(_errorVar, iRw, jECl) +  q[iRw] * gsl_matrix_get(SigIm.getMat(), _errInd[jECl], _errInd[jECl]) * gsl_matrix_get(muPr.fMat(), _upLevel->priorInd(iRw), _errInd[jECl]) );
+			gsl_matrix_set(_valueMat, iRw, _errInd[jECl], mn + gsl_ran_gaussian_ziggurat(_rV[0], sqrt(var)));
+		}
+	}
+}
+
+/*
+ * MuGrpEEmiss methods
+ */
+
+MuGrpEEmiss::MuGrpEEmiss(const string &datFlNam, const string &varFlNam, const string &indFlNam, const string &misMatFlNam, const string &misVecFlNam, RanIndex &up, const size_t &d) : MuGrpMiss(datFlNam, misMatFlNam, misVecFlNam, up, d) {
+	
+	gsl_matrix_int *tmpMisMat = gsl_matrix_int_alloc(_valueMat->size1, d);
+	FILE *mmIn = fopen(misMatFlNam.c_str(), "r");
+	if (mmIn == NULL) {
+		cerr << "ERROR: cannot missing data index file " << misMatFlNam << " in MuGrpMiss" << endl;
+		exit(-1);
+	}
+	gsl_matrix_int_fread(mmIn, tmpMisMat);
+	fclose(mmIn);
+	
+	list<size_t> tmpErrInd;
+	ifstream varIn(varFlNam.c_str());
+	
+	if (!varIn) {
+		cerr << "ERROR: cannot open file " << varFlNam << " for reading error variance index in MuGrpEEmiss initialization" << endl;
+		exit(-1);
+	}
+	int tmpIn;
+	while (varIn) {
+		varIn >> tmpIn;
+		if (tmpIn < 0) {
+			cerr << "ERROR: negative indexes not alllowed when reading error variance index from file " << varFlNam << " on initialization of MuGrpEEmiss" << endl;
+			exit(-1);
+		} else if (tmpIn > d){
+			cerr << "ERROR: value of the index (" << tmpIn << ") exceeds the number of variables (" << d << "). Check if you saved a base-0 index for MuGrpEEmiss" << endl;
+			exit(-1);
+		}
+		tmpErrInd.push_back(tmpIn);
+	}
+	if (tmpErrInd.size() > d) {
+		cerr << "ERROR: length of index of error variances (" << tmpErrInd.size() << ") exceeds the total number of variables (" << d << ") while initializing MuGrpEEmiss" << endl;
+		exit(-1);
+	}
+	varIn.close();
+	
+	for (size_t iDat = 0; iDat < _valueMat->size1; iDat++) {
+		_missErrMat.push_back(tmpErrInd);
+	}
+	
+	// for those lines in the _valueMat that have missing data, eliminate the traits that are missing from the measurement error sampling
+	for (vector<size_t>::iterator misIt = _misInd.begin(); misIt != _misInd.end(); ++misIt) {
+		
+		list<size_t>::iterator trtIt = _missErrMat[*misIt].begin();
+		while (trtIt != _missErrMat[*misIt].end()) {
+			if (gsl_matrix_int_get(tmpMisMat, *misIt, *trtIt) == 1) {
+				trtIt = _missErrMat[*misIt].erase(trtIt);
+			}
+			else {
+				++trtIt;
+			}
+		}
+	}
+	gsl_matrix_int_free(tmpMisMat);
+	
+	_errorVar = gsl_matrix_alloc(_valueMat->size1, tmpErrInd.size());
+	FILE *errIn = fopen(varFlNam.c_str(), "r");
+	if (errIn == NULL) {
+		cerr << "ERROR: Failed to open file " << varFlNam << " when inititializing MuGrpEEmiss" << endl;
+		exit(-1);
+	}
+	gsl_matrix_fread(errIn, _errorVar);
+	fclose(errIn);
+	
+}
+MuGrpEEmiss::MuGrpEEmiss(const string &datFlNam, const string &varFlNam, const vector<size_t> &varInd, const string &misMatFlNam, const string &misVecFlNam, RanIndex &up, const size_t &d) : MuGrpMiss(datFlNam, misMatFlNam, misVecFlNam, up, d) {
+	
+	gsl_matrix_int *tmpMisMat = gsl_matrix_int_alloc(_valueMat->size1, d);
+	FILE *mmIn = fopen(misMatFlNam.c_str(), "r");
+	if (mmIn == NULL) {
+		cerr << "ERROR: cannot missing data index file " << misMatFlNam << " in MuGrpMiss" << endl;
+		exit(-1);
+	}
+	gsl_matrix_int_fread(mmIn, tmpMisMat);
+	fclose(mmIn);
+	
+	list<size_t> tmpErrInd(varInd.begin(),varInd.end());
+	
+	
+	for (size_t iDat = 0; iDat < _valueMat->size1; iDat++) {
+		_missErrMat.push_back(tmpErrInd);
+	}
+	
+	// for those lines in the _valueMat that have missing data, eliminate the traits that are missing from the measurement error sampling
+	for (vector<size_t>::iterator misIt = _misInd.begin(); misIt != _misInd.end(); ++misIt) {
+		
+		list<size_t>::iterator trtIt = _missErrMat[*misIt].begin();
+		while (trtIt != _missErrMat[*misIt].end()) {
+			if (gsl_matrix_int_get(tmpMisMat, *misIt, *trtIt) == 1) {
+				trtIt = _missErrMat[*misIt].erase(trtIt);
+			}
+			else {
+				++trtIt;
+			}
+		}
+	}
+	gsl_matrix_int_free(tmpMisMat);
+	
+	_errorVar = gsl_matrix_alloc(_valueMat->size1, tmpErrInd.size());
+	FILE *errIn = fopen(varFlNam.c_str(), "r");
+	if (errIn == NULL) {
+		cerr << "ERROR: Failed to open file " << varFlNam << " when inititializing MuGrpEEmiss" << endl;
+		exit(-1);
+	}
+	gsl_matrix_fread(errIn, _errorVar);
+	fclose(errIn);
+}
+
+MuGrpEEmiss::MuGrpEEmiss(const MuGrpEEmiss &mG){
+	_misInd = mG._misInd;
+	gsl_matrix_free(_valueMat);
+	gsl_matrix_free(_errorVar);
+	_valueMat   = gsl_matrix_alloc((mG._valueMat)->size1, (mG._valueMat)->size2);
+	gsl_matrix_memcpy(_valueMat, mG._valueMat);
+	_errorVar   = gsl_matrix_alloc((mG._errorVar)->size1, (mG._errorVar)->size2);
+	gsl_matrix_memcpy(_errorVar, mG._errorVar);
+	
+	_upLevel    = mG._upLevel;
+	_missErrMat = mG._missErrMat;
+	
+	_theta.resize(_valueMat->size1);
+	size_t mI = 0;
+	for (size_t iVrw = 0; iVrw < _valueMat->size1; iVrw++) {
+		if (iVrw == _misInd[mI]) {
+			if (mI < _misInd.size()) {
+				mI++;
+			}
+			_theta[iVrw] = new MVnormMuMiss(_valueMat, iVrw, *(mG._theta[iVrw])->up(), (mG._theta[iVrw])->getMisPhen());
+		}
+		else {
+			_theta[iVrw] = new MVnormMu(_valueMat, iVrw, *(mG._theta[iVrw])->up());
+		}
+		
+	}
+}
+MuGrpEEmiss & MuGrpEEmiss::operator=(const MuGrpEEmiss &mG){
+	_misInd = mG._misInd;
+	gsl_matrix_free(_valueMat);
+	gsl_matrix_free(_errorVar);
+	_valueMat   = gsl_matrix_alloc((mG._valueMat)->size1, (mG._valueMat)->size2);
+	gsl_matrix_memcpy(_valueMat, mG._valueMat);
+	_errorVar   = gsl_matrix_alloc((mG._errorVar)->size1, (mG._errorVar)->size2);
+	gsl_matrix_memcpy(_errorVar, mG._errorVar);
+	
+	_upLevel    = mG._upLevel;
+	_missErrMat = mG._missErrMat;
+	
+	_theta.resize(_valueMat->size1);
+	size_t mI = 0;
+	for (size_t iVrw = 0; iVrw < _valueMat->size1; iVrw++) {
+		if (iVrw == _misInd[mI]) {
+			if (mI < _misInd.size()) {
+				mI++;
+			}
+			_theta[iVrw] = new MVnormMuMiss(_valueMat, iVrw, *(mG._theta[iVrw])->up(), (mG._theta[iVrw])->getMisPhen());
+		}
+		else {
+			_theta[iVrw] = new MVnormMu(_valueMat, iVrw, *(mG._theta[iVrw])->up());
+		}
+		
+	}
+	
+	return *this;
+}
+
+// all of these are actually priors
+void MuGrpEEmiss::update(const Grp &muPr, const SigmaI &SigIm){
+	for (size_t iRw = 0; iRw < _valueMat->size1; iRw++) {
+		size_t jECl = 0;
+		for ( list<size_t>::iterator colIt = _missErrMat[iRw].begin(); colIt != _missErrMat[iRw].end(); ++colIt) {
+			double var = 1.0/(1.0/gsl_matrix_get(_errorVar, iRw, jECl) + gsl_matrix_get(SigIm.getMat(), *colIt, *colIt));
+			double mn     = var * (gsl_matrix_get(_valueMat, iRw, *colIt)/gsl_matrix_get(_errorVar, iRw, jECl) +  gsl_matrix_get(SigIm.getMat(), *colIt, *colIt) * gsl_matrix_get(muPr.fMat(), _upLevel->priorInd(iRw), *colIt) );
+			gsl_matrix_set(_valueMat, iRw, *colIt, mn + gsl_ran_gaussian_ziggurat(_rV[0], sqrt(var)));
+			jECl++;
+		}
+	}
+	
+	for (vector<size_t>::iterator msIt = _misInd.begin(); msIt != _misInd.end(); ++msIt) {
+		_theta[*msIt]->update(muPr, SigIm, _rV[0]);
+	}
+	
+}
+void MuGrpEEmiss::update(const Grp &muPr, const Qgrp &q, const SigmaI &SigIm){
+	for (size_t iRw = 0; iRw < _valueMat->size1; iRw++) {
+		size_t jECl = 0;
+		for ( list<size_t>::iterator colIt = _missErrMat[iRw].begin(); colIt != _missErrMat[iRw].end(); ++colIt) {
+			double var = 1.0/(1.0/gsl_matrix_get(_errorVar, iRw, jECl) + q[iRw] * gsl_matrix_get(SigIm.getMat(), *colIt, *colIt));
+			double mn     = var * (gsl_matrix_get(_valueMat, iRw, *colIt)/gsl_matrix_get(_errorVar, iRw, jECl) +  q[iRw] * gsl_matrix_get(SigIm.getMat(), *colIt, *colIt) * gsl_matrix_get(muPr.fMat(), _upLevel->priorInd(iRw), *colIt) );
+			gsl_matrix_set(_valueMat, iRw, *colIt, mn + gsl_ran_gaussian_ziggurat(_rV[0], sqrt(var)));
+			jECl++;
+		}
+	}
+	
+	for (vector<size_t>::iterator msIt = _misInd.begin(); msIt != _misInd.end(); ++msIt) {
+		_theta[*msIt]->update(muPr, SigIm, _rV[0]);
+	}
+	
+}
+
 
 /*
  *	BetaGrpFt methods
@@ -5816,6 +6192,10 @@ BetaGrpFt::BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npre
 	_theta.resize(Npred);
 	
 	FILE *prdIn = fopen(predFlNam.c_str(), "r");
+	if (prdIn == NULL) {
+		cerr << "ERROR: cannot open file " << predFlNam << " in BetaGrpFt" << endl;
+		exit(-1);
+	}
 	gsl_matrix_fread(prdIn, _Xmat);
 	fclose(prdIn);
 	
@@ -5866,6 +6246,10 @@ BetaGrpFt::BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npre
 	_theta.resize(Npred);
 	
 	FILE *prdIn = fopen(predFlNam.c_str(), "r");
+	if (prdIn == NULL) {
+		cerr << "ERROR: cannot open file " << predFlNam << " in BetaGrpFt" << endl;
+		exit(-1);
+	}
 	gsl_matrix_fread(prdIn, _Xmat);
 	fclose(prdIn);
 	
@@ -5924,6 +6308,10 @@ BetaGrpFt::BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npre
 	 */
 	
 	FILE *prdIn = fopen(predFlNam.c_str(), "r");
+	if (prdIn == NULL) {
+		cerr << "ERROR: cannot open file " << predFlNam << " in BetaGrpFt" << endl;
+		exit(-1);
+	}
 	gsl_vector *row = gsl_vector_alloc(Npred);
 	for (size_t iGrp = 0; iGrp < _lowLevel->getNgrp(); iGrp++) {
 		gsl_vector_fread(prdIn, row);
@@ -5982,6 +6370,10 @@ BetaGrpFt::BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npre
 	_theta.resize(Npred);
 	
 	FILE *prdIn = fopen(predFlNam.c_str(), "r");
+	if (prdIn == NULL) {
+		cerr << "ERROR: cannot open file " << predFlNam << " in BetaGrpFt" << endl;
+		exit(-1);
+	}
 	gsl_matrix_fread(prdIn, _Xmat);
 	fclose(prdIn);
 	
@@ -6035,6 +6427,10 @@ BetaGrpFt::BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npre
 	_theta.resize(Npred);
 	
 	FILE *prdIn = fopen(predFlNam.c_str(), "r");
+	if (prdIn == NULL) {
+		cerr << "ERROR: cannot open file " << predFlNam << " in BetaGrpFt" << endl;
+		exit(-1);
+	}
 	gsl_matrix_fread(prdIn, _Xmat);
 	fclose(prdIn);
 	
@@ -6093,6 +6489,10 @@ BetaGrpFt::BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npre
 	 */
 	
 	FILE *prdIn = fopen(predFlNam.c_str(), "r");
+	if (prdIn == NULL) {
+		cerr << "ERROR: cannot open file " << predFlNam << " in BetaGrpFt" << endl;
+		exit(-1);
+	}
 	gsl_vector *row = gsl_vector_alloc(Npred);
 	for (size_t iGrp = 0; iGrp < _lowLevel->getNgrp(); iGrp++) {
 		gsl_vector_fread(prdIn, row);
@@ -6152,6 +6552,10 @@ BetaGrpFt::BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npre
 	_theta.resize(Npred);
 	
 	FILE *prdIn = fopen(predFlNam.c_str(), "r");
+	if (prdIn == NULL) {
+		cerr << "ERROR: cannot open file " << predFlNam << " in BetaGrpFt" << endl;
+		exit(-1);
+	}
 	gsl_matrix_fread(prdIn, _Xmat);
 	fclose(prdIn);
 	
@@ -6201,6 +6605,10 @@ BetaGrpFt::BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npre
 	_theta.resize(Npred);
 	
 	FILE *prdIn = fopen(predFlNam.c_str(), "r");
+	if (prdIn == NULL) {
+		cerr << "ERROR: cannot open file " << predFlNam << " in BetaGrpFt" << endl;
+		exit(-1);
+	}
 	gsl_matrix_fread(prdIn, _Xmat);
 	fclose(prdIn);
 	
@@ -6251,6 +6659,10 @@ BetaGrpFt::BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npre
 	
 	gsl_matrix *tmpX = gsl_matrix_alloc(_lowLevel->getNgrp(), Npred);
 	FILE *prdIn = fopen(predFlNam.c_str(), "r");
+	if (prdIn == NULL) {
+		cerr << "ERROR: cannot open file " << predFlNam << " in BetaGrpFt" << endl;
+		exit(-1);
+	}
 	gsl_matrix_fread(prdIn, tmpX);
 	fclose(prdIn);
 	meanImpute(tmpX, absLab);
@@ -6310,6 +6722,10 @@ BetaGrpFt::BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npre
 	_theta.resize(Npred);
 	
 	FILE *prdIn = fopen(predFlNam.c_str(), "r");
+	if (prdIn == NULL) {
+		cerr << "ERROR: cannot open file " << predFlNam << " in BetaGrpFt" << endl;
+		exit(-1);
+	}
 	gsl_matrix_fread(prdIn, _Xmat);
 	fclose(prdIn);
 	
@@ -6362,6 +6778,10 @@ BetaGrpFt::BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npre
 	_theta.resize(Npred);
 	
 	FILE *prdIn = fopen(predFlNam.c_str(), "r");
+	if (prdIn == NULL) {
+		cerr << "ERROR: cannot open file " << predFlNam << " in BetaGrpFt" << endl;
+		exit(-1);
+	}
 	gsl_matrix_fread(prdIn, _Xmat);
 	fclose(prdIn);
 	
@@ -6414,6 +6834,10 @@ BetaGrpFt::BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npre
 	
 	gsl_matrix *tmpX = gsl_matrix_alloc(_lowLevel->getNgrp(), Npred);
 	FILE *prdIn = fopen(predFlNam.c_str(), "r");
+	if (prdIn == NULL) {
+		cerr << "ERROR: cannot open file " << predFlNam << " in BetaGrpFt" << endl;
+		exit(-1);
+	}
 	gsl_matrix_fread(prdIn, tmpX);
 	fclose(prdIn);
 	meanImpute(tmpX, absLab);
@@ -6472,6 +6896,10 @@ BetaGrpFt::BetaGrpFt(const Grp &rsp, const SigmaI &SigI, const string &predFlNam
 	}
 	
 	FILE *prdIn = fopen(predFlNam.c_str(), "r");
+	if (prdIn == NULL) {
+		cerr << "ERROR: cannot open file " << predFlNam << " in BetaGrpFt" << endl;
+		exit(-1);
+	}
 	gsl_matrix_fread(prdIn, _Xmat);
 	fclose(prdIn);
 	
@@ -6536,6 +6964,10 @@ BetaGrpFt::BetaGrpFt(const Grp &rsp, const SigmaI &SigI, const string &predFlNam
 	}
 	
 	FILE *prdIn = fopen(predFlNam.c_str(), "r");
+	if (prdIn == NULL) {
+		cerr << "ERROR: cannot open predictor file " << predFlNam << " in BetaGrpFt" << endl;
+		exit(-1);
+	}
 	gsl_matrix_fread(prdIn, _Xmat);
 	fclose(prdIn);
 	
@@ -6610,6 +7042,10 @@ BetaGrpFt::BetaGrpFt(const Grp &rsp, const SigmaI &SigI, const string &predFlNam
 	}
 	
 	FILE *prdIn = fopen(predFlNam.c_str(), "r");
+	if (prdIn == NULL) {
+		cerr << "ERROR: cannot open file " << predFlNam << " in BetaGrpFt" << endl;
+		exit(-1);
+	}
 	gsl_matrix_fread(prdIn, _Xmat);
 	fclose(prdIn);
 	
@@ -6673,6 +7109,10 @@ BetaGrpFt::BetaGrpFt(const Grp &rsp, const SigmaI &SigI, const string &predFlNam
 	}
 	
 	FILE *prdIn = fopen(predFlNam.c_str(), "r");
+	if (prdIn == NULL) {
+		cerr << "ERROR: cannot open file " << predFlNam << " in BetaGrpFt" << endl;
+		exit(-1);
+	}
 	gsl_matrix_fread(prdIn, _Xmat);
 	fclose(prdIn);
 	colCenter(_Xmat, absLab);
@@ -7512,11 +7952,19 @@ BetaGrpPC::BetaGrpPC(const Grp &rsp, const string &predFlNam, const string &evFl
 	_theta.resize(Npred);
 	
 	FILE *prdIn = fopen(predFlNam.c_str(), "r");
+	if (prdIn == NULL) {
+		cerr << "ERROR: cannot open file " << predFlNam << " in BetaGrpPC" << endl;
+		exit(-1);
+	}
 	gsl_matrix_fread(prdIn, _Xmat);
 	fclose(prdIn);
 	// no centering, since eigenvectors are centered by definition
 	
 	FILE *evIn = fopen(evFlNam.c_str(), "r");
+	if (evIn == NULL) {
+		cerr << "ERROR: cannot open file " << evFlNam << " in BetaGrpPC" << endl;
+		exit(-1);
+	}
 	gsl_vector_fread(evIn, ev);
 	fclose(evIn);
 	
@@ -7571,6 +8019,10 @@ BetaGrpPC::BetaGrpPC(const Grp &rsp, const string &predFlNam, const string &evFl
 	_theta.resize(Npred);
 	
 	FILE *prdIn = fopen(predFlNam.c_str(), "r");
+	if (prdIn == NULL) {
+		cerr << "ERROR: cannot open file " << predFlNam << " in BetaGrpPC" << endl;
+		exit(-1);
+	}
 	gsl_vector *tmpRow = gsl_vector_alloc(Npred);
 	for (size_t iGrp = 0; iGrp < _lowLevel->getNgrp(); iGrp++) {
 		gsl_vector_fread(prdIn, tmpRow);
@@ -7583,6 +8035,10 @@ BetaGrpPC::BetaGrpPC(const Grp &rsp, const string &predFlNam, const string &evFl
 	colCenter(_Xmat);  // centering may be necessary if the design is unbalanced
 	
 	FILE *evIn = fopen(evFlNam.c_str(), "r");
+	if (evIn == NULL) {
+		cerr << "ERROR: cannot open file " << evFlNam << " in BetaGrpPC" << endl;
+		exit(-1);
+	}
 	gsl_vector_fread(evIn, ev);
 	fclose(evIn);
 	
@@ -7640,11 +8096,19 @@ BetaGrpPC::BetaGrpPC(const Grp &rsp, const string &predFlNam, const string &evFl
 	_theta.resize(Npred);
 	
 	FILE *prdIn = fopen(predFlNam.c_str(), "r");
+	if (prdIn == NULL) {
+		cerr << "ERROR: cannot open file " << predFlNam << " in BetaGrpPC" << endl;
+		exit(-1);
+	}
 	gsl_matrix_fread(prdIn, _Xmat);
 	fclose(prdIn);
 	// no centering, since eigenvectors are centered by definition
 	
 	FILE *evIn = fopen(evFlNam.c_str(), "r");
+	if (evIn == NULL) {
+		cerr << "ERROR: cannot open file " << evFlNam << " in BetaGrpPC" << endl;
+		exit(-1);
+	}
 	gsl_vector_fread(evIn, ev);
 	fclose(evIn);
 	
@@ -7701,6 +8165,10 @@ BetaGrpPC::BetaGrpPC(const Grp &rsp, const string &predFlNam, const string &evFl
 	_theta.resize(Npred);
 	
 	FILE *prdIn = fopen(predFlNam.c_str(), "r");
+	if (prdIn == NULL) {
+		cerr << "ERROR: cannot open file " << predFlNam << " in BetaGrpPC" << endl;
+		exit(-1);
+	}
 	gsl_vector *tmpRow = gsl_vector_alloc(Npred);
 	for (size_t iGrp = 0; iGrp < _lowLevel->getNgrp(); iGrp++) {
 		gsl_vector_fread(prdIn, tmpRow);
@@ -7713,6 +8181,10 @@ BetaGrpPC::BetaGrpPC(const Grp &rsp, const string &predFlNam, const string &evFl
 	colCenter(_Xmat);  // centering may be necessary if the design is unbalanced
 	
 	FILE *evIn = fopen(evFlNam.c_str(), "r");
+	if (evIn == NULL) {
+		cerr << "ERROR: cannot open file " << evFlNam << " in BetaGrpPC" << endl;
+		exit(-1);
+	}
 	gsl_vector_fread(evIn, ev);
 	fclose(evIn);
 	
@@ -7930,6 +8402,10 @@ void BetaGrpSnp::dump(){
 		_valueMat = gsl_matrix_calloc(_Npred, _Ystore->size2 + 1);  // the extra column will have the Hotelling-type statistic for all the traits
 		
 		FILE *prdIn = fopen(_inPredFl.c_str(), "r");
+		if (prdIn == NULL) {
+			cerr << "ERROR: cannot open file " << _inPredFl << " in BetaGrpSnp" << endl;
+			exit(-1);
+		}
 		gsl_matrix_fread(prdIn, _Xmat);
 		fclose(prdIn);
 		colCenter(_Xmat); // essential to mimic an intercept; predictor should be centered by construction of the sampler
@@ -7965,6 +8441,11 @@ void BetaGrpSnp::dump(){
 				for (int iSnp = 0; iSnp < _Npred; iSnp++) {
 					gsl_vector_view Xtmp = gsl_matrix_column(_Xmat, iSnp);
 					gsl_blas_ddot(&Xtmp.vector, &Xtmp.vector, &XtX);
+					if (XtX <= 1e-12) {
+						gsl_vector_view vmRw = gsl_matrix_row(_valueMat, iSnp);
+						gsl_vector_set_zero(&vmRw.vector);
+						continue;
+					}
 					XtX = 1.0/XtX;
 					
 					gsl_blas_dgemv(CblasTrans, XtX, _Ystore, &Xtmp.vector, 0.0, bTmp);
@@ -8006,6 +8487,11 @@ void BetaGrpSnp::dump(){
 				for (int iSnp = 0; iSnp < _Npred; iSnp++) {
 					gsl_vector_view Xtmp = gsl_matrix_column(_Xmat, iSnp);
 					gsl_blas_ddot(&Xtmp.vector, &Xtmp.vector, &XtX);
+					if (XtX <= 1e-12) {
+						gsl_vector_view vmRw = gsl_matrix_row(_valueMat, iSnp);
+						gsl_vector_set_zero(&vmRw.vector);
+						continue;
+					}
 					XtX = 1.0/XtX;
 					
 					gsl_blas_dgemv(CblasTrans, XtX, _Ystore, &Xtmp.vector, 0.0, bTmp);
@@ -8111,6 +8597,10 @@ void BetaGrpSnpCV::dump(){
 		_valueMat = gsl_matrix_calloc(_Npred, _Ystore->size2 + 1);  // the extra column will have the Hotelling-type statistic for all the traits
 		
 		FILE *prdIn = fopen(_inPredFl.c_str(), "r");
+		if (prdIn == NULL) {
+			cerr << "ERROR: cannot open file " << _inPredFl << " in BetaGrpSnpCV" << endl;
+			exit(-1);
+		}
 		gsl_matrix_fread(prdIn, _Xmat);
 		fclose(prdIn);
 		colCenter(_Xmat); // essential to mimic an intercept; predictor should be centered by construction of the sampler
@@ -8146,6 +8636,11 @@ void BetaGrpSnpCV::dump(){
 				for (int iSnp = 0; iSnp < _Npred; iSnp++) {
 					gsl_vector_view Xtmp = gsl_matrix_column(_Xmat, iSnp);
 					gsl_blas_ddot(&Xtmp.vector, &Xtmp.vector, &XtX);
+					if (XtX <= 1e-12) {
+						gsl_vector_view vmRw = gsl_matrix_row(_valueMat, iSnp);
+						gsl_vector_set_zero(&vmRw.vector);
+						continue;
+					}
 					XtX = 1.0/XtX;
 					
 					gsl_blas_dgemv(CblasTrans, XtX, _Ystore, &Xtmp.vector, 0.0, bTmp);
@@ -8188,6 +8683,11 @@ void BetaGrpSnpCV::dump(){
 				for (int iSnp = 0; iSnp < _Npred; iSnp++) {
 					gsl_vector_view Xtmp = gsl_matrix_column(_Xmat, iSnp);
 					gsl_blas_ddot(&Xtmp.vector, &Xtmp.vector, &XtX);
+					if (XtX <= 1e-12) {
+						gsl_vector_view vmRw = gsl_matrix_row(_valueMat, iSnp);
+						gsl_vector_set_zero(&vmRw.vector);
+						continue;
+					}
 					XtX = 1.0/XtX;
 					
 					gsl_blas_dgemv(CblasTrans, XtX, _Ystore, &Xtmp.vector, 0.0, bTmp);
@@ -8306,6 +8806,10 @@ void BetaGrpPSR::dump(){
 		_valueMat = gsl_matrix_calloc(_Npred, _Ystore->size2);  // no extra column.  Get the full multi-trait test through the BetaGrpSnp.dump()
 		
 		FILE *prdIn = fopen(_inPredFl.c_str(), "r");
+		if (prdIn == NULL) {
+			cerr << "ERROR: cannot open file " << _inPredFl << " in BetaGrpPSR" << endl;
+			exit(-1);
+		}
 		gsl_matrix_fread(prdIn, _Xmat);
 		fclose(prdIn);
 		colCenter(_Xmat); // essential to mimic an intercept
@@ -8355,6 +8859,10 @@ void BetaGrpPSR::dump(){
 						}
 						gsl_matrix_set_col(Xplus, Xplus->size2 - 1, &Xtmp.vector);
 						gsl_blas_dsyrk(CblasLower, CblasTrans, 1.0, Xplus, 0.0, XtX);  // XtX
+						if (gsl_matrix_get(XtX, Xplus->size2 - 1, Xplus->size2 - 1) <= 1e-12) {
+							gsl_matrix_set(_valueMat, iSnp, iTr, 0.0);
+							continue;
+						}
 						gsl_linalg_cholesky_decomp(XtX);
 						gsl_linalg_cholesky_invert(XtX); // XtX^-1
 						
@@ -8391,6 +8899,10 @@ void BetaGrpPSR::dump(){
 						}
 						gsl_matrix_set_col(Xplus, Xplus->size2 - 1, &Xtmp.vector);
 						gsl_blas_dsyrk(CblasLower, CblasTrans, 1.0, Xplus, 0.0, XtX);  // XtX
+						if (gsl_matrix_get(XtX, Xplus->size2 - 1, Xplus->size2 - 1) <= 1e-12) {
+							gsl_matrix_set(_valueMat, iSnp, iTr, 0.0);
+							continue;
+						}
 						gsl_linalg_cholesky_decomp(XtX);
 						gsl_linalg_cholesky_invert(XtX); // XtX^-1
 						
@@ -8518,6 +9030,10 @@ void BetaGrpSnpMiss::dump(){
 		
 		gsl_vector *tmpX = gsl_vector_alloc(_Npred);
 		FILE *prdIn = fopen(_inPredFl.c_str(), "r");
+		if (prdIn == NULL) {
+			cerr << "ERROR: cannot open file " << _inPredFl << " in BetaGrpSnpMiss" << endl;
+			exit(-1);
+		}
 		vector< vector<size_t> > presInd(_Npred);
 		
 		for (size_t XiRw = 0; XiRw < _Ystore->size1; XiRw++) { // reading in one row (line of predictor) at a time so that two whole SNP matrix worth of stuff is not in memory at once;  remember that SNPs are saved in row-major
@@ -8562,9 +9078,10 @@ void BetaGrpSnpMiss::dump(){
 						resd = gsl_matrix_alloc(1, 1); // just so the freeing of the matrix later works
 						gsl_vector_view pVrow = gsl_matrix_row(_valueMat, iSnp);
 						gsl_vector_set_zero(&pVrow.vector);
+						continue;
 					}
 					else if (presInd[iSnp].size() < _Ystore->size1) {  // i.e., some missing SNP data
-						resd = gsl_matrix_alloc(presInd.size(), _Ystore->size2);
+						resd = gsl_matrix_alloc(presInd[iSnp].size(), _Ystore->size2);
 						int ind = 0;
 						for (vector<size_t>::const_iterator it = presInd[iSnp].begin(); it != presInd[iSnp].end(); ++it) {
 							gsl_vector_view rspRw = gsl_matrix_row(_Ystore, *it);
@@ -8580,6 +9097,11 @@ void BetaGrpSnpMiss::dump(){
 					}
 					gsl_vector_view Xtmp = gsl_vector_view_array(_Xmat[iSnp].data(), _Xmat[iSnp].size());
 					gsl_blas_ddot(&Xtmp.vector, &Xtmp.vector, &XtX);
+					if (XtX <= 1e-12) {
+						gsl_vector_view vmRw = gsl_matrix_row(_valueMat, iSnp);
+						gsl_vector_set_zero(&vmRw.vector);
+						continue;
+					}
 					XtX = 1.0/XtX;
 					
 					gsl_blas_dgemv(CblasTrans, XtX, resd, &Xtmp.vector, 0.0, bTmp);
@@ -8625,9 +9147,10 @@ void BetaGrpSnpMiss::dump(){
 						resd = gsl_matrix_alloc(1, 1); // just so the freeing of the matrix later works
 						gsl_vector_view pVrow = gsl_matrix_row(_valueMat, iSnp);
 						gsl_vector_set_zero(&pVrow.vector);
+						continue;
 					}
 					else if (presInd[iSnp].size() < _Ystore->size1) {  // i.e., some missing data for this SNP
-						resd = gsl_matrix_alloc(presInd.size(), _Ystore->size2);
+						resd = gsl_matrix_alloc(presInd[iSnp].size(), _Ystore->size2);
 						int ind = 0;
 						for (vector<size_t>::const_iterator it = presInd[iSnp].begin(); it != presInd[iSnp].end(); ++it) {
 							gsl_vector_view rspRw = gsl_matrix_row(_Ystore, *it);
@@ -8643,6 +9166,11 @@ void BetaGrpSnpMiss::dump(){
 					}
 					gsl_vector_view Xtmp = gsl_vector_view_array(_Xmat[iSnp].data(), _Xmat[iSnp].size());
 					gsl_blas_ddot(&Xtmp.vector, &Xtmp.vector, &XtX);
+					if (XtX <= 1e-12) {
+						gsl_vector_view vmRw = gsl_matrix_row(_valueMat, iSnp);
+						gsl_vector_set_zero(&vmRw.vector);
+						continue;
+					}
 					XtX = 1.0/XtX;
 					
 					gsl_blas_dgemv(CblasTrans, XtX, resd, &Xtmp.vector, 0.0, bTmp);
@@ -8737,6 +9265,10 @@ void BetaGrpSnpMissCV::dump(){
 		
 		gsl_vector *tmpX = gsl_vector_alloc(_Npred);
 		FILE *prdIn = fopen(_inPredFl.c_str(), "r");
+		if (prdIn == NULL) {
+			cerr << "ERROR: cannot open file " << _inPredFl << " in BetaGrpMissCV" << endl;
+			exit(-1);
+		}
 		vector< vector<size_t> > presInd(_Npred);
 		
 		for (size_t XiRw = 0; XiRw < _Ystore->size1; XiRw++) { // reading in one row (line of predictor) at a time so that two whole SNP matrix worth of stuff is not in memory at once;  remember that SNPs are saved in row-major
@@ -8781,9 +9313,10 @@ void BetaGrpSnpMissCV::dump(){
 						resd = gsl_matrix_alloc(1, 1); // just so the freeing of the matrix later works
 						gsl_vector_view pVrow = gsl_matrix_row(_valueMat, iSnp);
 						gsl_vector_set_zero(&pVrow.vector);
+						continue;
 					}
 					else if (presInd[iSnp].size() < _Ystore->size1) {  // i.e., some missing SNP data
-						resd = gsl_matrix_alloc(presInd.size(), _Ystore->size2);
+						resd = gsl_matrix_alloc(presInd[iSnp].size(), _Ystore->size2);
 						int ind = 0;
 						for (vector<size_t>::const_iterator it = presInd[iSnp].begin(); it != presInd[iSnp].end(); ++it) {
 							gsl_vector_view rspRw = gsl_matrix_row(_Ystore, *it);
@@ -8799,6 +9332,11 @@ void BetaGrpSnpMissCV::dump(){
 					}
 					gsl_vector_view Xtmp = gsl_vector_view_array(_Xmat[iSnp].data(), _Xmat[iSnp].size());
 					gsl_blas_ddot(&Xtmp.vector, &Xtmp.vector, &XtX);
+					if (XtX <= 1e-12) {
+						gsl_vector_view vmRw = gsl_matrix_row(_valueMat, iSnp);
+						gsl_vector_set_zero(&vmRw.vector);
+						continue;
+					}
 					XtX = 1.0/XtX;
 					
 					gsl_blas_dgemv(CblasTrans, XtX, resd, &Xtmp.vector, 0.0, bTmp);
@@ -8845,9 +9383,10 @@ void BetaGrpSnpMissCV::dump(){
 						resd = gsl_matrix_alloc(1, 1); // just so the freeing of the matrix later works
 						gsl_vector_view pVrow = gsl_matrix_row(_valueMat, iSnp);
 						gsl_vector_set_zero(&pVrow.vector);
+						continue;
 					}
 					else if (presInd[iSnp].size() < _Ystore->size1) {  // i.e., some missing data for this SNP
-						resd = gsl_matrix_alloc(presInd.size(), _Ystore->size2);
+						resd = gsl_matrix_alloc(presInd[iSnp].size(), _Ystore->size2);
 						int ind = 0;
 						for (vector<size_t>::const_iterator it = presInd[iSnp].begin(); it != presInd[iSnp].end(); ++it) {
 							gsl_vector_view rspRw = gsl_matrix_row(_Ystore, *it);
@@ -8863,6 +9402,11 @@ void BetaGrpSnpMissCV::dump(){
 					}
 					gsl_vector_view Xtmp = gsl_vector_view_array(_Xmat[iSnp].data(), _Xmat[iSnp].size());
 					gsl_blas_ddot(&Xtmp.vector, &Xtmp.vector, &XtX);
+					if (XtX <= 1e-12) {
+						gsl_vector_view vmRw = gsl_matrix_row(_valueMat, iSnp);
+						gsl_vector_set_zero(&vmRw.vector);
+						continue;
+					}
 					XtX = 1.0/XtX;
 					
 					gsl_blas_dgemv(CblasTrans, XtX, resd, &Xtmp.vector, 0.0, bTmp);
@@ -8966,6 +9510,10 @@ void BetaGrpPSRmiss::dump(){
 		
 		gsl_vector *tmpX = gsl_vector_alloc(_Npred);
 		FILE *prdIn = fopen(_inPredFl.c_str(), "r");
+		if (prdIn == NULL) {
+			cerr << "ERROR: cannot open file " << _inPredFl << " in BetaGrpPSRmiss" << endl;
+			exit(-1);
+		}
 		vector< vector<size_t> > presInd(_Npred);
 		
 		for (size_t XiRw = 0; XiRw < _Ystore->size1; XiRw++) { // reading in one row (line of predictor) at a time so that two whole SNP matrix worth of stuff is not in memory at once;  remember that SNPs are saved in row-major
@@ -9010,6 +9558,7 @@ void BetaGrpPSRmiss::dump(){
 					if (presInd[iSnp].size() == 0) {    // i.e., no data at all.  Shouldn't happen, but who knows
 						gsl_vector_view pVrow = gsl_matrix_row(_valueMat, iSnp);
 						gsl_vector_set_zero(&pVrow.vector);
+						continue;
 					}
 					else if (presInd[iSnp].size() < _Ystore->size1) { // i.e., some missing data
 						gsl_matrix *Xplus = gsl_matrix_alloc(presInd[iSnp].size(), _Ystore->size2);
@@ -9038,6 +9587,11 @@ void BetaGrpPSRmiss::dump(){
 							colCenter(Xplus);
 							vecCenter(y);
 							gsl_blas_dsyrk(CblasLower, CblasTrans, 1.0, Xplus, 0.0, XtX);  // XtX
+							if (gsl_matrix_get(XtX, Xplus->size2 - 1, Xplus->size2 - 1) <= 1e-12) {
+								gsl_matrix_set(_valueMat, iSnp, iTr, 0.0);
+								continue;
+							}
+							
 							gsl_linalg_cholesky_decomp(XtX);
 							gsl_linalg_cholesky_invert(XtX); // XtX^-1
 							
@@ -9072,6 +9626,10 @@ void BetaGrpPSRmiss::dump(){
 							}
 							gsl_matrix_set_col(Xplus, Xplus->size2 - 1, &Xtmp.vector);
 							gsl_blas_dsyrk(CblasLower, CblasTrans, 1.0, Xplus, 0.0, XtX);  // XtX
+							if (gsl_matrix_get(XtX, Xplus->size2 - 1, Xplus->size2 - 1) <= 1e-12) {
+								gsl_matrix_set(_valueMat, iSnp, iTr, 0.0);
+								continue;
+							}
 							gsl_linalg_cholesky_decomp(XtX);
 							gsl_linalg_cholesky_invert(XtX); // XtX^-1
 							
@@ -9101,6 +9659,7 @@ void BetaGrpPSRmiss::dump(){
 					if (presInd[iSnp].size() == 0) {    // i.e., no data at all.  Shouldn't happen, but who knows
 						gsl_vector_view pVrow = gsl_matrix_row(_valueMat, iSnp);
 						gsl_vector_set_zero(&pVrow.vector);
+						continue;
 					}
 					else if (presInd[iSnp].size() < _Ystore->size1) { // i.e., some missing data
 						gsl_matrix *Xplus = gsl_matrix_alloc(presInd[iSnp].size(), _Ystore->size2);
@@ -9129,6 +9688,10 @@ void BetaGrpPSRmiss::dump(){
 							colCenter(Xplus);
 							vecCenter(y);
 							gsl_blas_dsyrk(CblasLower, CblasTrans, 1.0, Xplus, 0.0, XtX);  // XtX
+							if (gsl_matrix_get(XtX, Xplus->size2 - 1, Xplus->size2 - 1) <= 1e-12) {
+								gsl_matrix_set(_valueMat, iSnp, iTr, 0.0);
+								continue;
+							}
 							gsl_linalg_cholesky_decomp(XtX);
 							gsl_linalg_cholesky_invert(XtX); // XtX^-1
 							
@@ -9163,6 +9726,10 @@ void BetaGrpPSRmiss::dump(){
 							}
 							gsl_matrix_set_col(Xplus, Xplus->size2 - 1, &Xtmp.vector);
 							gsl_blas_dsyrk(CblasLower, CblasTrans, 1.0, Xplus, 0.0, XtX);  // XtX
+							if (gsl_matrix_get(XtX, Xplus->size2 - 1, Xplus->size2 - 1) <= 1e-12) {
+								gsl_matrix_set(_valueMat, iSnp, iTr, 0.0);
+								continue;
+							}
 							gsl_linalg_cholesky_decomp(XtX);
 							gsl_linalg_cholesky_invert(XtX); // XtX^-1
 							
@@ -9233,6 +9800,10 @@ BetaGrpBVSR::BetaGrpBVSR(const Grp &y, const SigmaI &SigI, const string &predFlN
 	remove(_outFlNam.c_str());
 	
 	FILE *prdIn = fopen(predFlNam.c_str(), "r");
+	if (prdIn == NULL) {
+		cerr << "ERROR: cannot open file " << predFlNam << " in BetaGrpBVSR" << endl;
+		exit(-1);
+	}
 	gsl_matrix_fread(prdIn, _Xmat);
 	fclose(prdIn);
 	
@@ -9329,6 +9900,10 @@ BetaGrpBVSR::BetaGrpBVSR(const Grp &y, const SigmaI &SigI, const string &predFlN
 	remove(_outFlNam.c_str());
 	
 	FILE *prdIn = fopen(predFlNam.c_str(), "r");
+	if (prdIn == NULL) {
+		cerr << "ERROR: cannot open file " << predFlNam << " in BetaGrpBVSR" << endl;
+		exit(-1);
+	}
 	gsl_matrix_fread(prdIn, _Xmat);
 	fclose(prdIn);
 	
@@ -9422,6 +9997,10 @@ BetaGrpBVSR::BetaGrpBVSR(const Grp &y, const SigmaI &SigI, const string &predFlN
 	remove(_outFlNam.c_str());
 	
 	FILE *prdIn = fopen(predFlNam.c_str(), "r");
+	if (prdIn == NULL) {
+		cerr << "ERROR: cannot open file " << predFlNam << " in BetaGrpBVSR" << endl;
+		exit(-1);
+	}
 	gsl_matrix_fread(prdIn, _Xmat);
 	fclose(prdIn);
 	
@@ -9517,6 +10096,10 @@ BetaGrpBVSR::BetaGrpBVSR(const Grp &y, const SigmaI &SigI, const string &predFlN
 	remove(_outFlNam.c_str());
 	
 	FILE *prdIn = fopen(predFlNam.c_str(), "r");
+	if (prdIn == NULL) {
+		cerr << "ERROR: cannot open file " << predFlNam << " in BetaGrpBVSR" << endl;
+		exit(-1);
+	}
 	gsl_matrix_fread(prdIn, _Xmat);
 	fclose(prdIn);
 	
@@ -9885,6 +10468,7 @@ void BetaGrpBVSR::update(const Grp &dat, const SigmaI &SigIm, const SigmaI &SigI
  *	MuBlk methods
  */
 
+// mean(x1:x3) == mean(x1:x3,mean(x1:x3)): can have different # of levels in each block
 MuBlk::MuBlk(const Grp &dat, const string &lowIndFlName, const size_t &Nval, RanIndex &up, const string &blkIndFileNam) : MuGrp(){
 	_lowLevel = 0;
 	_upLevel  = &up;
@@ -9892,6 +10476,10 @@ MuBlk::MuBlk(const Grp &dat, const string &lowIndFlName, const size_t &Nval, Ran
 	gsl_vector_int *blkInd = gsl_vector_int_alloc(dat.phenD());
 	
 	FILE *blkFl = fopen(blkIndFileNam.c_str(), "r");
+	if (blkFl == NULL) {
+		cerr << "ERROR: cannot open block index file " << blkIndFileNam << " in MuBlk" << endl;
+		exit(-1);
+	}
 	gsl_vector_int_fread(blkFl, blkInd);
 	fclose(blkFl);
 	
@@ -9926,6 +10514,10 @@ MuBlk::MuBlk(const Grp &dat, const string &lowIndFlName, const size_t &Nval, Ran
 	
 	gsl_matrix_int *tmpLow = gsl_matrix_int_alloc(dat.Ndata(), _blkStart.size());
 	FILE *lowFl = fopen(lowIndFlName.c_str(), "r");
+	if (lowFl == NULL) {
+		cerr << "ERROR: cannot open low-level-index file " << lowIndFlName << " in MuBlk" << endl;
+		exit(-1);
+	}
 	gsl_matrix_int_fread(lowFl, tmpLow);
 	fclose(lowFl);
 	
@@ -9935,7 +10527,7 @@ MuBlk::MuBlk(const Grp &dat, const string &lowIndFlName, const size_t &Nval, Ran
 	}
 	else if (minVal != 0) {
 		cerr << "WARNING: matrix of low-level indexes for MuBlk may not be base-1 or base-0. Making it base-0, but check for errors." << endl;
-		gsl_matrix_int_add_constant(tmpLow, -1*minVal);
+		gsl_matrix_int_add_constant(tmpLow, -minVal);
 	}
 	_blkLow.resize(Nval);
 	for (size_t iEl = 0; iEl < Nval; iEl++) {
@@ -9950,6 +10542,16 @@ MuBlk::MuBlk(const Grp &dat, const string &lowIndFlName, const size_t &Nval, Ran
 	
 	gsl_matrix_int_free(tmpLow);
 	
+	_shortLevels.resize(_blkStart.size(), 0); // keeping track of blocks with fewer levels
+	for (size_t iBlk = 0; iBlk < _blkStart.size(); iBlk++) {
+		for (size_t iEl = 0; iEl < _blkLow.size(); iEl++) {
+			if (_blkLow[iEl][iBlk].empty()) {
+				_shortLevels[iBlk] = iEl;
+				break;
+			}
+		}
+	}
+	
 	gsl_matrix_free(_valueMat);
 	gsl_vector *tmpMn = gsl_vector_alloc(dat.phenD());
 	gsl_vector *tmpSd = gsl_vector_alloc(dat.phenD());
@@ -9961,13 +10563,15 @@ MuBlk::MuBlk(const Grp &dat, const string &lowIndFlName, const size_t &Nval, Ran
 	for (size_t iEl = 0; iEl < Nval; iEl++) {
 		gsl_vector_set_zero(tmpMn);
 		for (size_t iBlk = 0; iBlk < _blkStart.size(); iBlk++) {
-			gsl_vector_view subMn = gsl_vector_subvector(tmpMn, _blkStart[iBlk], blkSize[iBlk]);
-			for (vector<size_t>::const_iterator el = _blkLow[iEl][iBlk].begin(); el != _blkLow[iEl][iBlk].end(); ++el) {
-				gsl_vector_const_view ln    = gsl_matrix_const_row(dat.dMat(), *el);
-				gsl_vector_const_view subLn = gsl_vector_const_subvector(&ln.vector, _blkStart[iBlk], blkSize[iBlk]);
-				gsl_vector_add(&subMn.vector, &subLn.vector);
+			if (!_blkLow[iEl][iBlk].empty()) {
+				gsl_vector_view subMn = gsl_vector_subvector(tmpMn, _blkStart[iBlk], blkSize[iBlk]);
+				for (vector<size_t>::const_iterator el = _blkLow[iEl][iBlk].begin(); el != _blkLow[iEl][iBlk].end(); ++el) {
+					gsl_vector_const_view ln    = gsl_matrix_const_row(dat.dMat(), *el);
+					gsl_vector_const_view subLn = gsl_vector_const_subvector(&ln.vector, _blkStart[iBlk], blkSize[iBlk]);
+					gsl_vector_add(&subMn.vector, &subLn.vector);
+				}
+				gsl_vector_scale(&subMn.vector, 1.0/_blkLow[iEl][iBlk].size());
 			}
-			gsl_vector_scale(&subMn.vector, 1.0/_blkLow[iEl][iBlk].size());
 		}
 		gsl_matrix_set_row(_valueMat, iEl, tmpMn);
 		
@@ -9991,6 +10595,10 @@ MuBlk::MuBlk(const Grp &dat, const string &lowIndFlName, const size_t &Nval, Ran
 	gsl_vector_int *blkInd = gsl_vector_int_alloc(dat.phenD());
 	
 	FILE *blkFl = fopen(blkIndFileNam.c_str(), "r");
+	if (blkFl == NULL) {
+		cerr << "ERROR: cannot open block index file " << blkIndFileNam << " in MuBlk" << endl;
+		exit(-1);
+	}
 	gsl_vector_int_fread(blkFl, blkInd);
 	fclose(blkFl);
 	
@@ -10025,6 +10633,10 @@ MuBlk::MuBlk(const Grp &dat, const string &lowIndFlName, const size_t &Nval, Ran
 	
 	gsl_matrix_int *tmpLow = gsl_matrix_int_alloc(dat.Ndata(), _blkStart.size());
 	FILE *lowFl = fopen(lowIndFlName.c_str(), "r");
+	if (lowFl == NULL) {
+		cerr << "ERROR: cannot open low-level-index file " << lowIndFlName << " in MuBlk" << endl;
+		exit(-1);
+	}
 	gsl_matrix_int_fread(lowFl, tmpLow);
 	fclose(lowFl);
 	
@@ -10046,8 +10658,17 @@ MuBlk::MuBlk(const Grp &dat, const string &lowIndFlName, const size_t &Nval, Ran
 			_blkLow[gsl_matrix_int_get(tmpLow, lRow, lCol)][lCol].push_back(lRow);
 		}
 	}
-	
 	gsl_matrix_int_free(tmpLow);
+	
+	_shortLevels.resize(_blkStart.size(), 0); // keeping track of blocks with fewer levels
+	for (size_t iBlk = 0; iBlk < _blkStart.size(); iBlk++) {
+		for (size_t iEl = 0; iEl < _blkLow.size() - 1; iEl++) {  // stopping one before the last element.  That way, the blocks that go to the end have 0 as the value.
+			if (_blkLow[iEl][iBlk].empty()) {
+				_shortLevels[iBlk] = iEl;
+				break;
+			}
+		}
+	}
 	
 	gsl_matrix_free(_valueMat);
 	gsl_vector *tmpMn = gsl_vector_alloc(dat.phenD());
@@ -10060,13 +10681,15 @@ MuBlk::MuBlk(const Grp &dat, const string &lowIndFlName, const size_t &Nval, Ran
 	for (size_t iEl = 0; iEl < Nval; iEl++) {
 		gsl_vector_set_zero(tmpMn);
 		for (size_t iBlk = 0; iBlk < _blkStart.size(); iBlk++) {
-			gsl_vector_view subMn = gsl_vector_subvector(tmpMn, _blkStart[iBlk], blkSize[iBlk]);
-			for (vector<size_t>::const_iterator el = _blkLow[iEl][iBlk].begin(); el != _blkLow[iEl][iBlk].end(); ++el) {
-				gsl_vector_const_view ln    = gsl_matrix_const_row(dat.dMat(), *el);
-				gsl_vector_const_view subLn = gsl_vector_const_subvector(&ln.vector, _blkStart[iBlk], blkSize[iBlk]);
-				gsl_vector_add(&subMn.vector, &subLn.vector);
+			if (!_blkLow[iEl][iBlk].empty()) {
+				gsl_vector_view subMn = gsl_vector_subvector(tmpMn, _blkStart[iBlk], blkSize[iBlk]);
+				for (vector<size_t>::const_iterator el = _blkLow[iEl][iBlk].begin(); el != _blkLow[iEl][iBlk].end(); ++el) {
+					gsl_vector_const_view ln    = gsl_matrix_const_row(dat.dMat(), *el);
+					gsl_vector_const_view subLn = gsl_vector_const_subvector(&ln.vector, _blkStart[iBlk], blkSize[iBlk]);
+					gsl_vector_add(&subMn.vector, &subLn.vector);
+				}
+				gsl_vector_scale(&subMn.vector, 1.0/_blkLow[iEl][iBlk].size());
 			}
-			gsl_vector_scale(&subMn.vector, 1.0/_blkLow[iEl][iBlk].size());
 		}
 		gsl_matrix_set_row(_valueMat, iEl, tmpMn);
 		
@@ -10083,16 +10706,73 @@ MuBlk::MuBlk(const Grp &dat, const string &lowIndFlName, const size_t &Nval, Ran
 
 void MuBlk::_updateExp(){
 	for (size_t iBlk = 0; iBlk < _blkStart.size(); iBlk++) {
+		size_t Nrow;
 		size_t bSz;
 		iBlk + 1 == _blkStart.size() ? bSz = _valueMat->size2 - _blkStart[iBlk] : bSz = _blkStart[iBlk + 1] - _blkStart[iBlk];
 		gsl_matrix_view subExp = gsl_matrix_submatrix(_expandedVM, 0, _blkStart[iBlk], _expandedVM->size1, bSz);
+		
+		_shortLevels[iBlk] == 0 ? Nrow = _valueMat->size1 : Nrow = _shortLevels[iBlk]; // are we dealing with a block with fewer levels?
 		gsl_matrix_view subVal = gsl_matrix_submatrix(_valueMat, 0, _blkStart[iBlk], _valueMat->size1, bSz);
 		
-		for (size_t iEl = 0; iEl < _blkLow.size(); iEl++) {
+		for (size_t iEl = 0; iEl < Nrow; iEl++) {
 			gsl_vector_view svRow = gsl_matrix_row(&subVal.matrix, iEl);
 			for (vector<size_t>::iterator lwIt = _blkLow[iEl][iBlk].begin(); lwIt != _blkLow[iEl][iBlk].end(); ++lwIt) {
 				gsl_matrix_set_row(&subExp.matrix, *lwIt, &svRow.vector);
 			}
+		}
+	}
+}
+
+void MuBlk::_fillIn(){
+	for (size_t iBlk = 0; iBlk < _blkStart.size(); iBlk++) {
+		if (_shortLevels[iBlk] != 0) {
+			size_t bSz;
+			iBlk + 1 == _blkStart.size() ? bSz = _valueMat->size2 - _blkStart[iBlk] : bSz = _blkStart[iBlk + 1] - _blkStart[iBlk];
+			vector<double> mean(bSz, 0.0);
+			for (size_t iRw = 0; iRw < _shortLevels[iBlk]; iRw++) {
+				for (size_t jSubCol = _blkStart[iBlk]; jSubCol < _blkStart[iBlk] + bSz; jSubCol++) {
+					mean[jSubCol - _blkStart[iBlk]] += gsl_matrix_get(_valueMat, iRw, jSubCol);
+				}
+			}
+			for (vector<double>::iterator mnIt = mean.begin(); mnIt != mean.end(); ++mnIt) {
+				*mnIt = (*mnIt)/static_cast<double>(_shortLevels[iBlk]);
+			}
+			for (size_t iRest = _shortLevels[iBlk]; iRest < _valueMat->size1; iRest++) {
+				for (size_t jSR = 0; jSR < mean.size(); jSR++) {
+					gsl_matrix_set(_valueMat, iRest, _blkStart[iBlk] + jSR, mean[jSR]);
+				}
+			}
+
+		}
+	}
+}
+void MuBlk::_fillInUp(){
+	for (size_t iBlk = 0; iBlk < _blkStart.size(); iBlk++) {
+		if (_shortLevels[iBlk] != 0) {
+			size_t bSz;
+			iBlk + 1 == _blkStart.size() ? bSz = _valueMat->size2 - _blkStart[iBlk] : bSz = _blkStart[iBlk + 1] - _blkStart[iBlk];
+			
+			for (size_t iRest = _shortLevels[iBlk]; iRest < _valueMat->size1; iRest++) {
+				vector<double> mean(bSz, 0.0);
+				for (vector<size_t>::iterator grpIt = (*_upLevel)[_upLevel->priorInd(iRest)].begin(); grpIt != (*_upLevel)[_upLevel->priorInd(iRest)].end(); ++grpIt) {
+					if (*grpIt >= _shortLevels[iBlk]) {
+						continue;
+					}
+					else {
+						for (size_t jSubCol = _blkStart[iBlk]; jSubCol < _blkStart[iBlk] + bSz; jSubCol++) {
+							mean[jSubCol - _blkStart[iBlk]] += gsl_matrix_get(_valueMat, *grpIt, jSubCol);
+						}
+					}
+				}
+				
+				for (vector<double>::iterator mnIt = mean.begin(); mnIt != mean.end(); ++mnIt) {
+					(*mnIt) = (*mnIt)/static_cast<double>((*_upLevel)[_upLevel->priorInd(iRest)].size());
+				}
+				for (size_t jSR = 0; jSR < mean.size(); jSR++) {
+					gsl_matrix_set(_valueMat, iRest, _blkStart[iBlk] + jSR, mean[jSR]);
+				}
+			}
+			
 		}
 	}
 }
@@ -10102,12 +10782,14 @@ void MuBlk::update(const Grp &dat, const SigmaI &SigIm){
 	for (vector<MVnorm *>::const_iterator elm = _theta.begin(); elm != _theta.end(); ++elm) {
 		(*elm)->update(dat, SigIm, _rV[0]);
 	}
+	_fillIn();
 	_updateExp();
 }
 void MuBlk::update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm){
 	for (vector<MVnorm *>::const_iterator elm = _theta.begin(); elm != _theta.end(); ++elm) {
 		(*elm)->update(dat, q, SigIm, _rV[0]);
 	}
+	_fillIn();
 	_updateExp();
 }
 
@@ -10116,24 +10798,28 @@ void MuBlk::update(const Grp &dat, const SigmaI &SigIm, const SigmaI &SigIp){
 	for (vector<MVnorm *>::const_iterator elm = _theta.begin(); elm != _theta.end(); ++elm) {
 		(*elm)->update(dat, SigIm, SigIp, _rV[0]);
 	}
+	_fillIn();
 	_updateExp();
 }
 void MuBlk::update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, const SigmaI &SigIp){
 	for (vector<MVnorm *>::const_iterator elm = _theta.begin(); elm != _theta.end(); ++elm) {
 		(*elm)->update(dat, q, SigIm, SigIp, _rV[0]);
 	}
+	_fillIn();
 	_updateExp();
 }
 void MuBlk::update(const Grp &dat, const SigmaI &SigIm, const Qgrp &qPr, const SigmaI &SigIp){
 	for (size_t iTh = 0; iTh < _theta.size(); iTh++) {
 		_theta[iTh]->update(dat, SigIm, qPr[iTh], SigIp, _rV[0]);
 	}
+	_fillIn();
 	_updateExp();
 }
 void MuBlk::update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, const Qgrp &qPr, const SigmaI &SigIp){
 	for (size_t iTh = 0; iTh < _theta.size(); iTh++) {
 		_theta[iTh]->update(dat, q, SigIm, qPr[iTh], SigIp, _rV[0]);
 	}
+	_fillIn();
 	_updateExp();
 }
 
@@ -10142,24 +10828,28 @@ void MuBlk::update(const Grp &dat, const SigmaI &SigIm, const Grp &muPr, const S
 	for (vector<MVnorm *>::const_iterator elm = _theta.begin(); elm != _theta.end(); ++elm) {
 		(*elm)->update(dat, SigIm, muPr, SigIp, _rV[0]);
 	}
+	_upLevel ? _fillInUp() : _fillIn();
 	_updateExp();
 }
 void MuBlk::update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, const Grp &muPr, const SigmaI &SigIp){
 	for (vector<MVnorm *>::const_iterator elm = _theta.begin(); elm != _theta.end(); ++elm) {
 		(*elm)->update(dat, q, SigIm, muPr, SigIp, _rV[0]);
 	}
+	_upLevel ? _fillInUp() : _fillIn();
 	_updateExp();
 }
 void MuBlk::update(const Grp &dat, const SigmaI &SigIm, const Grp &muPr, const Qgrp &qPr, const SigmaI &SigIp){
 	for (size_t iTh = 0; iTh < _theta.size(); iTh++) {
 		_theta[iTh]->update(dat, SigIm, muPr, qPr[iTh], SigIp, _rV[0]);
 	}
+	_upLevel ? _fillInUp() : _fillIn();
 	_updateExp();
 }
 void MuBlk::update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, const Grp &muPr, const Qgrp &qPr, const SigmaI &SigIp){
 	for (size_t iTh = 0; iTh < _theta.size(); iTh++) {
 		_theta[iTh]->update(dat, q, SigIm, muPr, qPr[iTh], SigIp, _rV[0]);
 	}
+	_upLevel ? _fillInUp() : _fillIn();
 	_updateExp();
 }
 
@@ -10171,6 +10861,10 @@ BetaBlk::BetaBlk(const Grp &dat, const string &predFlName, const size_t &Npred, 
 	gsl_vector_int *blkInd = gsl_vector_int_alloc(dat.phenD());
 	
 	FILE *blkFl = fopen(blkIndFileNam.c_str(), "r");
+	if (blkFl == NULL) {
+		cerr << "ERROR: cannot open block index file " << blkIndFileNam << " in BetaBlk" << endl;
+		exit(-1);
+	}
 	gsl_vector_int_fread(blkFl, blkInd);
 	fclose(blkFl);
 	
@@ -10179,7 +10873,7 @@ BetaBlk::BetaBlk(const Grp &dat, const string &predFlName, const size_t &Npred, 
 		gsl_vector_int_add_constant(blkInd, -1); // if the saved array is base-1 (as in R)
 	}
 	else if (minVal != 0) {
-		cerr << "WARNING: block index for MuBlk may not be base-1 or base-0. Making it base-0, but check for errors." << endl;
+		cerr << "WARNING: block index for BetaBlk may not be base-1 or base-0. Making it base-0, but check for errors." << endl;
 		gsl_vector_int_add_constant(blkInd, -1*minVal);
 	}
 	
@@ -10234,6 +10928,10 @@ BetaBlk::BetaBlk(const Grp &dat, const string &predFlName, const size_t &Npred, 
 	_theta.resize(Npred);
 	
 	FILE *prdIn = fopen(predFlName.c_str(), "r");
+	if (prdIn == NULL) {
+		cerr << "ERROR: cannot open predictor file " << predFlName << " in BetaBlk" << endl;
+		exit(-1);
+	}
 	gsl_matrix_fread(prdIn, _Xmat);
 	fclose(prdIn);
 	// I am assuming that the colums of _Xmat are arranged so that the all the different predictors are in a group, then the group is repeated for each phenotype block,
@@ -10271,6 +10969,10 @@ BetaBlk::BetaBlk(const Grp &dat, const string &predFlName, const size_t &Npred, 
 	gsl_vector_int *blkInd = gsl_vector_int_alloc(dat.phenD());
 	
 	FILE *blkFl = fopen(blkIndFileNam.c_str(), "r");
+	if (blkFl == NULL) {
+		cerr << "ERROR: cannot open block index file " << blkIndFileNam << " in BetaBlk" << endl;
+		exit(-1);
+	}
 	gsl_vector_int_fread(blkFl, blkInd);
 	fclose(blkFl);
 	
@@ -10336,6 +11038,10 @@ BetaBlk::BetaBlk(const Grp &dat, const string &predFlName, const size_t &Npred, 
 	_theta.resize(Npred);
 	
 	FILE *prdIn = fopen(predFlName.c_str(), "r");
+	if (prdIn == NULL) {
+		cerr << "ERROR: cannot open predictor file " << predFlName << " in BetaBlk" << endl;
+		exit(-1);
+	}
 	gsl_matrix_fread(prdIn, _Xmat);
 	fclose(prdIn);
 	// I am assuming that the colums of _Xmat are arranged so that the all the different predictors are in a group, then the group is repeated for each phenotype block,
@@ -10372,6 +11078,10 @@ BetaBlk::BetaBlk(const Grp &dat, const string &predFlName, const size_t &Npred, 
 	gsl_vector_int *blkInd = gsl_vector_int_alloc(dat.phenD());
 	
 	FILE *blkFl = fopen(blkIndFileNam.c_str(), "r");
+	if (blkFl == NULL) {
+		cerr << "ERROR: cannot open block index file " << blkIndFileNam << " in BetaBlk" << endl;
+		exit(-1);
+	}
 	gsl_vector_int_fread(blkFl, blkInd);
 	fclose(blkFl);
 	
@@ -10436,6 +11146,10 @@ BetaBlk::BetaBlk(const Grp &dat, const string &predFlName, const size_t &Npred, 
 	_theta.resize(Npred);
 	
 	FILE *prdIn = fopen(predFlName.c_str(), "r");
+	if (prdIn == NULL) {
+		cerr << "ERROR: cannot open predictor file " << predFlName << " in BetaBlk" << endl;
+		exit(-1);
+	}
 	gsl_matrix_fread(prdIn, _Xmat);
 	fclose(prdIn);
 	// I am assuming that the colums of _Xmat are arranged so that the all the different predictors are in a group, then the group is repeated for each phenotype block,
@@ -10472,6 +11186,10 @@ BetaBlk::BetaBlk(const Grp &dat, const string &predFlName, const size_t &Npred, 
 	gsl_vector_int *blkInd = gsl_vector_int_alloc(dat.phenD());
 	
 	FILE *blkFl = fopen(blkIndFileNam.c_str(), "r");
+	if (blkFl == NULL) {
+		cerr << "ERROR: cannot open block index file " << blkIndFileNam << " in BetaBlk" << endl;
+		exit(-1);
+	}
 	gsl_vector_int_fread(blkFl, blkInd);
 	fclose(blkFl);
 	
@@ -10538,6 +11256,10 @@ BetaBlk::BetaBlk(const Grp &dat, const string &predFlName, const size_t &Npred, 
 	_theta.resize(Npred);
 	
 	FILE *prdIn = fopen(predFlName.c_str(), "r");
+	if (prdIn == NULL) {
+		cerr << "ERROR: cannot open predictor file " << predFlName << " in BetaBlk" << endl;
+		exit(-1);
+	}
 	gsl_matrix_fread(prdIn, _Xmat);
 	fclose(prdIn);
 	// I am assuming that the colums of _Xmat are arranged so that all the different predictors are in a group, then the group is repeated for each phenotype block,
@@ -10575,6 +11297,10 @@ BetaBlk::BetaBlk(const Grp &dat, const string &predFlName, const size_t &Npred, 
 	gsl_vector_int *blkInd = gsl_vector_int_alloc(dat.phenD());
 	
 	FILE *blkFl = fopen(blkIndFileNam.c_str(), "r");
+	if (blkFl == NULL) {
+		cerr << "ERROR: cannot open block index file " << blkIndFileNam << " in BetaBlk" << endl;
+		exit(-1);
+	}
 	gsl_vector_int_fread(blkFl, blkInd);
 	fclose(blkFl);
 	
@@ -10638,6 +11364,10 @@ BetaBlk::BetaBlk(const Grp &dat, const string &predFlName, const size_t &Npred, 
 	_theta.resize(Npred);
 	
 	FILE *prdIn = fopen(predFlName.c_str(), "r");
+	if (prdIn == NULL) {
+		cerr << "ERROR: cannot open predictor file " << predFlName << " in BetaBlk" << endl;
+		exit(-1);
+	}
 	gsl_matrix_fread(prdIn, _Xmat);
 	fclose(prdIn);
 	// I am assuming that the colums of _Xmat are arranged so that the all the different predictors are in a group, then the group is repeated for each phenotype block,
@@ -10674,6 +11404,10 @@ BetaBlk::BetaBlk(const Grp &dat, const string &predFlName, const size_t &Npred, 
 	gsl_vector_int *blkInd = gsl_vector_int_alloc(dat.phenD());
 	
 	FILE *blkFl = fopen(blkIndFileNam.c_str(), "r");
+	if (blkFl == NULL) {
+		cerr << "ERROR: cannot open block index file " << blkIndFileNam << " in BetaBlk" << endl;
+		exit(-1);
+	}
 	gsl_vector_int_fread(blkFl, blkInd);
 	fclose(blkFl);
 	
@@ -10739,6 +11473,10 @@ BetaBlk::BetaBlk(const Grp &dat, const string &predFlName, const size_t &Npred, 
 	_theta.resize(Npred);
 	
 	FILE *prdIn = fopen(predFlName.c_str(), "r");
+	if (blkFl == NULL) {
+		cerr << "ERROR: cannot open predictor file " << predFlName << " in BetaBlk" << endl;
+		exit(-1);
+	}
 	gsl_matrix_fread(prdIn, _Xmat);
 	fclose(prdIn);
 	// I am assuming that the colums of _Xmat are arranged so that the all the different predictors are in a group, then the group is repeated for each phenotype block,
@@ -10775,6 +11513,10 @@ BetaBlk::BetaBlk(const Grp &dat, const string &predFlName, const size_t &Npred, 
 	gsl_vector_int *blkInd = gsl_vector_int_alloc(dat.phenD());
 	
 	FILE *blkFl = fopen(blkIndFileNam.c_str(), "r");
+	if (blkFl == NULL) {
+		cerr << "ERROR: cannot open block index file " << blkIndFileNam << " in BetaBlk" << endl;
+		exit(-1);
+	}
 	gsl_vector_int_fread(blkFl, blkInd);
 	fclose(blkFl);
 	
@@ -10839,6 +11581,10 @@ BetaBlk::BetaBlk(const Grp &dat, const string &predFlName, const size_t &Npred, 
 	_theta.resize(Npred);
 	
 	FILE *prdIn = fopen(predFlName.c_str(), "r");
+	if (prdIn == NULL) {
+		cerr << "ERROR: cannot open predictor file " << predFlName << " in BetaBlk" << endl;
+		exit(-1);
+	}
 	gsl_matrix_fread(prdIn, _Xmat);
 	fclose(prdIn);
 	// I am assuming that the colums of _Xmat are arranged so that the all the different predictors are in a group, then the group is repeated for each phenotype block,
@@ -10875,6 +11621,10 @@ BetaBlk::BetaBlk(const Grp &dat, const string &predFlName, const size_t &Npred, 
 	gsl_vector_int *blkInd = gsl_vector_int_alloc(dat.phenD());
 	
 	FILE *blkFl = fopen(blkIndFileNam.c_str(), "r");
+	if (blkFl == NULL) {
+		cerr << "ERROR: cannot open block index file " << blkIndFileNam << " in BetaBlk" << endl;
+		exit(-1);
+	}
 	gsl_vector_int_fread(blkFl, blkInd);
 	fclose(blkFl);
 	
@@ -10942,6 +11692,10 @@ BetaBlk::BetaBlk(const Grp &dat, const string &predFlName, const size_t &Npred, 
 	_theta.resize(Npred);
 	
 	FILE *prdIn = fopen(predFlName.c_str(), "r");
+	if (prdIn == NULL) {
+		cerr << "ERROR: cannot open block index file " << predFlName << " in BetaBlk" << endl;
+		exit(-1);
+	}
 	gsl_matrix_fread(prdIn, _Xmat);
 	fclose(prdIn);
 	// I am assuming that the colums of _Xmat are arranged so that the all the different predictors are in a group, then the group is repeated for each phenotype block,
@@ -11096,18 +11850,20 @@ SigmaI::SigmaI(const gsl_matrix *S, const size_t d, const size_t &df, const doub
 	_r = gsl_rng_alloc(T);
 	gsl_rng_set(_r, time(NULL)+rdtsc());
 
+	_LamSc = gsl_matrix_alloc(_d, _d);
+	gsl_matrix_set_identity(_LamSc);
+	gsl_vector_view Ldiag  = gsl_matrix_diagonal(_LamSc);
+	gsl_vector_scale(&Ldiag.vector, diagPr*nu0);
+	
 	_mat = gsl_matrix_alloc(_d, _d);
 	gsl_matrix *tmp = gsl_matrix_alloc(d, d);
 	gsl_matrix_memcpy(tmp, S);
+	gsl_matrix_add(tmp, _LamSc);
 	gsl_linalg_cholesky_decomp(tmp);
 	gsl_linalg_cholesky_invert(tmp);
 	gsl_linalg_cholesky_decomp(tmp);
 	Wishart(tmp, df, _r, _mat);
 	gsl_matrix_free(tmp);
-	_LamSc = gsl_matrix_alloc(_d, _d);
-	gsl_matrix_set_identity(_LamSc);
-	gsl_vector_view Ldiag  = gsl_matrix_diagonal(_LamSc);
-	gsl_vector_scale(&Ldiag.vector, diagPr*nu0);
 }
 
 SigmaI::SigmaI(const gsl_matrix *S, const size_t d, const size_t &df, const gsl_matrix *LamPr, const double &nu0) : _d(d), _n0(nu0), _srDet(-1.0), _outFlNam("SigIout.gbin") {	//	the constructor for initialization
@@ -11117,17 +11873,19 @@ SigmaI::SigmaI(const gsl_matrix *S, const size_t d, const size_t &df, const gsl_
 	_r = gsl_rng_alloc(T);
 	gsl_rng_set(_r, time(NULL)+rdtsc());
 
+	_LamSc = gsl_matrix_alloc(_d, _d);
+	gsl_matrix_memcpy(_LamSc, LamPr);
+	gsl_matrix_scale(_LamSc, _n0);
+	
 	_mat = gsl_matrix_alloc(_d, _d);
 	gsl_matrix *tmp = gsl_matrix_alloc(d, d);
 	gsl_matrix_memcpy(tmp, S);
+	gsl_matrix_add(tmp, _LamSc);
 	gsl_linalg_cholesky_decomp(tmp);
 	gsl_linalg_cholesky_invert(tmp);
 	gsl_linalg_cholesky_decomp(tmp);
 	Wishart(tmp, df, _r, _mat);
 	gsl_matrix_free(tmp);
-	_LamSc = gsl_matrix_alloc(_d, _d);
-	gsl_matrix_memcpy(_LamSc, LamPr);
-	gsl_matrix_scale(_LamSc, _n0);
 }
 
 
@@ -11147,8 +11905,12 @@ SigmaI::SigmaI(const Grp &dat, const double &prDiag, const double &nu0) : _d(dat
 	
 	gsl_matrix *S = gsl_matrix_alloc(_d, _d);
 	
-	gsl_blas_dsyrk(CblasLower, CblasTrans, 1.0, dat.dMat(), 0.0, S);
+	gsl_matrix *tmp = gsl_matrix_alloc(dat.dMat()->size1, dat.dMat()->size2);
+	colCenter(dat.dMat(), tmp);
+	gsl_blas_dsyrk(CblasLower, CblasTrans, 1.0, tmp, 0.0, S);
+	gsl_matrix_free(tmp);
 	
+	gsl_matrix_add(S, _LamSc);
 	gsl_linalg_cholesky_decomp(S);
 	gsl_linalg_cholesky_invert(S);
 	gsl_linalg_cholesky_decomp(S);
@@ -11172,8 +11934,12 @@ SigmaI::SigmaI(const Grp &dat, const string &outFlNam, const double &prDiag, con
 	
 	gsl_matrix *S = gsl_matrix_alloc(_d, _d);
 	
-	gsl_blas_dsyrk(CblasLower, CblasTrans, 1.0, dat.dMat(), 0.0, S);
+	gsl_matrix *tmp = gsl_matrix_alloc(dat.dMat()->size1, dat.dMat()->size2);
+	colCenter(dat.dMat(), tmp);
+	gsl_blas_dsyrk(CblasLower, CblasTrans, 1.0, tmp, 0.0, S);
+	gsl_matrix_free(tmp);
 	
+	gsl_matrix_add(S, _LamSc);
 	gsl_linalg_cholesky_decomp(S);
 	gsl_linalg_cholesky_invert(S);
 	gsl_linalg_cholesky_decomp(S);
@@ -11412,6 +12178,10 @@ SigmaIblk::SigmaIblk(const size_t &d, const double &invVar, const double &df, co
 	gsl_vector_int *blkInd = gsl_vector_int_alloc(_d);
 	
 	FILE *blkFl = fopen(blkIndFileNam.c_str(), "r");
+	if (blkFl == NULL) {
+		cerr << "ERROR: cannot open block index file " << blkIndFileNam << " in SigmaIblk" << endl;
+		exit(-1);
+	}
 	gsl_vector_int_fread(blkFl, blkInd);
 	fclose(blkFl);
 	
@@ -11454,6 +12224,10 @@ SigmaIblk::SigmaIblk(const size_t &d, const double &invVar, const double &df, co
 	gsl_vector_int *blkInd = gsl_vector_int_alloc(_d);
 	
 	FILE *blkFl = fopen(blkIndFileNam.c_str(), "r");
+	if (blkFl == NULL) {
+		cerr << "ERROR: cannot open block index file " << blkIndFileNam << " in SigmaIblk" << endl;
+		exit(-1);
+	}
 	gsl_vector_int_fread(blkFl, blkInd);
 	fclose(blkFl);
 	
@@ -11509,6 +12283,10 @@ SigmaIblk::SigmaIblk(const Grp &dat, const string &blkIndFileNam, const double &
 	gsl_vector_int *blkInd = gsl_vector_int_alloc(_d);
 	
 	FILE *blkFl = fopen(blkIndFileNam.c_str(), "r");
+	if (blkFl == NULL) {
+		cerr << "ERROR: cannot open block index file " << blkIndFileNam << " in SigmaIblk" << endl;
+		exit(-1);
+	}
 	gsl_vector_int_fread(blkFl, blkInd);
 	fclose(blkFl);
 	
@@ -11585,6 +12363,10 @@ SigmaIblk::SigmaIblk(const Grp &dat, const string &blkIndFileNam, const string &
 	remove(_outFlNam.c_str());
 	
 	FILE *blkFl = fopen(blkIndFileNam.c_str(), "r");
+	if (blkFl == NULL) {
+		cerr << "ERROR: cannot open block index file " << blkIndFileNam << " in SigmaIblk" << endl;
+		exit(-1);
+	}
 	gsl_vector_int_fread(blkFl, blkInd);
 	fclose(blkFl);
 	
@@ -11865,6 +12647,10 @@ Qgrp::Qgrp(const size_t &N, const double &nu, const string &misVecFlNam) : _nu(n
 	gsl_vector_int *missInd = gsl_vector_int_alloc(N);
 	
 	FILE *indIn = fopen(misVecFlNam.c_str(), "r");
+	if (indIn == NULL) {
+		cerr << "ERROR: cannot open missing value index file " << misVecFlNam << " in Qgrp" << endl;
+		exit(-1);
+	}
 	gsl_vector_int_fread(indIn, missInd);
 	fclose(indIn);
 	

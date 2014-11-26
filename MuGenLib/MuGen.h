@@ -31,8 +31,10 @@
 #include <gsl/gsl_permutation.h>
 #include <vector>
 #include <string>
+#include <list>
 
 using std::vector;
+using std::list;
 using std::string;
 
 class MVnorm;
@@ -55,9 +57,13 @@ class MuGrp;
 class MuGrpPEX;
 class BetaGrpPEX;
 class MuGrpMiss;
+class MuGrpEE;
+class MuGrpEEmiss;
 class BetaGrpSnp;
+class BetaGrpSnpCV;
 class BetaGrpPSR;
 class BetaGrpSnpMiss;
+class BetaGrpSnpMissCV;
 class BetaGrpPSRmiss;
 class BetaGrpFt;
 class BetaGrpSc;
@@ -1462,10 +1468,9 @@ public:
 /** @} */
 // end of lineLoc group
 
-/*
- *	random index class that allows for mixture models.  Can be used as a deterministic index if there is deterministic initiation and no updating
+/** \brief Random index class that allows for mixture models.
+ *	Can be used as a deterministic index if there is deterministic initiation and no updating
  */
-
 class RanIndex {
 protected:
 	vector< vector<size_t> > _idx; // rugged 2D array that relates the upper-level elements to the indexes of the lower levels
@@ -1734,6 +1739,7 @@ protected:
 	vector<size_t> _misInd;
 	
 public:
+	MuGrpMiss() : MuGrp() {};
 	MuGrpMiss(const string &datFlNam, const string &misMatFlNam, const string &misVecFlNam, RanIndex &up, const size_t &d);
 	
 	~MuGrpMiss() {};
@@ -1742,11 +1748,61 @@ public:
 	MuGrpMiss & operator=(const MuGrpMiss &mG);
 	
 	// only Gaussian updates work for imputation (in general)
-	void update(const Grp &mu, const SigmaI &SigIm);
-	void update(const Grp &mu, const SigmaI &SigIm, const SigmaI &SigIp);
+	virtual void update(const Grp &mu, const SigmaI &SigIm);
+	virtual void update(const Grp &mu, const SigmaI &SigIm, const SigmaI &SigIp);
 	
 	size_t nMis() const{return _misInd.size();};
 	size_t nMis(){return _misInd.size();};
+};
+
+/** \brief Data with measurement error
+ *
+ */
+
+class MuGrpEE : public MuGrp {
+protected:
+	gsl_matrix *_errorVar;
+	vector<size_t> _errInd; // each row is the same
+	
+public:
+	MuGrpEE() : MuGrp() {_errorVar = gsl_matrix_alloc(1, 1); };
+	MuGrpEE(const string &datFlNam, const string &varFlNam, const string &indFlNam, RanIndex &up, const size_t &d);
+	MuGrpEE(const string &datFlNam, const string &varFlNam, const vector<size_t> &varInd, RanIndex &up, const size_t &d);
+	
+	~MuGrpEE() {gsl_matrix_free(_errorVar); };
+	
+	MuGrpEE(const MuGrpEE &mG); // copy constructor
+	MuGrpEE & operator=(const MuGrpEE &mG);
+	
+	// all of these are actually priors
+	virtual void update(const Grp &muPr, const SigmaI &SigIm);
+	virtual void update(const Grp &muPr, const Qgrp &q, const SigmaI &SigIm);
+	
+};
+
+/** \brief Data with measurement error and missing phenotypes
+ *
+ */
+
+class MuGrpEEmiss : public MuGrpMiss {
+protected:
+	gsl_matrix *_errorVar;
+	vector< list<size_t> > _missErrMat;
+	
+public:
+	MuGrpEEmiss() : MuGrpMiss() {};
+	MuGrpEEmiss(const string &datFlNam, const string &varFlNam, const string &indFlNam, const string &misMatFlNam, const string &misVecFlNam, RanIndex &up, const size_t &d);
+	MuGrpEEmiss(const string &datFlNam, const string &varFlNam, const vector<size_t> &varInd, const string &misMatFlNam, const string &misVecFlNam, RanIndex &up, const size_t &d);
+	
+	~MuGrpEEmiss() {gsl_matrix_free(_errorVar); };
+	
+	MuGrpEEmiss(const MuGrpEEmiss &mG); // copy constructor
+	MuGrpEEmiss & operator=(const MuGrpEEmiss &mG);
+	
+	// all of these are actually priors
+	void update(const Grp &muPr, const SigmaI &SigIm);
+	void update(const Grp &muPr, const Qgrp &q, const SigmaI &SigIm);
+	
 };
 
 class BetaGrpFt : public Grp {
@@ -2086,15 +2142,23 @@ public:
 	void update(const Grp &dat, const SigmaI &SigIm, const SigmaI &SigIp);
 };
 
+/** \brief Independent blocks of traits
+ *
+ */
 class MuBlk : public MuGrp {
 protected:
 	vector< size_t > _blkStart;                  // vector of indexes into beginnings of each block
-	vector< vector< vector<size_t> > > _blkLow;  // lowLevel indexes, separate for each block
-	gsl_matrix *_expandedVM;                     // the _valuMat exapnded according to _blkLow
+	vector< vector< vector<size_t> > > _blkLow;  // lowLevel indexes, separate for each block, not necessarily the same number of levels
+	gsl_matrix *_expandedVM;                     // the _valuMat expanded according to _blkLow
+	vector<size_t> _shortLevels;                 // for cases where the number of levels of low differ among blocks, store here index of the first element past the available one
 	
 	void _updateExp();
+	void _fillIn();
+	void _fillInUp();
+	
 public:
 	MuBlk() : MuGrp() {};
+	// Nval is the number of rows in _valueMat; if there are diffent numbers of levels of the low factor in each block, it's the maximum number
 	MuBlk(const Grp &dat, const string &lowIndFlName, const size_t &Nval, RanIndex &up, const string &blkIndFileNam);
 	MuBlk(const Grp &dat, const string &lowIndFlName, const size_t &Nval, RanIndex &up, const string &outFlNam, const string &blkIndFileNam);
 	
