@@ -1280,27 +1280,151 @@ public:
 	 *
 	 */
 	MVnormBeta(gsl_vector *b, const gsl_vector *sd, gsl_matrix *pred, const size_t &iCl, const gsl_rng *r);
+	/** \brief Univariate random constructor with vector and pointer to prior
+	 *
+	 * Sets up _vec to point to the provided vector of values, the predictor to a column in the provided matrix of predictors, and the pointer to the corresponding row in the prior matrix.
+	 *
+	 * \param[in] gsl_vector* vector of values
+	 * \param[in] gsl_vector* vector of standard deviations
+	 * \param[in] gsl_matrix* matrix of predictors
+	 * \param[in] size_t& column index for the predictor matrix
+	 * \param[in] gsl_rng* pointer to a PNG
+	 * \param[in] size_t& index of the appropriate row in the prior matrix
+	 *
+	 */
 	MVnormBeta(gsl_vector *b, const gsl_vector *sd, gsl_matrix *pred, const size_t &iCl, const gsl_rng *r, const size_t &up);
 	
+	/** \brief Multivariate random constructor with vector
+	 *
+	 * Sets up _vec to point to the provided vector of values, and the predictor to a column in the provided matrix of predictors.
+	 *
+	 * \param[in] gsl_vector* vector of values
+	 * \param[in] gsl_matrix* covariance matrix
+	 * \param[in] gsl_matrix* matrix of predictors
+	 * \param[in] size_t& column index for the predictor matrix
+	 * \param[in] gsl_rng* pointer to a PNG
+	 *
+	 */
 	MVnormBeta(gsl_vector *b, const gsl_matrix *Sig, gsl_matrix *pred, const size_t &iCl, const gsl_rng *r);
+	/** \brief Multivariate random constructor with vector and pointer to prior
+	 *
+	 * Sets up _vec to point to the provided vector of values, the predictor to a column in the provided matrix of predictors, and the pointer to the corresponding row in the prior matrix.
+	 *
+	 * \param[in] gsl_vector* vector of values
+	 * \param[in] gsl_matrix* covariance matrix
+	 * \param[in] gsl_matrix* matrix of predictors
+	 * \param[in] size_t& column index for the predictor matrix
+	 * \param[in] gsl_rng* pointer to a PNG
+	 * \param[in] size_t& index of the appropriate row in the prior matrix
+	 *
+	 */
 	MVnormBeta(gsl_vector *b, const gsl_matrix *Sig, gsl_matrix *pred, const size_t &iCl, const gsl_rng *r, const size_t &up);
 	
+	/** \brief Multivariate constructor with response matrix
+	 *
+	 * Sets up _vec to point to a row in the provided matrix of regression coefficients, and the predictor to a column of the matrix of predictors.  Initializes regression coefficients using the provided response matrix.
+	 *
+	 * \param[in] gsl_matrix* response matrix
+	 * \param[in] gsl_matrix* predictor martix
+	 * \param[in] size_t& column index of the predictor matrix
+	 * \param[in] gsl_matrix* covariance matrix
+	 * \param[in] gsl_rng* pointer to a PNG
+	 * \param[in] gsl_matrix* matrix of regression coefficients
+	 * \param[in] size_t& row index of the regression coefficient matrix
+	 *
+	 */
 	MVnormBeta(const gsl_matrix *resp, gsl_matrix *pred, const size_t &iCl, const gsl_matrix *Sig, const gsl_rng *r, gsl_matrix *bet, const size_t &iRw);
+	/** \brief Multivariate constructor with response matrix and index for a prior
+	 *
+	 * Sets up _vec to point to a row in the provided matrix of regression coefficients, and the predictor to a column of the matrix of predictors.  Initializes regression coefficients using the provided response matrix.  
+	 * Initializes _upLevel to point to the appropriate row in the matrix of priors.
+	 *
+	 * \param[in] gsl_matrix* response matrix
+	 * \param[in] gsl_matrix* predictor martix
+	 * \param[in] size_t& column index of the predictor matrix
+	 * \param[in] gsl_matrix* covariance matrix
+	 * \param[in] gsl_rng* pointer to a PNG
+	 * \param[in] size_t& row index of the prior matrix
+	 * \param[in] gsl_matrix* matrix of regression coefficients
+	 * \param[in] size_t& row index of the regression coefficient matrix
+	 *
+	 */
 	MVnormBeta(const gsl_matrix *resp, gsl_matrix *pred, const size_t &iCl, const gsl_matrix *Sig, const gsl_rng *r, const size_t &up, gsl_matrix *bet, const size_t &iRw);
 	
+	/** \brief Multivariate constructor with a Grp type response
+	 *
+	 * Sets up _vec to point to a row in the provided matrix of regression coefficients, and the predictor to a column of the matrix of predictors.  Initializes regression coefficients using the provided response matrix.
+	 *
+	 * \param[in] Grp& response
+	 * \param[in] gsl_matrix* predictor martix
+	 * \param[in] size_t& column index of the predictor matrix
+	 * \param[in] gsl_matrix* covariance matrix
+	 * \param[in] gsl_rng* pointer to a PNG
+	 * \param[in] gsl_matrix* matrix of regression coefficients
+	 * \param[in] size_t& row index of the regression coefficient matrix
+	 *
+	 */
 	MVnormBeta(const Grp &resp, gsl_matrix *pred, const size_t &iCl, const gsl_matrix *Sig, const gsl_rng *r, gsl_matrix *bet, const size_t &iRw);
+	/** \brief Multivariate constructor with a Grp type response and index for a prior
+	 *
+	 * Sets up _vec to point to a row in the provided matrix of regression coefficients, and the predictor to a column of the matrix of predictors.  Initializes regression coefficients using the provided response matrix.
+	 * Initializes _upLevel to point to the appropriate row in the matrix of priors.
+	 *
+	 * \param[in] Grp& response
+	 * \param[in] gsl_matrix* predictor martix
+	 * \param[in] size_t& column index of the predictor matrix
+	 * \param[in] gsl_matrix* covariance matrix
+	 * \param[in] gsl_rng* pointer to a PNG
+	 * \param[in] size_t& row index of the prior matrix
+	 * \param[in] gsl_matrix* matrix of regression coefficients
+	 * \param[in] size_t& row index of the regression coefficient matrix
+	 *
+	 */
 	MVnormBeta(const Grp &resp, gsl_matrix *pred, const size_t &iCl, const gsl_matrix *Sig, const gsl_rng *r, const size_t &up, gsl_matrix *bet, const size_t &iRw);
 	
-	MVnormBeta(gsl_matrix *pred, const size_t &iCl, gsl_matrix *bet, const size_t &iRw); // deterministic constructor that just points to whatever is already in *bet
-	MVnormBeta(gsl_matrix *pred, const size_t &iCl, const size_t &up, gsl_matrix *bet, const size_t &iRw);  // deterministic constructor that just points to whatever is already in *bet
+	/** \brief Deterministic constructor
+	 *
+	 * Does not initialize the regression coefficients, but simply points to the already-initialized matrix of values.
+	 *
+	 * \param[in] gsl_matrix* predictor matrix
+	 * \param[in] size_t& column index of the predictor matrix
+	 * \param[in] gsl_matrix* regression coefficient matrix
+	 * \param[in] size_t& row index of the regression coefficient matrix
+	 *
+	 */
+	MVnormBeta(gsl_matrix *pred, const size_t &iCl, gsl_matrix *bet, const size_t &iRw);
+	/** \brief Deterministic constructor with prior index
+	 *
+	 * Does not initialize the regression coefficients, but simply points to the already-initialized matrix of values.
+	 * Sets the _upLevel to point to the corresponding row of the prior matrix
+	 *
+	 * \param[in] gsl_matrix* predictor matrix
+	 * \param[in] size_t& column index of the predictor matrix
+	 * \param[in] size_t& row index of the prior matrix
+	 * \param[in] gsl_matrix* regression coefficient matrix
+	 * \param[in] size_t& row index of the regression coefficient matrix
+	 *
+	 */
+	MVnormBeta(gsl_matrix *pred, const size_t &iCl, const size_t &up, gsl_matrix *bet, const size_t &iRw);
 	
-	MVnormBeta(const MVnormBeta &); // copy constructor
+	/** \brief Deterministic copy constructor
+	 *
+	 * \param[in] MVnormBeta& object to be copied
+	 *
+	 */
+	MVnormBeta(const MVnormBeta &);
+	/** \brief Deterministic assignement operator
+	 *
+	 * \param[in] MVnormBeta& object to be assigned
+	 *
+	 * \return A reference to a MVnormBeta object
+	 *
+	 */
 	MVnormBeta & operator=(const MVnormBeta &);
 	
+	/** \brief Destructor */
 	virtual ~MVnormBeta(); 	// destructor
 	
-	// legacy C/GSL methods
-	void update(const gsl_matrix *resp, const SigmaI &SigIb, const gsl_rng *r);
 	// improper prior methods
 	virtual void update(const Grp &dat, const SigmaI &SigIb, const gsl_rng *r);
 	virtual void update(const Grp &dat, const Qgrp &q, const SigmaI &SigIb, const gsl_rng *r);
@@ -1319,33 +1443,273 @@ public:
 	double scalePar() const {return _scale; };
 };
 
+/** \brief Regression with multiple predictors
+ *
+ * Full implementation of a multiple regression using one-at-a-time updating. Updates regression coefficients for the current predictor, while accounting for the effects of other predictors
+ *
+ */
 class MVnormBetaFt: public MVnormBeta {
 protected:
+	/** \brief Matrix of already fitted values
+	 *
+	 * \f$ \boldsymbol{XB} \f$ matrix for all predictors but the current one (i.e., \f$ \boldsymbol{X}_{\cdot -j}\boldsymbol{B}_{-j\cdot} \f$).  It is subtracted from the response and the regression is performed on the residual.
+	 *
+	 */
 	gsl_matrix_view _fitted;
 	
 public:
-	
+	/** \brief Default constructor */
 	MVnormBetaFt(): MVnormBeta() {};
-	MVnormBetaFt(gsl_vector *b, const gsl_vector *sd, gsl_matrix *pred, const size_t &iCl, gsl_matrix *allFt, const size_t &begRw, const gsl_rng *r) : MVnormBeta(b, sd, pred, iCl, r) {_fitted = gsl_matrix_submatrix(allFt, begRw, 0, pred->size1, _d); };
-	MVnormBetaFt(gsl_vector *b, const gsl_matrix *Sig, gsl_matrix *pred, const size_t &iCl, gsl_matrix *allFt, const size_t &begRw, const gsl_rng *r) : MVnormBeta(b, Sig, pred, iCl, r) {_fitted = gsl_matrix_submatrix(allFt, begRw, 0, pred->size1, _d); };
-	MVnormBetaFt(const gsl_matrix *resp, gsl_matrix *pred, const size_t &iCl, gsl_matrix *allFt, const size_t &begRw, const gsl_matrix *Sig, const gsl_rng *r, gsl_matrix *bet, const size_t &iRw) : MVnormBeta(resp, pred, iCl, Sig, r, bet, iRw) {_fitted = gsl_matrix_submatrix(allFt, begRw, 0, pred->size1, _d); };
-	MVnormBetaFt(const gsl_matrix *resp, gsl_matrix *pred, const size_t &iCl, vector<double> &eaFt, const gsl_matrix *Sig, const gsl_rng *r, gsl_matrix *bet, const size_t &iRw) : MVnormBeta(resp, pred, iCl, Sig, r, bet, iRw) {_fitted = gsl_matrix_view_array(eaFt.data(), pred->size1, _d); };
-	MVnormBetaFt(const Grp &resp, gsl_matrix *pred, const size_t &iCl, gsl_matrix *allFt, const size_t &begRw, const gsl_matrix *Sig, const gsl_rng *r, gsl_matrix *bet, const size_t &iRw) : MVnormBeta(resp, pred, iCl, Sig, r, bet, iRw) {_fitted = gsl_matrix_submatrix(allFt, begRw, 0, pred->size1, _d); }; // deprecated
-	MVnormBetaFt(const Grp &resp, gsl_matrix *pred, const size_t &iCl, vector<double> &eaFt, const gsl_matrix *Sig, const gsl_rng *r, gsl_matrix *bet, const size_t &iRw) : MVnormBeta(resp, pred, iCl, Sig, r, bet, iRw) {_fitted = gsl_matrix_view_array(eaFt.data(), pred->size1, _d); };
-	MVnormBetaFt(gsl_matrix *pred, const size_t &iCl, vector<double> &eaFt, gsl_matrix *bet, const size_t &iRw) : MVnormBeta(pred, iCl, bet, iRw) {_fitted = gsl_matrix_view_array(eaFt.data(), pred->size1, _d); };
 	
+	/** \brief Univariate random constructor with vector
+	 *
+	 * Sets up _vec to point to the provided vector of values, and the predictor to a column in the provided matrix of predictors.  
+	 * The _fitted member points to the indicated submatrix of a matrix that contains all the partial fitted matrices.
+	 *
+	 * \param[in] gsl_vector* vector of values
+	 * \param[in] gsl_vector* vector of standard deviations
+	 * \param[in] gsl_matrix* matrix of predictors
+	 * \param[in] size_t& column index for the predictor matrix
+	 * \param[in] gsl_matrix* matrix with all the partial fitted matrices stacked
+	 * \param[in] size_t& index of the row where the relevant fitted matrix begins
+	 * \param[in] gsl_rng* pointer to a PNG
+	 *
+	 */
+	MVnormBetaFt(gsl_vector *b, const gsl_vector *sd, gsl_matrix *pred, const size_t &iCl, gsl_matrix *allFt, const size_t &begRw, const gsl_rng *r) : MVnormBeta(b, sd, pred, iCl, r) {_fitted = gsl_matrix_submatrix(allFt, begRw, 0, pred->size1, _d); };
+	/** \brief Univariate random constructor with vector and prior index
+	 *
+	 * Sets up _vec to point to the provided vector of values, and the predictor to a column in the provided matrix of predictors.
+	 * The _fitted member points to the indicated submatrix of a matrix that contains all the partial fitted matrices. The _upLevel member is set to point to a row in the prior matrix.
+	 *
+	 * \param[in] gsl_vector* vector of values
+	 * \param[in] gsl_vector* vector of standard deviations
+	 * \param[in] gsl_matrix* matrix of predictors
+	 * \param[in] size_t& column index for the predictor matrix
+	 * \param[in] gsl_matrix* matrix with all the partial fitted matrices stacked
+	 * \param[in] size_t& index of the row where the relevant fitted matrix begins
+	 * \param[in] gsl_rng* pointer to a PNG
+	 * \param[in] size_t& row index of the prior matrix
+	 *
+	 */
 	MVnormBetaFt(gsl_vector *b, const gsl_vector *sd, gsl_matrix *pred, const size_t &iCl, gsl_matrix *allFt, const size_t &begRw, const gsl_rng *r, const size_t &up) : MVnormBeta(b, sd, pred, iCl, r, up) {_fitted = gsl_matrix_submatrix(allFt, begRw, 0, pred->size1, _d); };
+	
+	/** \brief Multivariate random constructor with vector
+	 *
+	 * Sets up _vec to point to the provided vector of values, and the predictor to a column in the provided matrix of predictors.
+	 * The _fitted member points to the indicated submatrix of a matrix that contains all the partial fitted matrices.
+	 *
+	 * \param[in] gsl_vector* vector of values
+	 * \param[in] gsl_matrix* covariance matrix
+	 * \param[in] gsl_matrix* matrix of predictors
+	 * \param[in] size_t& column index for the predictor matrix
+	 * \param[in] gsl_matrix* matrix with all the partial fitted matrices stacked
+	 * \param[in] size_t& index of the row where the relevant fitted matrix begins
+	 * \param[in] gsl_rng* pointer to a PNG
+	 *
+	 */
+	MVnormBetaFt(gsl_vector *b, const gsl_matrix *Sig, gsl_matrix *pred, const size_t &iCl, gsl_matrix *allFt, const size_t &begRw, const gsl_rng *r) : MVnormBeta(b, Sig, pred, iCl, r) {_fitted = gsl_matrix_submatrix(allFt, begRw, 0, pred->size1, _d); };
+	/** \brief Multivariate random constructor with vector and prior index
+	 *
+	 * Sets up _vec to point to the provided vector of values, and the predictor to a column in the provided matrix of predictors.
+	 * The _fitted member points to the indicated submatrix of a matrix that contains all the partial fitted matrices. The _upLevel member is set to point to a row in the prior matrix.
+	 *
+	 * \param[in] gsl_vector* vector of values
+	 * \param[in] gsl_matrix* covariance matrix
+	 * \param[in] gsl_matrix* matrix of predictors
+	 * \param[in] size_t& column index for the predictor matrix
+	 * \param[in] gsl_matrix* matrix with all the partial fitted matrices stacked
+	 * \param[in] size_t& index of the row where the relevant fitted matrix begins
+	 * \param[in] gsl_rng* pointer to a PNG
+	 * \param[in] size_t& row index of the prior matrix
+	 *
+	 */
 	MVnormBetaFt(gsl_vector *b, const gsl_matrix *Sig, gsl_matrix *pred, const size_t &iCl, gsl_matrix *allFt, const size_t &begRw, const gsl_rng *r, const size_t &up) : MVnormBeta(b, Sig, pred, iCl, r, up) {_fitted = gsl_matrix_submatrix(allFt, begRw, 0, pred->size1, _d); };
+	
+	/** \brief Multivariate random constructor with response matrix
+	 *
+	 * Sets up _vec to point to the provided vector of values, and the predictor to a column in the provided matrix of predictors.   Initializes regression coefficients using the provided response matrix.
+	 * The _fitted member points to the indicated submatrix of a matrix that contains all the partial fitted matrices.
+	 *
+	 * \param[in] gsl_matrix* response matrix
+	 * \param[in] gsl_matrix* predictor matrix
+	 * \param[in] size_t& column index for the predictor matrix
+	 * \param[in] gsl_matrix* matrix with all the partial fitted matrices stacked
+	 * \param[in] size_t& index of the row where the relevant fitted matrix begins
+	 * \param[in] gsl_matrix* covariance matrix
+	 * \param[in] gsl_rng* pointer to a PNG
+	 * \param[in] gsl_matrix* matrix of regression coefficients
+	 * \param[in] size_t& row index of the regression coefficient matrix
+	 *
+	 */
+	MVnormBetaFt(const gsl_matrix *resp, gsl_matrix *pred, const size_t &iCl, gsl_matrix *allFt, const size_t &begRw, const gsl_matrix *Sig, const gsl_rng *r, gsl_matrix *bet, const size_t &iRw) : MVnormBeta(resp, pred, iCl, Sig, r, bet, iRw) {_fitted = gsl_matrix_submatrix(allFt, begRw, 0, pred->size1, _d); };
+	/** \brief Multivariate random constructor with response matrix and prior index
+	 *
+	 * Sets up _vec to point to the provided vector of values, and the predictor to a column in the provided matrix of predictors. Initializes regression coefficients using the provided response matrix.
+	 * The _fitted member points to the indicated submatrix of a matrix that contains all the partial fitted matrices.  The _upLevel member is set to point to a row in the prior matrix.
+	 *
+	 * \param[in] gsl_matrix* response matrix
+	 * \param[in] gsl_matrix* predictor matrix
+	 * \param[in] size_t& column index for the predictor matrix
+	 * \param[in] gsl_matrix* matrix with all the partial fitted matrices stacked
+	 * \param[in] size_t& index of the row where the relevant fitted matrix begins
+	 * \param[in] gsl_matrix* covariance matrix
+	 * \param[in] gsl_rng* pointer to a PNG
+	 * \param[in] size_t& row index of the prior matrix
+	 * \param[in] gsl_matrix* matrix of regression coefficients
+	 * \param[in] size_t& row index of the regression coefficient matrix
+	 *
+	 */
 	MVnormBetaFt(const gsl_matrix *resp, gsl_matrix *pred, const size_t &iCl, gsl_matrix *allFt, const size_t &begRw, const gsl_matrix *Sig, const gsl_rng *r, const size_t &up, gsl_matrix *bet, const size_t &iRw) : MVnormBeta(resp, pred, iCl, Sig, r, up, bet, iRw) {_fitted = gsl_matrix_submatrix(allFt, begRw, 0, pred->size1, _d); };
+	
+	/** \brief Multivariate random constructor with response matrix
+	 *
+	 * Sets up _vec to point to the provided vector of values, and the predictor to a column in the provided matrix of predictors. Initializes regression coefficients using the provided response matrix.
+	 * The _fitted member points to the indicated vector that has the appropriate partial fitted values.
+	 *
+	 * \param[in] gsl_matrix* response matrix
+	 * \param[in] gsl_matrix* predictor matrix
+	 * \param[in] size_t& column index for the predictor matrix
+	 * \param[in] vector<double>& vectorized partial fitted matrix
+	 * \param[in] gsl_matrix* covariance matrix
+	 * \param[in] gsl_rng* pointer to a PNG
+	 * \param[in] gsl_matrix* matrix of regression coefficients
+	 * \param[in] size_t& row index of the regression coefficient matrix
+	 *
+	 */
+	MVnormBetaFt(const gsl_matrix *resp, gsl_matrix *pred, const size_t &iCl, vector<double> &eaFt, const gsl_matrix *Sig, const gsl_rng *r, gsl_matrix *bet, const size_t &iRw) : MVnormBeta(resp, pred, iCl, Sig, r, bet, iRw) {_fitted = gsl_matrix_view_array(eaFt.data(), pred->size1, _d); };
+	/** \brief Multivariate random constructor with response matrix and prior index
+	 *
+	 * Sets up _vec to point to the provided vector of values, and the predictor to a column in the provided matrix of predictors. Initializes regression coefficients using the provided response matrix.
+	 * The _fitted member points to the indicated vector that has the appropriate partial fitted values. The _upLevel member is set to point to a row in the prior matrix.
+	 *
+	 * \param[in] gsl_matrix* response matrix
+	 * \param[in] gsl_matrix* predictor matrix
+	 * \param[in] size_t& column index for the predictor matrix
+	 * \param[in] vector<double>& vectorized partial fitted matrix
+	 * \param[in] gsl_matrix* covariance matrix
+	 * \param[in] gsl_rng* pointer to a PNG
+	 * \param[in] size_t& row index of the prior matrix
+	 * \param[in] gsl_matrix* matrix of regression coefficients
+	 * \param[in] size_t& row index of the regression coefficient matrix
+	 *
+	 */
 	MVnormBetaFt(const gsl_matrix *resp, gsl_matrix *pred, const size_t &iCl, vector<double> &eaFt, const gsl_matrix *Sig, const gsl_rng *r, const size_t &up, gsl_matrix *bet, const size_t &iRw) : MVnormBeta(resp, pred, iCl, Sig, r, up, bet, iRw) {_fitted = gsl_matrix_view_array(eaFt.data(), pred->size1, _d); };
+	
+	/** \brief Multivariate random constructor with Grp type response
+	 *
+	 * Sets up _vec to point to the provided vector of values, and the predictor to a column in the provided matrix of predictors.   Initializes regression coefficients using the provided response matrix.
+	 * The _fitted member points to the indicated submatrix of a matrix that contains all the partial fitted matrices.
+	 *
+	 * \param[in] Grp& response
+	 * \param[in] gsl_matrix* predictor matrix
+	 * \param[in] size_t& column index for the predictor matrix
+	 * \param[in] gsl_matrix* matrix with all the partial fitted matrices stacked
+	 * \param[in] size_t& index of the row where the relevant fitted matrix begins
+	 * \param[in] gsl_matrix* covariance matrix
+	 * \param[in] gsl_rng* pointer to a PNG
+	 * \param[in] gsl_matrix* matrix of regression coefficients
+	 * \param[in] size_t& row index of the regression coefficient matrix
+	 *
+	 */
+	MVnormBetaFt(const Grp &resp, gsl_matrix *pred, const size_t &iCl, gsl_matrix *allFt, const size_t &begRw, const gsl_matrix *Sig, const gsl_rng *r, gsl_matrix *bet, const size_t &iRw) : MVnormBeta(resp, pred, iCl, Sig, r, bet, iRw) {_fitted = gsl_matrix_submatrix(allFt, begRw, 0, pred->size1, _d); }; // deprecated
+	/** \brief Multivariate random constructor with Grp type response and prior index
+	 *
+	 * Sets up _vec to point to the provided vector of values, and the predictor to a column in the provided matrix of predictors. Initializes regression coefficients using the provided response matrix.
+	 * The _fitted member points to the indicated submatrix of a matrix that contains all the partial fitted matrices.  The _upLevel member is set to point to a row in the prior matrix.
+	 *
+	 * \param[in] Grp& response
+	 * \param[in] gsl_matrix* predictor matrix
+	 * \param[in] size_t& column index for the predictor matrix
+	 * \param[in] gsl_matrix* matrix with all the partial fitted matrices stacked
+	 * \param[in] size_t& index of the row where the relevant fitted matrix begins
+	 * \param[in] gsl_matrix* covariance matrix
+	 * \param[in] gsl_rng* pointer to a PNG
+	 * \param[in] size_t& row index of the prior matrix
+	 * \param[in] gsl_matrix* matrix of regression coefficients
+	 * \param[in] size_t& row index of the regression coefficient matrix
+	 *
+	 */
 	MVnormBetaFt(const Grp &resp, gsl_matrix *pred, const size_t &iCl, gsl_matrix *allFt, const size_t &begRw, const gsl_matrix *Sig, const gsl_rng *r, const size_t &up, gsl_matrix *bet, const size_t &iRw) : MVnormBeta(resp, pred, iCl, Sig, r, up, bet, iRw) {_fitted = gsl_matrix_submatrix(allFt, begRw, 0, pred->size1, _d); };
+	
+	/** \brief Multivariate random constructor with Grp type response
+	 *
+	 * Sets up _vec to point to the provided vector of values, and the predictor to a column in the provided matrix of predictors. Initializes regression coefficients using the provided response matrix.
+	 * The _fitted member points to the indicated vector that has the appropriate partial fitted values.
+	 *
+	 * \param[in] Grp& response
+	 * \param[in] gsl_matrix* predictor matrix
+	 * \param[in] size_t& column index for the predictor matrix
+	 * \param[in] vector<double>& vectorized partial fitted matrix
+	 * \param[in] gsl_matrix* covariance matrix
+	 * \param[in] gsl_rng* pointer to a PNG
+	 * \param[in] gsl_matrix* matrix of regression coefficients
+	 * \param[in] size_t& row index of the regression coefficient matrix
+	 *
+	 */
+	MVnormBetaFt(const Grp &resp, gsl_matrix *pred, const size_t &iCl, vector<double> &eaFt, const gsl_matrix *Sig, const gsl_rng *r, gsl_matrix *bet, const size_t &iRw) : MVnormBeta(resp, pred, iCl, Sig, r, bet, iRw) {_fitted = gsl_matrix_view_array(eaFt.data(), pred->size1, _d); };
+	/** \brief Multivariate random constructor with Grp type response and prior index
+	 *
+	 * Sets up _vec to point to the provided vector of values, and the predictor to a column in the provided matrix of predictors. Initializes regression coefficients using the provided response matrix.
+	 * The _fitted member points to the indicated vector that has the appropriate partial fitted values. The _upLevel member is set to point to a row in the prior matrix.
+	 *
+	 * \param[in] Grp& response
+	 * \param[in] gsl_matrix* predictor matrix
+	 * \param[in] size_t& column index for the predictor matrix
+	 * \param[in] vector<double>& vectorized partial fitted matrix
+	 * \param[in] gsl_matrix* covariance matrix
+	 * \param[in] gsl_rng* pointer to a PNG
+	 * \param[in] size_t& row index of the prior matrix
+	 * \param[in] gsl_matrix* matrix of regression coefficients
+	 * \param[in] size_t& row index of the regression coefficient matrix
+	 *
+	 */
 	MVnormBetaFt(const Grp &resp, gsl_matrix *pred, const size_t &iCl, vector<double> &eaFt, const gsl_matrix *Sig, const gsl_rng *r, const size_t &up, gsl_matrix *bet, const size_t &iRw) : MVnormBeta(resp, pred, iCl, Sig, r, up, bet, iRw) {_fitted = gsl_matrix_view_array(eaFt.data(), pred->size1, _d); };
+	
+	/** \brief Deterministic constructor
+	 *
+	 * Does not initialize the regression coefficients, but simply points to the already-initialized matrix of values.
+	 * The _fitted member points to the indicated vector that has the appropriate partial fitted values.
+	 *
+	 * \param[in] gsl_matrix* predictor matrix
+	 * \param[in] size_t& column index of the predictor matrix
+	 * \param[in] vector<double>& vectorized partial fitted matrix
+	 * \param[in] gsl_matrix* regression coefficient matrix
+	 * \param[in] size_t& row index of the regression coefficient matrix
+	 *
+	 */
+	MVnormBetaFt(gsl_matrix *pred, const size_t &iCl, vector<double> &eaFt, gsl_matrix *bet, const size_t &iRw) : MVnormBeta(pred, iCl, bet, iRw) {_fitted = gsl_matrix_view_array(eaFt.data(), pred->size1, _d); };
+	/** \brief Deterministic constructor with a prior index
+	 *
+	 * Does not initialize the regression coefficients, but simply points to the already-initialized matrix of values.
+	 * The _fitted member points to the indicated vector that has the appropriate partial fitted values.  The _upLevel member is set to point to a row in the prior matrix.
+	 *
+	 * \param[in] gsl_matrix* predictor matrix
+	 * \param[in] size_t& column index of the predictor matrix
+	 * \param[in] vector<double>& vectorized partial fitted matrix
+	 * \param[in] size_t& row index of the prior matrix
+	 * \param[in] gsl_matrix* regression coefficient matrix
+	 * \param[in] size_t& row index of the regression coefficient matrix
+	 *
+	 */
 	MVnormBetaFt(gsl_matrix *pred, const size_t &iCl, vector<double> &eaFt, const size_t &up, gsl_matrix *bet, const size_t &iRw) : MVnormBeta(pred, iCl, up, bet, iRw) {_fitted = gsl_matrix_view_array(eaFt.data(), pred->size1, _d); };
-
-	MVnormBetaFt(const MVnormBetaFt &); // copy constructor
+	
+	/** \brief Deterministic copy constructor
+	 *
+	 * \param[in] MVnormBetaFt& object to be copied
+	 *
+	 */
+	MVnormBetaFt(const MVnormBetaFt &);
+	/** \brief Deterministic assignment operator
+	 *
+	 * \param[in] MVnormBetaFt& object to be copied
+	 *
+	 * \return Refernce to an object of class MVnormBetaFt
+	 *
+	 */
 	MVnormBetaFt & operator=(const MVnormBetaFt &);
 	
-	virtual ~MVnormBetaFt() {}; 	// destructor
+	/** \brief Destructor */
+	virtual ~MVnormBetaFt() {};
 	
 	// update() methods
 	// Gaussian model, improper prior (for "fixed effect" regression)

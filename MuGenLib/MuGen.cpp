@@ -1472,12 +1472,26 @@ MVnormBeta::MVnormBeta(gsl_vector *b, const gsl_vector *sd, gsl_matrix *pred, co
 	gsl_blas_ddot(&_X.vector, &_X.vector, &_scale);
 	_upLevel = 0;
 }
+MVnormBeta::MVnormBeta(gsl_vector *b, const gsl_vector *sd, gsl_matrix *pred, const size_t &iCl, const gsl_rng *r, const size_t &up) : MVnorm(b, sd, r){
+	_X = gsl_matrix_column(pred, iCl);
+	_N = pred->size1;
+	gsl_blas_ddot(&_X.vector, &_X.vector, &_scale);
+	_upLevel = &up;
+}
+
 MVnormBeta::MVnormBeta(gsl_vector *b, const gsl_matrix *Sig, gsl_matrix *pred, const size_t &iCl, const gsl_rng *r) : MVnorm(b, Sig, r){
 	_X = gsl_matrix_column(pred, iCl);
 	_N = pred->size1;
 	gsl_blas_ddot(&_X.vector, &_X.vector, &_scale);
 	_upLevel = 0;
 }
+MVnormBeta::MVnormBeta(gsl_vector *b, const gsl_matrix *Sig, gsl_matrix *pred, const size_t &iCl, const gsl_rng *r, const size_t &up) : MVnorm(b, Sig, r){
+	_X = gsl_matrix_column(pred, iCl);
+	_N = pred->size1;
+	gsl_blas_ddot(&_X.vector, &_X.vector, &_scale);
+	_upLevel = &up;
+}
+
 MVnormBeta::MVnormBeta(const gsl_matrix *resp, gsl_matrix *pred, const size_t &iCl, const gsl_matrix *Sig, const gsl_rng *r, gsl_matrix *bet, const size_t &iRw){ // NOTE: no-intercept regression for initialization here
 	_upLevel = 0;
 	_d       = resp->size2;
@@ -1511,66 +1525,6 @@ MVnormBeta::MVnormBeta(const gsl_matrix *resp, gsl_matrix *pred, const size_t &i
 	gsl_vector_free(bH);
 	gsl_matrix_free(chl);
 }
-MVnormBeta::MVnormBeta(const Grp &resp, gsl_matrix *pred, const size_t &iCl, const gsl_matrix *Sig, const gsl_rng *r, gsl_matrix *bet, const size_t &iRw){
-	_upLevel = 0;
-	_N       = pred->size1;
-	_d       = resp.phenD();
-	
-	_vec = gsl_matrix_row(bet, iRw);
-	
-	if (_N != resp.Ndata()) {
-		cerr << "ERROR: unequal number of rows in predictor (" << _N << ") and response (" << resp.Ndata() << ") when initializing MVnormBeta" << endl;
-		exit(1);
-	}
-	else if (resp.phenD() != Sig->size1){
-		cerr << "ERROR: incompatible matrices *resp (d = " << resp.phenD() << ") and *Sig (d = " << Sig->size1 << ") when initializing MVnormBeta" << endl;
-		exit(1);
-	}
-	
-	_X = gsl_matrix_column(pred, iCl);
-	gsl_blas_ddot(&_X.vector, &_X.vector, &_scale);
-	
-	gsl_vector *bH   = gsl_vector_alloc(_d);
-	gsl_matrix *chl  = gsl_matrix_alloc(_d, _d);
-	
-	gsl_blas_dgemv(CblasTrans, 1.0/_scale, resp.dMat(), &_X.vector, 0.0, bH);
-	
-	gsl_matrix_memcpy(chl, Sig);
-	gsl_matrix_scale(chl, 1.0/_scale);
-	gsl_linalg_cholesky_decomp(chl);
-	
-	MVgauss(bH, chl, r, &_vec.vector);
-	
-	gsl_vector_free(bH);
-	gsl_matrix_free(chl);
-}
-MVnormBeta::MVnormBeta(gsl_matrix *pred, const size_t &iCl, gsl_matrix *bet, const size_t &iRw){
-	_upLevel = 0;
-	_N       = pred->size1;
-	_d       = bet->size2;
-	
-	_vec = gsl_matrix_row(bet, iRw);
-	
-	_X = gsl_matrix_column(pred, iCl);
-	gsl_blas_ddot(&_X.vector, &_X.vector, &_scale);
-	
-}
-
-
-MVnormBeta::MVnormBeta(gsl_vector *b, const gsl_vector *sd, gsl_matrix *pred, const size_t &iCl, const gsl_rng *r, const size_t &up) : MVnorm(b, sd, r){
-	_X = gsl_matrix_column(pred, iCl);
-	_N = pred->size1;
-	gsl_blas_ddot(&_X.vector, &_X.vector, &_scale);
-	_upLevel = &up;
-}
-MVnormBeta::MVnormBeta(gsl_vector *b, const gsl_matrix *Sig, gsl_matrix *pred, const size_t &iCl, const gsl_rng *r, const size_t &up) : MVnorm(b, Sig, r){
-	_X = gsl_matrix_column(pred, iCl);
-	_N = pred->size1;
-	gsl_blas_ddot(&_X.vector, &_X.vector, &_scale);
-	_upLevel = &up;
-}
-
-
 MVnormBeta::MVnormBeta(const gsl_matrix *resp, gsl_matrix *pred, const size_t &iCl, const gsl_matrix *Sig, const gsl_rng *r, const size_t &up, gsl_matrix *bet, const size_t &iRw){ // NOTE: no-intercept regression for initialization here
 	_upLevel = &up;
 	_d       = resp->size2;
@@ -1594,6 +1548,40 @@ MVnormBeta::MVnormBeta(const gsl_matrix *resp, gsl_matrix *pred, const size_t &i
 	gsl_matrix *chl   = gsl_matrix_alloc(_d, _d);
 	
 	gsl_blas_dgemv(CblasTrans, 1.0/_scale, resp, &_X.vector, 0.0, bH);
+	
+	gsl_matrix_memcpy(chl, Sig);
+	gsl_matrix_scale(chl, 1.0/_scale);
+	gsl_linalg_cholesky_decomp(chl);
+	
+	MVgauss(bH, chl, r, &_vec.vector);
+	
+	gsl_vector_free(bH);
+	gsl_matrix_free(chl);
+}
+
+MVnormBeta::MVnormBeta(const Grp &resp, gsl_matrix *pred, const size_t &iCl, const gsl_matrix *Sig, const gsl_rng *r, gsl_matrix *bet, const size_t &iRw){
+	_upLevel = 0;
+	_N       = pred->size1;
+	_d       = resp.phenD();
+	
+	_vec = gsl_matrix_row(bet, iRw);
+	
+	if (_N != resp.Ndata()) {
+		cerr << "ERROR: unequal number of rows in predictor (" << _N << ") and response (" << resp.Ndata() << ") when initializing MVnormBeta" << endl;
+		exit(1);
+	}
+	else if (resp.phenD() != Sig->size1){
+		cerr << "ERROR: incompatible matrices *resp (d = " << resp.phenD() << ") and *Sig (d = " << Sig->size1 << ") when initializing MVnormBeta" << endl;
+		exit(1);
+	}
+	
+	_X = gsl_matrix_column(pred, iCl);
+	gsl_blas_ddot(&_X.vector, &_X.vector, &_scale);
+	
+	gsl_vector *bH   = gsl_vector_alloc(_d);
+	gsl_matrix *chl  = gsl_matrix_alloc(_d, _d);
+	
+	gsl_blas_dgemv(CblasTrans, 1.0/_scale, resp.dMat(), &_X.vector, 0.0, bH);
 	
 	gsl_matrix_memcpy(chl, Sig);
 	gsl_matrix_scale(chl, 1.0/_scale);
@@ -1637,6 +1625,18 @@ MVnormBeta::MVnormBeta(const Grp &resp, gsl_matrix *pred, const size_t &iCl, con
 	gsl_vector_free(bH);
 	gsl_matrix_free(chl);
 }
+
+MVnormBeta::MVnormBeta(gsl_matrix *pred, const size_t &iCl, gsl_matrix *bet, const size_t &iRw){
+	_upLevel = 0;
+	_N       = pred->size1;
+	_d       = bet->size2;
+	
+	_vec = gsl_matrix_row(bet, iRw);
+	
+	_X = gsl_matrix_column(pred, iCl);
+	gsl_blas_ddot(&_X.vector, &_X.vector, &_scale);
+	
+}
 MVnormBeta::MVnormBeta(gsl_matrix *pred, const size_t &iCl, const size_t &up, gsl_matrix *bet, const size_t &iRw){
 	_upLevel = &up;
 	_N       = pred->size1;
@@ -1678,25 +1678,6 @@ MVnormBeta::~MVnormBeta(){
 /*
  *	overloaded update() methods
  */
-
-void MVnormBeta::update(const gsl_matrix *resp, const SigmaI &SigIb, const gsl_rng *r){
-	gsl_matrix *SigSum = gsl_matrix_alloc(_d, _d);
-	gsl_vector *tmpV   = gsl_vector_alloc(_d);
-	
-	gsl_matrix_memcpy(SigSum, SigIb.getMat());
-	gsl_matrix_scale(SigSum, _scale);
-	gsl_linalg_cholesky_decomp(SigSum);
-	gsl_linalg_cholesky_invert(SigSum);
-	gsl_linalg_cholesky_decomp(SigSum);
-	
-	gsl_blas_dgemv(CblasTrans, 1.0/_scale, resp, &_X.vector, 0.0, tmpV);
-	
-	MVgauss(tmpV, SigSum, r, &_vec.vector);
-	
-	gsl_matrix_free(SigSum);
-	gsl_vector_free(tmpV);
-}
-
 
 void MVnormBeta::update(const Grp &mu, const SigmaI &SigIb, const gsl_rng *r){
 	gsl_matrix *SigSum = gsl_matrix_alloc(_d, _d);
