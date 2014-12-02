@@ -1736,19 +1736,69 @@ public:
 	void update(const Grp &resp, const Qgrp &q, const SigmaI &SigIb, const Grp &muPr, const double &qPr, const SigmaI &SigIp, const gsl_rng *r);
 	
 };
-
+/** \brief Individual vector of means with blocks of traits
+ *
+ * Implements separate models for blocks of traits.  The likelihood covariance matrix is block-diagonal.  Traits of the same block have to be contiguous within the vector.
+ *
+ */
 class MVnormMuBlk : public MVnorm {
 protected:
-	const size_t *_upLevel;                  // pointer to the upper-level (prior) index -- the same for all blocks
-	const vector< size_t > *_blkStart;       // starts of vector pieces; pointer to the vector that's in the corresponding Grp class
-	vector< gsl_vector_view > _eachVec;      // views of vector pieces, each corresponding to a block of variables
-	const vector< vector<size_t> > *_eachLL; // lowLevel (LL) for each block
+	/** \brief Pointer to a row index of the prior
+	 *
+	 * This has to be the same for all the blocks.
+	 *
+	 */
+	const size_t *_upLevel;
+	/** \brief Start positions of blocks
+	 *
+	 * Pointer to the vector that's in the corresponding Grp class.
+	 *
+	 */
+	const vector< size_t > *_blkStart;
+	/** \brief Trait blocks
+	 *
+	 * Vector views of vector pieces, each corresponding to a block of variables. Pointer to the vector that's in the corresponding Grp class.
+	 *
+	 */
+	vector< gsl_vector_view > _eachVec;
+	/** \brief Data matrix row indexes
+	 *
+	 * Each block of traits can have a different number and identity of rows in the data matrix it refers to.  Each vector of *size_t* in this vector corresponds to a block, so the size of this should be the same as the size of *_eachVec*.
+	 * This member is a pointer to the vector that's in the corresponding Grp class.
+	 *
+	 */
+	const vector< vector<size_t> > *_eachLL;
 	
 public:
+	/** \brief Default constructor */
 	MVnormMuBlk() : MVnorm() {};
+	/** \brief Deterministic constructor
+	 *
+	 * Sets up the member variables to point to blocks of traits in the matrix _mn_, but does not perform stochastic intitialization.
+	 *
+	 * \param[in] gsl_matrix* mean values matrix
+	 * \param[in] size_t& row index of the mean values matrix
+	 * \param[in] vector<size_t>& vector of start indexes for each block
+	 * \param[in] size_t& row index of the prior matrix
+	 *
+	 */
 	MVnormMuBlk(gsl_matrix *mn, const size_t &iRw, const vector<size_t> &blkStart, const size_t &up);
+	/** \brief Univariate stochastic constructor
+	 *
+	 * Sets initial values independently for each trait, modifying the matrix row that corresponds to this vector.
+	 *
+	 * \param[in] gsl_matrix* mean values matrix
+	 * \param[in] size_t& row index of the mean values matrix
+	 * \param[in] gsl_vector* vector of standard deviations
+	 * \param[in] gsl_rng* pointer to a PNG
+	 * \param[in] vector<size_t>& vector of start indexes for each block
+	 * \param[in] vector< vector<size_t> >& vector of lower-level index vectors
+	 * \param[in] size_t& row index of the prior matrix
+	 *
+	 */
 	MVnormMuBlk(gsl_matrix *mn, const size_t &iRw, const gsl_vector *sd, const gsl_rng *r, const vector<size_t> &blkStart, const vector< vector<size_t> > &eachLL, const size_t &up);
 	
+	/** \brief Destructor */
 	virtual ~MVnormMuBlk() {};
 	
 	const size_t *up() const{return _upLevel; };
@@ -2150,7 +2200,7 @@ public:
 
 class MuGrpEEmiss : public MuGrpMiss {
 protected:
-	gsl_matrix *_errorVar;
+	vector< list<double> > _errorVar;
 	vector< list<size_t> > _missErrMat;
 	
 public:
@@ -2158,7 +2208,7 @@ public:
 	MuGrpEEmiss(const string &datFlNam, const string &varFlNam, const string &indFlNam, const string &misMatFlNam, const string &misVecFlNam, RanIndex &up, const size_t &d);
 	MuGrpEEmiss(const string &datFlNam, const string &varFlNam, const vector<size_t> &varInd, const string &misMatFlNam, const string &misVecFlNam, RanIndex &up, const size_t &d);
 	
-	~MuGrpEEmiss() {gsl_matrix_free(_errorVar); };
+	~MuGrpEEmiss() { };
 	
 	MuGrpEEmiss(const MuGrpEEmiss &mG); // copy constructor
 	MuGrpEEmiss & operator=(const MuGrpEEmiss &mG);

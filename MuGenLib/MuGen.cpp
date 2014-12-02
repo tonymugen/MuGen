@@ -5823,15 +5823,14 @@ void MuGrpMiss::update(const Grp &mu, const SigmaI &SigIm, const SigmaI &SigIp){
  */
 MuGrpEE::MuGrpEE(const string &datFlNam, const string &varFlNam, const string &indFlNam, RanIndex &up, const size_t &d) : MuGrp(datFlNam, up, d){
 	
-	ifstream varIn(varFlNam.c_str());
+	ifstream varIn(indFlNam.c_str());
 	
 	if (!varIn) {
-		cerr << "ERROR: cannot open file " << varFlNam << " for reading error variance index in MuGrpEE initialization" << endl;
+		cerr << "ERROR: cannot open file " << indFlNam << " for reading error variance index in MuGrpEE initialization" << endl;
 		exit(-1);
 	}
 	int tmpIn;
-	while (varIn) {
-		varIn >> tmpIn;
+	while (varIn >> tmpIn) {
 		if (tmpIn < 0) {
 			cerr << "ERROR: negative indexes not alllowed when reading error variance index from file " << varFlNam << " on initialization of MuGrpEE" << endl;
 			exit(-1);
@@ -5951,17 +5950,16 @@ MuGrpEEmiss::MuGrpEEmiss(const string &datFlNam, const string &varFlNam, const s
 	fclose(mmIn);
 	
 	list<size_t> tmpErrInd;
-	ifstream varIn(varFlNam.c_str());
+	ifstream varIn(indFlNam.c_str());
 	
 	if (!varIn) {
-		cerr << "ERROR: cannot open file " << varFlNam << " for reading error variance index in MuGrpEEmiss initialization" << endl;
+		cerr << "ERROR: cannot open file " << indFlNam << " for reading error variance index in MuGrpEEmiss initialization" << endl;
 		exit(-1);
 	}
 	int tmpIn;
-	while (varIn) {
-		varIn >> tmpIn;
+	while (varIn >> tmpIn) {
 		if (tmpIn < 0) {
-			cerr << "ERROR: negative indexes not alllowed when reading error variance index from file " << varFlNam << " on initialization of MuGrpEEmiss" << endl;
+			cerr << "ERROR: negative indexes not alllowed when reading error variance index from file " << indFlNam << " on initialization of MuGrpEEmiss" << endl;
 			exit(-1);
 		} else if (tmpIn > d){
 			cerr << "ERROR: value of the index (" << tmpIn << ") exceeds the number of variables (" << d << "). Check if you saved a base-0 index for MuGrpEEmiss" << endl;
@@ -5979,29 +5977,43 @@ MuGrpEEmiss::MuGrpEEmiss(const string &datFlNam, const string &varFlNam, const s
 		_missErrMat.push_back(tmpErrInd);
 	}
 	
-	// for those lines in the _valueMat that have missing data, eliminate the traits that are missing from the measurement error sampling
-	for (vector<size_t>::iterator misIt = _misInd.begin(); misIt != _misInd.end(); ++misIt) {
-		
-		list<size_t>::iterator trtIt = _missErrMat[*misIt].begin();
-		while (trtIt != _missErrMat[*misIt].end()) {
-			if (gsl_matrix_int_get(tmpMisMat, *misIt, *trtIt) == 1) {
-				trtIt = _missErrMat[*misIt].erase(trtIt);
-			}
-			else {
-				++trtIt;
-			}
-		}
-	}
-	gsl_matrix_int_free(tmpMisMat);
-	
-	_errorVar = gsl_matrix_alloc(_valueMat->size1, tmpErrInd.size());
+	gsl_matrix *tmpEV = gsl_matrix_alloc(_valueMat->size1, tmpErrInd.size());
 	FILE *errIn = fopen(varFlNam.c_str(), "r");
 	if (errIn == NULL) {
 		cerr << "ERROR: Failed to open file " << varFlNam << " when inititializing MuGrpEEmiss" << endl;
 		exit(-1);
 	}
-	gsl_matrix_fread(errIn, _errorVar);
+	gsl_matrix_fread(errIn, tmpEV);
 	fclose(errIn);
+	
+	_errorVar.resize(tmpEV->size1);
+	
+	for (size_t iRw = 0; iRw < tmpEV->size1; iRw++) {
+		for (size_t jCl = 0; jCl < tmpEV->size2; jCl++) {
+			_errorVar[iRw].push_back(gsl_matrix_get(tmpEV, iRw, jCl));
+		}
+	}
+	gsl_matrix_free(tmpEV);
+	
+	// for those lines in the _valueMat that have missing data, eliminate the traits that are missing from the measurement error sampling
+	for (vector<size_t>::iterator misIt = _misInd.begin(); misIt != _misInd.end(); ++misIt) {
+		
+		list<size_t>::iterator trtIt = _missErrMat[*misIt].begin();
+		list<double>::iterator varIt = _errorVar[*misIt].begin();
+		while (trtIt != _missErrMat[*misIt].end()) {
+			if (gsl_matrix_int_get(tmpMisMat, *misIt, *trtIt) == 1) {
+				trtIt = _missErrMat[*misIt].erase(trtIt);
+				varIt = _errorVar[*misIt].erase(varIt);
+			}
+			else {
+				++trtIt;
+				++varIt;
+			}
+			
+		}
+	}
+	gsl_matrix_int_free(tmpMisMat);
+	
 	
 }
 MuGrpEEmiss::MuGrpEEmiss(const string &datFlNam, const string &varFlNam, const vector<size_t> &varInd, const string &misMatFlNam, const string &misVecFlNam, RanIndex &up, const size_t &d) : MuGrpMiss(datFlNam, misMatFlNam, misVecFlNam, up, d) {
@@ -6022,39 +6034,50 @@ MuGrpEEmiss::MuGrpEEmiss(const string &datFlNam, const string &varFlNam, const v
 		_missErrMat.push_back(tmpErrInd);
 	}
 	
-	// for those lines in the _valueMat that have missing data, eliminate the traits that are missing from the measurement error sampling
-	for (vector<size_t>::iterator misIt = _misInd.begin(); misIt != _misInd.end(); ++misIt) {
-		
-		list<size_t>::iterator trtIt = _missErrMat[*misIt].begin();
-		while (trtIt != _missErrMat[*misIt].end()) {
-			if (gsl_matrix_int_get(tmpMisMat, *misIt, *trtIt) == 1) {
-				trtIt = _missErrMat[*misIt].erase(trtIt);
-			}
-			else {
-				++trtIt;
-			}
-		}
-	}
-	gsl_matrix_int_free(tmpMisMat);
-	
-	_errorVar = gsl_matrix_alloc(_valueMat->size1, tmpErrInd.size());
+	gsl_matrix *tmpEV = gsl_matrix_alloc(_valueMat->size1, tmpErrInd.size());
 	FILE *errIn = fopen(varFlNam.c_str(), "r");
 	if (errIn == NULL) {
 		cerr << "ERROR: Failed to open file " << varFlNam << " when inititializing MuGrpEEmiss" << endl;
 		exit(-1);
 	}
-	gsl_matrix_fread(errIn, _errorVar);
+	gsl_matrix_fread(errIn, tmpEV);
 	fclose(errIn);
+	
+	_errorVar.resize(tmpEV->size1);
+	
+	for (size_t iRw = 0; iRw < tmpEV->size1; iRw++) {
+		for (size_t jCl = 0; jCl < tmpEV->size2; jCl++) {
+			_errorVar[iRw].push_back(gsl_matrix_get(tmpEV, iRw, jCl));
+		}
+	}
+	gsl_matrix_free(tmpEV);
+	
+	// for those lines in the _valueMat that have missing data, eliminate the traits that are missing from the measurement error sampling
+	for (vector<size_t>::iterator misIt = _misInd.begin(); misIt != _misInd.end(); ++misIt) {
+		
+		list<size_t>::iterator trtIt = _missErrMat[*misIt].begin();
+		list<double>::iterator varIt = _errorVar[*misIt].begin();
+		while (trtIt != _missErrMat[*misIt].end()) {
+			if (gsl_matrix_int_get(tmpMisMat, *misIt, *trtIt) == 1) {
+				trtIt = _missErrMat[*misIt].erase(trtIt);
+				varIt = _errorVar[*misIt].erase(varIt);
+			}
+			else {
+				++trtIt;
+				++varIt;
+			}
+			
+		}
+	}
+	gsl_matrix_int_free(tmpMisMat);
 }
 
 MuGrpEEmiss::MuGrpEEmiss(const MuGrpEEmiss &mG){
 	_misInd = mG._misInd;
 	gsl_matrix_free(_valueMat);
-	gsl_matrix_free(_errorVar);
 	_valueMat   = gsl_matrix_alloc((mG._valueMat)->size1, (mG._valueMat)->size2);
 	gsl_matrix_memcpy(_valueMat, mG._valueMat);
-	_errorVar   = gsl_matrix_alloc((mG._errorVar)->size1, (mG._errorVar)->size2);
-	gsl_matrix_memcpy(_errorVar, mG._errorVar);
+	_errorVar   = mG._errorVar;
 	
 	_upLevel    = mG._upLevel;
 	_missErrMat = mG._missErrMat;
@@ -6077,11 +6100,9 @@ MuGrpEEmiss::MuGrpEEmiss(const MuGrpEEmiss &mG){
 MuGrpEEmiss & MuGrpEEmiss::operator=(const MuGrpEEmiss &mG){
 	_misInd = mG._misInd;
 	gsl_matrix_free(_valueMat);
-	gsl_matrix_free(_errorVar);
 	_valueMat   = gsl_matrix_alloc((mG._valueMat)->size1, (mG._valueMat)->size2);
 	gsl_matrix_memcpy(_valueMat, mG._valueMat);
-	_errorVar   = gsl_matrix_alloc((mG._errorVar)->size1, (mG._errorVar)->size2);
-	gsl_matrix_memcpy(_errorVar, mG._errorVar);
+	_errorVar   = mG._errorVar;
 	
 	_upLevel    = mG._upLevel;
 	_missErrMat = mG._missErrMat;
@@ -6107,12 +6128,12 @@ MuGrpEEmiss & MuGrpEEmiss::operator=(const MuGrpEEmiss &mG){
 // all of these are actually priors
 void MuGrpEEmiss::update(const Grp &muPr, const SigmaI &SigIm){
 	for (size_t iRw = 0; iRw < _valueMat->size1; iRw++) {
-		size_t jECl = 0;
-		for ( list<size_t>::iterator colIt = _missErrMat[iRw].begin(); colIt != _missErrMat[iRw].end(); ++colIt) {
-			double var = 1.0/(1.0/gsl_matrix_get(_errorVar, iRw, jECl) + gsl_matrix_get(SigIm.getMat(), *colIt, *colIt));
-			double mn     = var * (gsl_matrix_get(_valueMat, iRw, *colIt)/gsl_matrix_get(_errorVar, iRw, jECl) +  gsl_matrix_get(SigIm.getMat(), *colIt, *colIt) * gsl_matrix_get(muPr.fMat(), _upLevel->priorInd(iRw), *colIt) );
-			gsl_matrix_set(_valueMat, iRw, *colIt, mn + gsl_ran_gaussian_ziggurat(_rV[0], sqrt(var)));
-			jECl++;
+		list<size_t>::iterator indIt = _missErrMat[iRw].begin();
+		for ( list<double>::iterator colIt = _errorVar[iRw].begin(); colIt != _errorVar[iRw].end(); ++colIt) {
+			double var = 1.0/(1.0/(*colIt) + gsl_matrix_get(SigIm.getMat(), *indIt, *indIt));
+			double mn  = var * (gsl_matrix_get(_valueMat, iRw, *indIt)/(*colIt) +  gsl_matrix_get(SigIm.getMat(), *indIt, *indIt) * gsl_matrix_get(muPr.fMat(), _upLevel->priorInd(iRw), *indIt) );
+			gsl_matrix_set(_valueMat, iRw, *indIt, mn + gsl_ran_gaussian_ziggurat(_rV[0], sqrt(var)));
+			++indIt;
 		}
 	}
 	
@@ -6123,12 +6144,12 @@ void MuGrpEEmiss::update(const Grp &muPr, const SigmaI &SigIm){
 }
 void MuGrpEEmiss::update(const Grp &muPr, const Qgrp &q, const SigmaI &SigIm){
 	for (size_t iRw = 0; iRw < _valueMat->size1; iRw++) {
-		size_t jECl = 0;
-		for ( list<size_t>::iterator colIt = _missErrMat[iRw].begin(); colIt != _missErrMat[iRw].end(); ++colIt) {
-			double var = 1.0/(1.0/gsl_matrix_get(_errorVar, iRw, jECl) + q[iRw] * gsl_matrix_get(SigIm.getMat(), *colIt, *colIt));
-			double mn     = var * (gsl_matrix_get(_valueMat, iRw, *colIt)/gsl_matrix_get(_errorVar, iRw, jECl) +  q[iRw] * gsl_matrix_get(SigIm.getMat(), *colIt, *colIt) * gsl_matrix_get(muPr.fMat(), _upLevel->priorInd(iRw), *colIt) );
-			gsl_matrix_set(_valueMat, iRw, *colIt, mn + gsl_ran_gaussian_ziggurat(_rV[0], sqrt(var)));
-			jECl++;
+		list<size_t>::iterator indIt = _missErrMat[iRw].begin();
+		for ( list<double>::iterator colIt = _errorVar[iRw].begin(); colIt != _errorVar[iRw].end(); ++colIt) {
+			double var = 1.0/(1.0/(*colIt) + q[iRw] * gsl_matrix_get(SigIm.getMat(), *indIt, *indIt));
+			double mn  = var * (gsl_matrix_get(_valueMat, iRw, *indIt)/(*colIt) +  q[iRw] * gsl_matrix_get(SigIm.getMat(), *indIt, *indIt) * gsl_matrix_get(muPr.fMat(), _upLevel->priorInd(iRw), *indIt) );
+			gsl_matrix_set(_valueMat, iRw, *indIt, mn + gsl_ran_gaussian_ziggurat(_rV[0], sqrt(var)));
+			++indIt;
 		}
 	}
 	
@@ -6285,7 +6306,7 @@ BetaGrpFt::BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npre
 	_theta.resize(Npred);
 	
 	/*
-	 *  will read on line at a time so as not to have two potentially big matrices in memory at the same time; taking advantage of the row-major arrangement
+	 *  will read one line at a time so as not to have two potentially big matrices in memory at the same time; taking advantage of the row-major arrangement
 	 */
 	
 	FILE *prdIn = fopen(predFlNam.c_str(), "r");
@@ -8289,7 +8310,6 @@ BetaGrpSnp::BetaGrpSnp(const string &predFlNam, const string &outFlNam, RanIndex
 	_fakeFmat = gsl_matrix_calloc(low.getNgrp(), d);       // will be all zero, so we can use it for addition and subtraction without any consequences other than loss of efficiency
 	_lowLevel = &low;
 	
-	//_Ystore  = gsl_matrix_calloc(low.getNgrp(), d);
 	_Ystore  = gsl_matrix_calloc(low.getNtot(), d);
 	
 	_outFlNam = outFlNam;
@@ -8313,7 +8333,6 @@ BetaGrpSnp::BetaGrpSnp(const string &predFlNam, const string &outFlNam, RanIndex
 	_fakeFmat = gsl_matrix_calloc(low.getNgrp(), d);       // will be all zero, so we can use it for addition and subtraction without any consequences other than loss of efficiency
 	_lowLevel = &low;
 	
-	//_Ystore   = gsl_matrix_calloc(low.getNgrp(), d);
 	_Ystore  = gsl_matrix_calloc(low.getNtot(), d);
 	
 	_outFlNam = outFlNam;
@@ -8936,7 +8955,7 @@ BetaGrpSnpMiss::BetaGrpSnpMiss(const string &predFlNam, const string &outFlNam, 
 	
 }
 BetaGrpSnpMiss::BetaGrpSnpMiss(const string &predFlNam, const string &outFlNam, RanIndex &low, const size_t &Npred, const size_t &d, const int &Nthr, const double &absLab) : _numSaves(0.0), _nThr(Nthr), _Npred(Npred), _inPredFl(predFlNam), _priorVar(0.0), _absLab(absLab), MuGrp() {
-	_Ystore  = gsl_matrix_calloc(low.getNgrp(), d);
+	_Ystore  = gsl_matrix_calloc(low.getNtot(), d);
 	
 	_fakeFmat = gsl_matrix_calloc(low.getNgrp(), d);     // will be all zero, so we can use it for addition and subtraction without any consequences other than loss of efficiency
 	_lowLevel = &low;
@@ -8953,7 +8972,7 @@ BetaGrpSnpMiss::BetaGrpSnpMiss(const string &predFlNam, const string &outFlNam, 
 	
 }
 BetaGrpSnpMiss::BetaGrpSnpMiss(const string &predFlNam, const string &outFlNam, RanIndex &low, const size_t &Npred, const size_t &d, const int &Nthr, const double &prVar, const double &absLab) : _numSaves(0.0), _nThr(Nthr), _Npred(Npred), _inPredFl(predFlNam), _priorVar(prVar), _absLab(absLab), MuGrp() {
-	_Ystore  = gsl_matrix_calloc(low.getNgrp(), d);
+	_Ystore  = gsl_matrix_calloc(low.getNtot(), d);
 	
 	_fakeFmat = gsl_matrix_calloc(low.getNgrp(), d);     // will be all zero, so we can use it for addition and subtraction without any consequences other than loss of efficiency
 	_lowLevel = &low;
