@@ -426,7 +426,8 @@ int main(int argc, char *argv[]){
 	RanIndex exp2ln(Nxp, Nln, lnFacVec);
 	RanIndex e2e(N, N);
 	RanIndex e2tub(N, Ntub, tubFacVec);
-	RanIndex tub2pr(Ntub, Nel, tubPrFacVec);
+	//RanIndex tub2pr(Ntub, Nel, tubPrFacVec);
+	RanIndex tub2pr(Ntub);
 	RanIndex el2pr(Nel);
 	RanIndex ln2mu(Nln);
 	RanIndex exp2mu(Nxp);
@@ -435,7 +436,9 @@ int main(int argc, char *argv[]){
 	RanIndex mu2pr;
 	
 	RanIndex *e2bch;
-	RanIndex *bch2pr;
+	//RanIndex *bch2pr;
+	RanIndex bch2pr(Nbatch);
+	//RanIndex bch2pr(Nbatch, Nel, bPrFacVec);
 	
 	MuGrpEEmiss dataI(dfNam, sdfNam, eIndFnam, mMatFnam, mVecFnam, e2e, d);
 	Grp &data = dataI;
@@ -450,32 +453,39 @@ int main(int argc, char *argv[]){
 	Grp &betaCv = betaCvI;
 	
 	MuGrp tubI(data, e2tub, tub2pr);
+	//MuGrpPEX tubI(data, e2tub, tub2pr, 1e-6, nThr);
 	Grp &tub = tubI;
 	
+	MuGrp muTI(tub, tub2pr, mu2pr);
+	Grp &muT = muTI;
+	
+	/*
 	MuGrp tubPrI(tub, tub2pr, el2pr);
 	Grp &tubPr = tubPrI;
 	
 	MuGrp tubHPI(tubPr, el2pr, mu2pr);
 	Grp &tubHP = tubHPI;
-	
+	*/
 	Grp *batchI;
 	if (trtSet == "all") {
-		bch2pr = new RanIndex(Nbatch, Nel, bPrFacVec);
-		batchI = new MuBlk(data, batchFacVec, Nbatch, *bch2pr, "phenoData/allBlkInd.gbin");
+		batchI = new MuBlk(data, batchFacVec, Nbatch, bch2pr, "phenoData/allBlkInd.gbin");
 	}
 	else {
 		e2bch = new RanIndex(N, Nbatch, batchFacVec);
-		bch2pr = new RanIndex(Nbatch, Nel, bPrFacVec);
-		batchI = new MuGrp(data, *e2bch, *bch2pr);
+		batchI = new MuGrp(data, *e2bch, bch2pr);
+		//batchI = new MuGrp(data, *e2bch, bch2pr);
 	}
 	Grp &batch = *batchI;
 	
-	MuGrp bchPrI(batch, *bch2pr, el2pr);
+	MuGrp muBI(batch, bch2pr, mu2pr);
+	Grp &muB = muBI;
+	/*
+	MuGrp bchPrI(batch, bch2pr, el2pr);
 	Grp &bchPr = bchPrI;
 	
 	MuGrp bchHPI(bchPr, el2pr, mu2pr);
 	Grp &bchHP = bchHPI;
-	
+	*/
 	MuGrp dExpI = data - muExp;
 	Grp &dExp   = dExpI;
 	
@@ -503,13 +513,18 @@ int main(int argc, char *argv[]){
 	MuGrp scaPredI = muExp - mu;
 	Grp &scaPred   = scaPredI;
 	
-	MuGrpPEX scaI(scaPred, exp2ln, ln2mu, 1e-6, nThr);
+	//MuGrpPEX scaI(scaPred, exp2ln, ln2mu, 1e-6, nThr);
+	MuGrp scaI(scaPred, exp2ln, ln2mu);
 	Grp &sca = scaI;
+	
+	//MuGrp muSI(sca, ln2mu, mu2pr);
+	//Grp &muS = muSI;
 	
 	MuGrp gamPredI = muExp - mu;
 	Grp &gamPred   = gamPredI;
 	
-	BetaGrpPC gammaI(gamPred, pcEvecFlNam, pcEvalFlNam, Npc, exp2ln, gm2pr, nThr);
+	//BetaGrpPC gammaI(gamPred, pcEvecFlNam, pcEvalFlNam, Npc, exp2ln, gm2pr, nThr);
+	BetaGrpPCpex gammaI(gamPred, pcEvecFlNam, pcEvalFlNam, Npc, 1e-6, exp2ln, gm2pr, nThr);
 	Grp &gamma = gammaI;
 	
 	MuGrp bvI = mu + gamma;
@@ -530,40 +545,66 @@ int main(int argc, char *argv[]){
 	MuGrp eDevI = data - dataPr;
 	Grp &eDev   = eDevI;
 	
+	printMat(muExp.fMat());
+	cout << "#####" << endl;
+	
+	printMat(muLn.fMat());
+	cout << "#####" << endl;
+	
 	MuGrp expDevI = muExp - muLn;
 	Grp &expDev   = expDevI;
 	
-	SigmaI SigIe(eDev, SgEout, 1.0, 2.0);
-	SigmaI SigItub(tub, 1.0, 2.0);
-	SigmaI SigItpr(tubPr, 1.0, static_cast<double>(d));
-	SigmaI SigIbch(batch, 1.0, 2.0);
-	SigmaI SigIbpr(bchPr, 1.0, static_cast<double>(d));
+	printMat(expDev.fMat());
+	cout << "#####" << endl;
+	
+	SigmaIpex SigIeI(eDev, SgEout, 1.0, 2.0);
+	SigmaI &SigIe = SigIeI;
+	//SigmaI SigIe(eDev, SgEout, 1.0, 2.0);
+	//SigmaI SigIe(eDev, SgEout, 1.0, 2000.0);
+	//SigmaI SigItub(tub, 1.0, 2.0);
+	SigmaI SigItub(tub, 1.0, static_cast<double>(d));
+	//SigmaI SigItpr(tubPr, 1.0, static_cast<double>(d));
+	//SigmaI SigIbch(batch, 1.0, 2.0);
+	SigmaI SigIbch(batch, 1.0, static_cast<double>(d));
+	//SigmaI SigIbpr(bchPr, 1.0, static_cast<double>(d));
 	SigmaI SigIexp(expDev, SgEXout, 1.0, 2.0);
+	//SigmaI SigIexp(expDev, SgEXout, 1.0, 2000.0);
 	SigmaI SigIs(sca, SgSout, 1.0, 2.0);
 	SigmaI SigIa(gamma, 1.0, 2.0);
 	SigmaI SigIpr(d, 1e-6);
 	
-	Qgrp qE(N, nuE, mVecFnam);
+	QgrpPEX qEI(N, nuE, mVecFnam);
+	Qgrp &qE = qEI;
+	//Qgrp qE(N, nuE, mVecFnam);
 	Qgrp qG(Npc, nuG);
 	
 	cout << "Burn-in..." << endl;
 	for (int iBnin = 0; iBnin < Nbnin; iBnin++) {
 		data.update(dataPr, qE, SigIe);
+		dExpI = data - muExp;
 		
 		cvPredI = dExp - tBch;
 		betaCv.update(cvPred, qE, SigIe, SigIpr);
 		
 		tubPredI = dExp - betaCv - batch;
-		tub.update(tubPred, qE, SigIe, tubPr, SigItub);
-		tubPr.update(tub, SigItub, tubHP, SigItpr);
-		SigItub.update(tub, tubPr);
-		tubHP.update(tubPr, SigItpr, SigIpr);
-		SigItpr.update(tubPr, tubHP);
+		//tub.update(tubPred, qE, SigIe, tubPr, SigItub);
+		//tub.update(tubPred, qE, SigIe, SigItub);
+		tub.update(tubPred, qE, SigIe, muT, SigItub);
+		muT.update(tub, SigItub, SigIpr);
+		//tubPr.update(tub, SigItub, tubHP, SigItpr);
+		//SigItub.update(tub, tubPr);
+		//SigItub.update(tub);
+		SigItub.update(tub, muT);
+		//tubHP.update(tubPr, SigItpr, SigIpr);
+		//SigItpr.update(tubPr, tubHP);
 		
 		bchPredI = dExp - betaCv - tub;
-		batch.update(bchPred, qE, SigIe, bchPr, SigIbch);
-		bchPr.update(batch, SigIbch, bchHP, SigIbpr);
-		bchHP.update(bchPr, SigIbpr, SigIpr);
+		//batch.update(bchPred, qE, SigIe, bchPr, SigIbch);
+		//bchPr.update(batch, SigIbch, bchHP, SigIbpr);
+		//batch.update(bchPred, qE, SigIe, SigIbch);
+		batch.update(bchPred, qE, SigIe, muB, SigIbch);
+		muB.update(batch, SigIbch, SigIpr);
+		SigIbch.update(batch, muB);
 		
 		tBchI   = tub + batch;
 		beTbchI = betaCv + tBch;
@@ -577,7 +618,10 @@ int main(int argc, char *argv[]){
 		qE.update(eDev, SigIe);
 		
 		scaPredI = muExp - bv;
+		//sca.update(scaPred, SigIexp, muS, SigIs);
 		sca.update(scaPred, SigIexp, SigIs);
+		//muS.update(sca, SigIs, SigIpr);
+		//SigIs.update(sca, muS);
 		SigIs.update(sca);
 		
 		msI      = mu + sca;
@@ -586,11 +630,12 @@ int main(int argc, char *argv[]){
 		SigIa.update(gamma, qG);
 		qG.update(gamma, SigIa);
 		
+		bvI     = mu + gamma;
 		gsI     = gamma + sca;
 		muPredI = muExp - gs;
 		mu.update(muPred, SigIexp, SigIpr);
 		
-		muLnI = mu + bv;
+		muLnI   = bv + sca;
 		expDevI = muExp - muLn;
 		SigIexp.update(expDev);
 		
@@ -601,21 +646,35 @@ int main(int argc, char *argv[]){
 	cout << "Sampling..." << endl;
 	for (int iSam = 0; iSam < Nsamp; iSam++) {
 		data.update(dataPr, qE, SigIe);
+		dExpI = data - muExp;
 		
 		cvPredI = dExp - tBch;
 		betaCv.update(cvPred, qE, SigIe, SigIpr);
 		
 		tubPredI = dExp - betaCv - batch;
-		tub.update(tubPred, qE, SigIe, tubPr, SigItub);
-		tubPr.update(tub, SigItub, tubHP, SigItpr);
-		SigItub.update(tub, tubPr);
-		tubHP.update(tubPr, SigItpr, SigIpr);
-		SigItpr.update(tubPr, tubHP);
+		//tub.update(tubPred, qE, SigIe, tubPr, SigItub);
+		//tub.update(tubPred, qE, SigIe, SigItub);
+		tub.update(tubPred, qE, SigIe, muT, SigItub);
+		muT.update(tub, SigItub, SigIpr);
+		//tubPr.update(tub, SigItub, tubHP, SigItpr);
+		//SigItub.update(tub, tubPr);
+		//SigItub.update(tub);
+		SigItub.update(tub, muT);
+		//tubHP.update(tubPr, SigItpr, SigIpr);
+		//SigItpr.update(tubPr, tubHP);
 		
 		bchPredI = dExp - betaCv - tub;
-		batch.update(bchPred, qE, SigIe, bchPr, SigIbch);
-		bchPr.update(batch, SigIbch, bchHP, SigIbpr);
-		bchHP.update(bchPr, SigIbpr, SigIpr);
+		//batch.update(bchPred, qE, SigIe, bchPr, SigIbch);
+		//bchPr.update(batch, SigIbch, bchHP, SigIbpr);
+		//batch.update(bchPred, qE, SigIe, SigIbch);
+		batch.update(bchPred, qE, SigIe, muB, SigIbch);
+		muB.update(batch, SigIbch, SigIpr);
+		SigIbch.update(batch, muB);
+		//SigIbch.update(batch);
+		//SigIbch.update(batch, bchPr);
+		//bchPr.update(batch, SigIbch, bchHP, SigIbpr);
+		//bchHP.update(bchPr, SigIbpr, SigIpr);
+		//SigIbpr.update(bchPr, bchHP);
 		
 		tBchI   = tub + batch;
 		beTbchI = betaCv + tBch;
@@ -629,7 +688,10 @@ int main(int argc, char *argv[]){
 		qE.update(eDev, SigIe);
 		
 		scaPredI = muExp - bv;
+		//sca.update(scaPred, SigIexp, muS, SigIs);
 		sca.update(scaPred, SigIexp, SigIs);
+		//muS.update(sca, SigIs, SigIpr);
+		//SigIs.update(sca, muS);
 		SigIs.update(sca);
 		
 		msI      = mu + sca;
@@ -638,11 +700,12 @@ int main(int argc, char *argv[]){
 		SigIa.update(gamma, qG);
 		qG.update(gamma, SigIa);
 		
+		bvI     = mu + gamma;
 		gsI     = gamma + sca;
 		muPredI = muExp - gs;
 		mu.update(muPred, SigIexp, SigIpr);
 		
-		muLnI = mu + bv;
+		muLnI   = bv + sca;
 		expDevI = muExp - muLn;
 		SigIexp.update(expDev);
 		
