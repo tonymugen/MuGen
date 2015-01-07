@@ -342,10 +342,9 @@ public:
 	 */
 	virtual ~MVnorm() {};
 	
-	/** \defgroup updateFun Overloaded update functions
+	/** \defgroup updateFun Overloaded update methods
 	 *
-	 * These functions generate updated values of the corresponding lines in the location matrix via Gibbs sampling, given the current states of the parameters listed as arguments. 
-	 * In this class, these are all pure virtual functions.
+	 * Update functions generate new stochastic values of a given parameter or set of parameters as we step through the Markov chain iteration.  These are mostly Gibbs updates, but occasional Metropolis steps are used in special cases.
 	 *
 	 * @{
 	 */
@@ -846,12 +845,12 @@ public:
 	virtual void update(const Grp &dat, const SigmaI &SigIm, const SigmaI &SigIp, const gsl_rng *r);
 	virtual void update(const Grp &dat, const SigmaI &SigIm, const double &qPr, const SigmaI &SigIp, const gsl_rng *r);
 	virtual void update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, const SigmaI &SigIp, const gsl_rng *r);
-	void update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, const double &qPr, const SigmaI &SigIp, const gsl_rng *r);
+	virtual void update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, const double &qPr, const SigmaI &SigIp, const gsl_rng *r);
 	// non-zero mean prior methods
 	virtual void update(const Grp &dat, const SigmaI &SigIm, const Grp &muPr, const SigmaI &SigIp, const gsl_rng *r);
 	virtual void update(const Grp &dat, const SigmaI &SigIm, const Grp &muPr, const double &qPr, const SigmaI &SigIp, const gsl_rng *r);
-	void update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, const Grp &muPr, const SigmaI &SigIp, const gsl_rng *r);
-	void update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, const Grp &muPr, const double &qPr, const SigmaI &SigIp, const gsl_rng *r);
+	virtual void update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, const Grp &muPr, const SigmaI &SigIp, const gsl_rng *r);
+	virtual void update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, const Grp &muPr, const double &qPr, const SigmaI &SigIp, const gsl_rng *r);
 	
 	virtual size_t nMissP() const{return 0; };
 	virtual const vector<size_t> getMisPhen() const{ return vector<size_t>(0); };
@@ -945,9 +944,13 @@ public:
 	
 	virtual void update(const Grp &dat, const SigmaI &SigIm, const SigmaI &SigIp, const gsl_rng *r);
 	virtual void update(const Grp &dat, const SigmaI &SigIm, const double &qPr, const SigmaI &SigIp, const gsl_rng *r);
+	virtual void update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, const SigmaI &SigIp, const gsl_rng *r);
+	virtual void update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, const double &qPr, const SigmaI &SigIp, const gsl_rng *r);
 	
 	virtual void update(const Grp &dat, const SigmaI &SigIm, const Grp &muPr, const SigmaI &SigIp, const gsl_rng *r);
 	virtual void update(const Grp &dat, const SigmaI &SigIm, const Grp &muPr, const double &qPr, const SigmaI &SigIp, const gsl_rng *r);
+	virtual void update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, const Grp &muPr, const SigmaI &SigIp, const gsl_rng *r);
+	virtual void update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, const Grp &muPr, const double &qPr, const SigmaI &SigIp, const gsl_rng *r);
 };
 
 /** \brief Individual regression with parameter expansion
@@ -1038,10 +1041,13 @@ public:
 	
 	void update(const Grp &dat, const SigmaI &SigIm, const SigmaI &SigIp, const gsl_rng *r);
 	void update(const Grp &dat, const SigmaI &SigIm, const double &qPr, const SigmaI &SigIp, const gsl_rng *r);
+	void update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, const SigmaI &SigIp, const gsl_rng *r);
+	void update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, const double &qPr, const SigmaI &SigIp, const gsl_rng *r);
 	
 	void update(const Grp &dat, const SigmaI &SigIm, const Grp &muPr, const SigmaI &SigIp, const gsl_rng *r);
 	void update(const Grp &dat, const SigmaI &SigIm, const Grp &muPr, const double &qPr, const SigmaI &SigIp, const gsl_rng *r);
-	
+	void update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, const Grp &muPr, const SigmaI &SigIp, const gsl_rng *r);
+	void update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, const Grp &muPr, const double &qPr, const SigmaI &SigIp, const gsl_rng *r);
 };
 
 /** \brief Individual vector of means with missing data
@@ -1817,23 +1823,117 @@ public:
 	void update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, const Grp &muPr, const double &qPr, const SigmaI &SigIp, const gsl_rng *r);
 };
 
+/** \brief Individual vector of regression coefficients with blocks of traits
+ *
+ * Implements separate regression models for blocks of traits.  The likelihood covariance matrix is block-diagonal.  Traits of the same block have to be contiguous within the vector.  
+ *
+ */
 class MVnormBetaBlk : public MVnorm {
 protected:
-	const vector< size_t > *_blkStart;  // starts of vector pieces; pointer to the vector that's in the corresponding Grp class
-	vector< gsl_vector_view > _eachVec; // views of vector pieces, each corresponding to a block of variables
-	vector< gsl_vector_view > _X;       // vector view of predictor values (typically column of a predictor matrix that is in the encapsulating group class).  The matrix this points to can be modified through this, as when I scale the predictor
-	vector<double> _scale;              // Scale -- typically XtX, but not always (special cases dealt with in derived classes)
+	/** \brief Start positions of blocks
+	 *
+	 * Pointer to the vector that's in the corresponding Grp class.
+	 *
+	 */
+	const vector< size_t > *_blkStart;
+	/** \brief Trait blocks
+	 *
+	 * Vector views of vector pieces, each corresponding to a block of variables. Pointer to the vector that's in the corresponding Grp class.
+	 *
+	 */
+	vector< gsl_vector_view > _eachVec;
+	/** \brief Separate predictors
+	 *
+	 * Vector views of predictor vectors, each corresponding to a block of variables. The predictor matrix is in the encompassing Grp class.
+	 *
+	 */
+	vector< gsl_vector_view > _X;
+	/** \brief Vector of scales
+	 *
+	 * Typically \f$X^{T}X\f$, but can bet something else in special cases.  Each _X has a correspodning _scale.
+	 *
+	 */
+	vector<double> _scale;
 	
-	const size_t *_upLevel;             // index into the vector of priors
+	/** \brief Pointer to a row index of the prior
+	 *
+	 * This has to be the same for all the blocks.
+	 *
+	 */
+	const size_t *_upLevel;
 
 	
 public:
+	/** \brief Default constructor 
+	 *
+	 * Simply calls the MVnorm default constructor.
+	 *
+	 */
 	MVnormBetaBlk() : MVnorm () {};
+	/** \brief Constructor with no prior index
+	 *
+	 * Stochastic constructor for a regression with an improper prior.
+	 *
+	 * \param[in] Grp& response variable
+	 * \param[in] gsl_matrix* predictor matrix
+	 * \param[in] vector<size_t>& column indexes of the predictor matrix
+	 * \param[in] gsl_matrix* covariance marix for stochastic initiation
+	 * \param[in] vector<size_t>& vector of start indixes of each block
+	 * \param[in] gsl_rng* pointer to a PNG
+	 * \param[in] gsl_matrix* matrix of regression coefficients
+	 * \param[in] size_t& row index of the regression coefficient matrix
+	 *
+	 */
 	MVnormBetaBlk(const Grp &resp, gsl_matrix *pred, const vector<size_t> &iCl, const gsl_matrix *Sig, const vector<size_t> &blkStart, const gsl_rng *r, gsl_matrix *bet, const size_t &iRw);
+	/** \brief Constructor with a prior index
+	 *
+	 * Stochastic constructor for a regression with a proper prior.
+	 *
+	 * \param[in] Grp& response variable
+	 * \param[in] gsl_matrix* predictor matrix
+	 * \param[in] vector<size_t>& column indexes of the predictor matrix
+	 * \param[in] gsl_matrix* covariance marix for stochastic initiation
+	 * \param[in] vector<size_t>& vector of start indixes of each block
+	 * \param[in] gsl_rng* pointer to a PNG
+	 * \param[in] size_t& row index of the prior matrix
+	 * \param[in] gsl_matrix* matrix of regression coefficients
+	 * \param[in] size_t& row index of the regression coefficient matrix
+	 *
+	 */
 	MVnormBetaBlk(const Grp &resp, gsl_matrix *pred, const vector<size_t> &iCl, const gsl_matrix *Sig, const vector<size_t> &blkStart, const gsl_rng *r, const size_t &up, gsl_matrix *bet, const size_t &iRw);
+	/** \brief Constructor with no prior index
+	 *
+	 * Stochastic constructor for a regression with an improper prior.
+	 *
+	 * \param[in] gsl_matrix* response matrix
+	 * \param[in] gsl_matrix* predictor matrix
+	 * \param[in] vector<size_t>& column indexes of the predictor matrix
+	 * \param[in] gsl_matrix* covariance marix for stochastic initiation
+	 * \param[in] vector<size_t>& vector of start indixes of each block
+	 * \param[in] gsl_rng* pointer to a PNG
+	 * \param[in] gsl_matrix* matrix of regression coefficients
+	 * \param[in] size_t& row index of the regression coefficient matrix
+	 *
+	 */
 	MVnormBetaBlk(const gsl_matrix *resp, gsl_matrix *pred, const vector<size_t> &iCl, const gsl_matrix *Sig, const vector<size_t> &blkStart, const gsl_rng *r, gsl_matrix *bet, const size_t &iRw);
+	/** \brief Constructor with a prior index
+	 *
+	 * Stochastic constructor for a regression with a proper prior.
+	 *
+	 * \param[in] gsl_matrix* response matrix
+	 * \param[in] gsl_matrix* predictor matrix
+	 * \param[in] vector<size_t>& column indexes of the predictor matrix
+	 * \param[in] gsl_matrix* covariance marix for stochastic initiation
+	 * \param[in] vector<size_t>& vector of start indixes of each block
+	 * \param[in] gsl_rng* pointer to a PNG
+	 * \param[in] size_t& row index of the prior matrix
+	 * \param[in] gsl_matrix* matrix of regression coefficients
+	 * \param[in] size_t& row index of the regression coefficient matrix
+	 *
+	 */
 	MVnormBetaBlk(const gsl_matrix *resp, gsl_matrix *pred, const vector<size_t> &iCl, const gsl_matrix *Sig, const vector<size_t> &blkStart, const gsl_rng *r, const size_t &up, gsl_matrix *bet, const size_t &iRw);
 	
+	/** \brief Destructor */
 	virtual ~MVnormBetaBlk() {};
 	
 	const size_t *up() const{return _upLevel; };
@@ -1852,17 +1952,96 @@ public:
 	virtual void update(const Grp &dat, const Qgrp &q, const SigmaI &SigIb, const Grp &muPr, const double &qPr, const SigmaI &SigIp, const gsl_rng *r);
 };
 
+/** \brief Individual vector of conditional regression coefficients with blocks of traits
+ *
+ * Implements separate regression models for blocks of traits.  The likelihood covariance matrix is block-diagonal.  Traits of the same block have to be contiguous within the vector.
+ * The regression is conditional on other regression coefficient estimates within a group (i.e., one-at-a-time updating).
+ *
+ */
 class MVnormBetaFtBlk : public MVnormBetaBlk {
 protected:
+	/** \brief Matrix of fitted values
+	 *
+	 * \f$ \boldsymbol{XB} \f$ matrix for all predictors but the current one (i.e., \f$ \boldsymbol{X}_{\cdot -j}\boldsymbol{B}_{-j\cdot} \f$).  It is subtracted from the response and the regression is performed on the residual.
+	 *
+	 */
 	gsl_matrix_view _fitted;
 	
 public:
+	/** \brief Default constructor
+	 *
+	 * Simply calls the default constructor of the MVnormBetaBlk class.  Pointer to the fitted matrix is not set to anything.
+	 *
+	 */
 	MVnormBetaFtBlk() : MVnormBetaBlk() {};
+	/** \brief Constructor with no prior index
+	 *
+	 * Stochastic constructor for a regression with an improper prior.
+	 *
+	 * \param[in] Grp& response variable
+	 * \param[in] gsl_matrix* predictor matrix
+	 * \param[in] vector<double>& vectorized fitted matrix
+	 * \param[in] vector<size_t>& column indexes of the predictor matrix
+	 * \param[in] gsl_matrix* covariance marix for stochastic initiation
+	 * \param[in] vector<size_t>& vector of start indixes of each block
+	 * \param[in] gsl_rng* pointer to a PNG
+	 * \param[in] gsl_matrix* matrix of regression coefficients
+	 * \param[in] size_t& row index of the regression coefficient matrix
+	 *
+	 */
 	MVnormBetaFtBlk(const Grp &resp, gsl_matrix *pred, vector<double> &eaFt, const vector<size_t> &iCl, const gsl_matrix *Sig, const vector<size_t> &blkStart, const gsl_rng *r, gsl_matrix *bet, const size_t &iRw) : MVnormBetaBlk(resp, pred, iCl, Sig, blkStart, r, bet, iRw) {_fitted = gsl_matrix_view_array(eaFt.data(), pred->size1, _d);};
+	/** \brief Constructor with a prior index
+	 *
+	 * Stochastic constructor for a regression with a proper prior.
+	 *
+	 * \param[in] Grp& response variable
+	 * \param[in] gsl_matrix* predictor matrix
+	 * \param[in] vector<double>& vectorized fitted matrix
+	 * \param[in] vector<size_t>& column indexes of the predictor matrix
+	 * \param[in] gsl_matrix* covariance marix for stochastic initiation
+	 * \param[in] vector<size_t>& vector of start indixes of each block
+	 * \param[in] gsl_rng* pointer to a PNG
+	 * \param[in] size_t& row index of the prior matrix
+	 * \param[in] gsl_matrix* matrix of regression coefficients
+	 * \param[in] size_t& row index of the regression coefficient matrix
+	 *
+	 */
 	MVnormBetaFtBlk(const Grp &resp, gsl_matrix *pred, vector<double> &eaFt, const vector<size_t> &iCl, const gsl_matrix *Sig, const vector<size_t> &blkStart, const gsl_rng *r, const size_t &up, gsl_matrix *bet, const size_t &iRw) : MVnormBetaBlk(resp, pred, iCl, Sig, blkStart, r, up, bet, iRw) {_fitted = gsl_matrix_view_array(eaFt.data(), pred->size1, _d);};
+	/** \brief Constructor with no prior index
+	 *
+	 * Stochastic constructor for a regression with an improper prior.
+	 *
+	 * \param[in] gsl_matrix* response matrix
+	 * \param[in] gsl_matrix* predictor matrix
+	 * \param[in] vector<double>& vectorized fitted matrix
+	 * \param[in] vector<size_t>& column indexes of the predictor matrix
+	 * \param[in] gsl_matrix* covariance marix for stochastic initiation
+	 * \param[in] vector<size_t>& vector of start indixes of each block
+	 * \param[in] gsl_rng* pointer to a PNG
+	 * \param[in] gsl_matrix* matrix of regression coefficients
+	 * \param[in] size_t& row index of the regression coefficient matrix
+	 *
+	 */
 	MVnormBetaFtBlk(const gsl_matrix *resp, gsl_matrix *pred, vector<double> &eaFt, const vector<size_t> &iCl, const gsl_matrix *Sig, const vector<size_t> &blkStart, const gsl_rng *r, gsl_matrix *bet, const size_t &iRw) : MVnormBetaBlk(resp, pred, iCl, Sig, blkStart, r, bet, iRw) {_fitted = gsl_matrix_view_array(eaFt.data(), pred->size1, _d);};
+	/** \brief Constructor with a prior index
+	 *
+	 * Stochastic constructor for a regression with a proper prior.
+	 *
+	 * \param[in] gsl_matrix* response matrix
+	 * \param[in] gsl_matrix* predictor matrix
+	 * \param[in] vector<double>& vectorized fitted matrix
+	 * \param[in] vector<size_t>& column indexes of the predictor matrix
+	 * \param[in] gsl_matrix* covariance marix for stochastic initiation
+	 * \param[in] vector<size_t>& vector of start indixes of each block
+	 * \param[in] gsl_rng* pointer to a PNG
+	 * \param[in] size_t& row index of the prior matrix
+	 * \param[in] gsl_matrix* matrix of regression coefficients
+	 * \param[in] size_t& row index of the regression coefficient matrix
+	 *
+	 */
 	MVnormBetaFtBlk(const gsl_matrix *resp, gsl_matrix *pred, vector<double> &eaFt, const vector<size_t> &iCl, const gsl_matrix *Sig, const vector<size_t> &blkStart, const gsl_rng *r, const size_t &up, gsl_matrix *bet, const size_t &iRw) : MVnormBetaBlk(resp, pred, iCl, Sig, blkStart, r, up, bet, iRw) {_fitted = gsl_matrix_view_array(eaFt.data(), pred->size1, _d);};
 	
+	/** \brief Destructor */
 	~MVnormBetaFtBlk() {};
 	
 	void update(const Grp &dat, const SigmaI &SigIb, const gsl_rng *r);
@@ -1881,214 +2060,1135 @@ public:
 };
 /** @} */
 // end of lineLoc group
+/** \defgroup Index Index classes
+ *
+ * Index classes relate model hierarchy levels to each other through indexes.  The relationships can be kept the same throughout the Gibbs sampling process.  Alternatively, they can be updated according to various models, implemented in the base and derived class.
+ *
+ * \note The updating of indexes has not yet been extensively tested.
+ *
+ *@{
+ */
 
-/** \brief Random index class that allows for mixture models.
- *	Can be used as a deterministic index if there is deterministic initiation and no updating
+/** \brief Generic index class.
+ *
+ * Establishes relationships of location parameter levels in a hierarchy.  If the constructor is deterministic and there is no updating, this class is used simply to relate levels.  Updating methods are provided that implement Gaussian mixture models.
+ *
  */
 class RanIndex {
+
 protected:
-	vector< vector<size_t> > _idx; // rugged 2D array that relates the upper-level elements to the indexes of the lower levels
+	/** \brief Indexes of lower levels
+	 *
+	 * This vector of vectors relates a top level of a hierarchy to the corresponding lower level.  The total number of elements is the number of elements in the top level.  Each element is a vector of row indexes into the lower level location parameter matrix.
+	 * Constituent vectors may not be of the same length (corresponding to an unbalanced design).
+	 *
+	 */
+	vector< vector<size_t> > _idx;
+	/** \brief Indexes of upper levels
+	 *
+	 * Stores the row indexes of the upper-level location parameter matrix corresponding to each lower-level index.  The length of this vector is the same as the sum of all the vectors in *_idx*, and the number of unique values is equal to the length of *_idx*.
+	 *
+	 */
 	vector<size_t> _vecInd;        // vector that has the upper-level element IDs for each lower-level instance
+	/** \brief Pointer to a PNG
+	 *
+	 * The PNG is initialized whether or not updating is going to be performed. We use the sum of _time(NULL)_ and RTDSC for seeding.
+	 *
+	 */
 	gsl_rng *_r;
 	
 public:
-	// constructors
+	/** \brief Default constructor
+	 *
+	 * The PNG is initialized, _idx is set to length 0, and _vecInd has only one element set to 0.
+	 *
+	 */
 	RanIndex();
+	/** \brief Vector-based constructor
+	 *
+	 * The GSL vector of integers has the indexes of the upper level (number of unique values is _Nup_), and is the same length as the number of rows in the lower-level location parameter matrix (_Ntot_).
+	 *
+	 * \param[in] gsl_vector_int* GSL vector of index information
+	 * \param[in] size_t& number of elements in the lower level
+	 * \param[in] size_t& number of elements in the upper level
+	 *
+	 */
 	RanIndex(const gsl_vector_int *lInd, const size_t &Ntot, const size_t &Nup);
+	/** \brief Constructor with one upper level
+	 *
+	 * For cases where all the lower-level elemants have the same prior.
+	 *
+	 * \param[in] size_t& number of lower-level elements
+	 *
+	 */
 	RanIndex(const size_t &Ntot);
-	RanIndex(const size_t &Ntot, const size_t &Nup); // one-to-one for all the Ntot that are =< Nup
-	RanIndex(const size_t &Ntot, const size_t &Nup, const string &fileNam); // reading it directly from a file
+	/** \brief Constructor for single-element lower levels
+	 *
+	 * Each element of the lower level has a separate corresponding upper level (prior).  Typically the two numbers passed will be the same, but the one-argument constructor is already used for setting up the single-prior index.
+	 * If the number of elements in the upper level is bigger than that in the lower level, an error is issued.  If the number of upper elements is smaller than the _Ntot_, only the first _Nup_ elements of the lower level are used and the rest are ignored with a warning.
+	 *
+	 */
+	RanIndex(const size_t &Ntot, const size_t &Nup);
+	/** \brief Constructor with file input
+	 *
+	 * Reads the index information from a file. Base-0 indexing is generally assumed, checks are ettempted.  Since there are cases when indexes that look non-base-0 are needed (such as when only a subset of lower-level rows are accessed), these generate warnings rather than errors, unless there are upper-level index values outsinde the set range.
+	 *
+	 * \param[in] size_t& number of lower-level elements
+	 * \param[in] size_t& number of upper-level elements
+	 * \param[in] string& file name
+	 *
+	 */
+	RanIndex(const size_t &Ntot, const size_t &Nup, const string &fileNam);
+	/** \brief Constructor with file-stream input
+	 *
+	 * Reads the index information from a file. Base-0 indexing is generally assumed, checks are ettempted.  Since there are cases when indexes that look non-base-0 are needed (such as when only a subset of lower-level rows are accessed), these generate warnings rather than errors, unless there are upper-level index values outsinde the set range.
+	 *
+	 * \param[in] size_t& number of lower-level elements
+	 * \param[in] size_t& number of upper-level elements
+	 * \param[in] FILE* file stream name
+	 *
+	 */
 	RanIndex(const size_t &Ntot, const size_t &Nup, FILE *fileStr);
 	
+	/** \brief Destructor */
 	virtual ~RanIndex() {gsl_rng_free(_r);};
 	
+	/** \brief Subscript operator
+	 *
+	 * Returns a vector of lower-level indexes for a given upper-level index. This is the _const_ version.
+	 *
+	 * \param[in] size_t upper-level index value
+	 * \return const vector<size_t>& vector of lower-level indexes
+	 *
+	 */
 	const vector<size_t> &operator[](const size_t i) const{return _idx[i];};
-	const vector<size_t> &getIndVec() const{return _vecInd; };
-	const size_t &priorInd(const size_t i) const{return _vecInd[i]; };
+	/** \brief Subscript operator
+	 *
+	 * Returns a vector of lower-level indexes for a given upper-level index.
+	 *
+	 * \param[in] size_t upper-level index value
+	 * \return vector<size_t>& vector of lower-level indexes
+	 *
+	 */
 	vector<size_t> &operator[](const size_t i) {return _idx[i];};
+	
+	/** \brief Retrieve the index vector
+	 *
+	 * Provides access to the vector of indexes into the upper level.  This is the _const_ version.
+	 *
+	 * \return const vector<size_t> vector of upper-level indexes
+	 *
+	 */
+	const vector<size_t> &getIndVec() const{return _vecInd; };
+	/** \brief Retrieve the index vector
+	 *
+	 * Provides access to the vector of indexes into the upper level.
+	 *
+	 * \return const vector<size_t> vector of upper-level indexes
+	 *
+	 */
 	vector<size_t> &getIndVec() {return _vecInd; };
+	
+	/** \brief Upper-level index
+	 *
+	 * Returns the upper-level index that corresponds to the given lower-level index.  This is the _const_ version.
+	 *
+	 * \param[in] size_t lower-level index
+	 * \return const size_t upper-level index
+	 *
+	 */
+	const size_t &priorInd(const size_t i) const{return _vecInd[i]; };
+	/** \brief Upper-level index
+	 *
+	 * Returns the upper-level index that corresponds to the given lower-level index.
+	 *
+	 * \param[in] size_t lower-level index
+	 * \return const size_t upper-level index
+	 *
+	 */
 	size_t &priorInd(const size_t i) {return _vecInd[i]; };
 	
-	size_t getNtot(){return _vecInd.size(); };
-	size_t getNgrp(){return _idx.size(); };
+	/** \brief Number of lower-level elements
+	 *
+	 * Returns the number of rows in the lower-level location matrix.  This is the _const_ version.
+	 *
+	 * \return size_t number of lower-level elements
+	 *
+	 */
 	size_t getNtot() const{return _vecInd.size(); };
+	/** \brief Number of lower-level elements
+	 *
+	 * Returns the number of rows in the lower-level location matrix.
+	 *
+	 * \return size_t number of lower-level elements
+	 *
+	 */
+	size_t getNtot(){return _vecInd.size(); };
+	
+	/** \brief Number of upper-level elements
+	 *
+	 * Returns the number of rows in the upper-level (prior) matrix. This is the _const_ version.
+	 *
+	 * \return size_t number of upper-level elements
+	 *
+	 */
 	size_t getNgrp() const{return _idx.size(); };
+	/** \brief Number of upper-level elements
+	 *
+	 * Returns the number of rows in the upper-level (prior) matrix.
+	 *
+	 * \return size_t number of upper-level elements
+	 *
+	 */
+	size_t getNgrp(){return _idx.size(); };
+	
+	/** \brief Proportions of each group
+	 *
+	 * Returns the fraction of the total number of lower-level elements that fall into each of the upper-level groups.
+	 *
+	 * \return vector<double> a vector of proportions
+	 *
+	 */
 	virtual const vector<double> props() const;
 	
-	virtual void init(const vector< vector<size_t> > &idx, const vector< vector<size_t> > &rLD); // determnistic initiation; rLD is ignored in this class
-	virtual void save(const string &outFlNam) {};
+	/** \brief Initialization function
+	 *
+	 * Deterministically re-initializes the index with a new vector of vectors. Used for some mixture models.
+	 *
+	 * \param[in] vector< vector<size_t> >& vector to replace the current _idx
+	 * \param[in] vector< vector<size_t> >& a relationship vector; ignored in this class
+	 *
+	 */
+	virtual void init(const vector< vector<size_t> > &idx, const vector< vector<size_t> > &rLD);
+	/** \brief Variable selection save
+	 *
+	 * Saves probablities of belonging to a group. For now, only implemented in the derived class.
+	 *
+	 * \param[in] Grp& data
+	 * \param[in] BetaGrpBVSR* location parameters
+	 * \param[in] SigmaI& inverse-covariance matrix
+	 *
+	 */
 	virtual void save(const Grp &y, const BetaGrpBVSR *theta, const SigmaI &SigIe) {};
+	/** \brief Probability save
+	 *
+	 * Saves probablities of belonging to a group. For now, only implemented in the derived class.
+	 *
+	 * \param[in] Grp& data
+	 * \param[in] Grp& location parameters
+	 * \param[in] SigmaI& inverse-covariance matrix
+	 *
+	 */
 	virtual void save(const Grp &y, const Grp &theta, const SigmaI &SigIe) {};
+	/** \brief Dump results to a file
+	 *
+	 * Dumping the mean values for group probabilites to a file. For now, only implemented in the derived class.
+	 *
+	 */
 	virtual void dump(){};
 	
+	/** \brief Update mixture model with multiple covariances.
+	 *
+	 * \ingroup updateFun
+	 *
+	 * Updates the group relationships for Gaussian mixture models when each group has a different mean and covariance.
+	 *
+	 * \param[in] Grp& data
+	 * \param[in] Grp& group means
+	 * \param[in] vector<SigmaI>& vector of inverse-covariances
+	 * \param[in] MixP& prior proportions
+	 *
+	 */
 	void update(const Grp &theta, const Grp &mu, const vector<SigmaI> &SigI, const MixP &p);
+	/** \brief Update mixture model with a single covariance.
+	 *
+	 * \ingroup updateFun
+	 *
+	 * Updates the group relationships for Gaussian mixture models when each group has a different mean but all covrariances are the same.
+	 *
+	 * \param[in] Grp& data
+	 * \param[in] Grp& group means
+	 * \param[in] SigmaI& common inverse-covariance
+	 * \param[in] MixP& prior proportions
+	 *
+	 */
 	void update(const Grp &theta, const Grp &mu, const SigmaI &SigI, const MixP &p);
-	virtual void update(const Grp &y, const SigmaI &SigIe, BetaGrpBVSR *theta, const SigmaI &SigIp) {}; // not supported at present
+	/** \brief Variable selection update
+	 *
+	 * \ingroup updateFun
+	 *
+	 * Update for a mixture that includes point-mass at 0.  Only implemented in the derived class.
+	 *
+	 * \param[in] Grp& data
+	 * \param[in] SigmaI& likelihood inverse-covariance
+	 * \param[in] BetaGrpBVSR* location parameter values
+	 * \param[in] SigmaI& prior inverse-covariance
+	 *
+	 */
+	virtual void update(const Grp &y, const SigmaI &SigIe, BetaGrpBVSR *theta, const SigmaI &SigIp) {};
+	
 };
 
-/*
- *	Index class that keeps track of the variable selection process.
+/** \brief BVSR index class
+ *
+ * Keeps track of the variable selection process for a multivariate version of the Bayesian Variable Selection Regression (BVSR) multi-marker regression method of Guan and Stephens \cite guan11 (Greenberg, unpublished).   This clas is a friend of BetaGrpBVSR.
+ *
+ * \warning This class is experimental and has not been extensively tested.
+ *
  */
-class RanIndexVS : public RanIndex {  //  is a friend of BetaGrpBVSR
+class RanIndexVS : public RanIndex {
 	
 protected:
-	vector<double> _pep;              // posterior EXCLUSION probabilities, in the order of the picked X; keep adding to this at each save, then dump into a file in the end
-	vector<bool> _mcmcTrack;          // accept/reject and which move tracking.  Each _mcmcTrack[i] has 4 elements: accepted? adding proposal? dropping proposal? swapping proposal?
-	vector< vector<size_t> > _relLD;  // relates the new positions of selected predictors to the original positions; _relLD[i][0] is the original position, i.e. _rel has to be as long as the selected # of predictors; the rest of _relLD (if any) are positions of linked SNPs (or, in general, correlated predictors)
-	size_t _Ntp;			          // original number of predictors
+	/** \brief Posterior exclusion probabilities
+	 *
+	 * Posterior _exclusion_ probabilities.  This is the opposite if the implementation in Guan and Stephens, where the inclusion probabilities are exported.  My implementation results in output that is analogous to \f$ -\log_{10}p \f$, making it more intuitive to people used to frequentist approaches.
+	 * The probabilities stored in this variable are in the order of the SNPs picked for initial inclusion in the BetaGrpBVSR class.  We keep adding PEP values to this at each save, then dump the mean into a file in the end, giving a Rao-Blackwellized point estimate of PEP.
+	 *
+	 */
+	vector<double> _pep;
+	/** \brief Transition tracking variable
+	 *
+	 * Used to track the Metropolis moves made after the current MCMC step. There are four elements, three last ones being mutually exclusive: [0]: accepted? [1]: proposed adding a predictor? [2]: proposed dropping a predictor? [3]: proposed swapping predictors?
+	 *
+	 */
+	vector<bool> _mcmcTrack;
+	/** \brief Mapping selected to original predictors
+	 *
+	 * Relates the new positions of selected predictors to the original positions.  Its length is the same as the selected number of predictors.  _relLD[i][0] is the original position of the selected predictor _i_; the rest of _relLD[i] (if any) are positions of linked SNPs (or, in general, correlated predictors)
+	 *
+	 */
+	vector< vector<size_t> > _relLD;
+	/** \brief Original number of predictors */
+	size_t _Ntp;
 	
-	MixP *_prior;               // the prior
+	/** \brief Prior proportions
+	 *
+	 * Prior proportion of predictors in selected to be in the model.
+	 */
+	MixP *_prior;
 	
-	vector<bool> _acceptDrop;	// these vectors store the possible values of _mcmcTrak, so I can just copy over the correct one instead of doing element-wise assignment
+	/** \brief Accept a drop
+	 *
+	 * The state of _mcmcTrack that corresponds to accepting a drop of a predictor.  Pre-set so that it is easy to modify _mcmcTrack.
+	 *
+	 */
+	vector<bool> _acceptDrop;
+	/** \brief Reject a drop
+	 *
+	 * The state of _mcmcTrack that corresponds to rejecting a drop of a predictor.  Pre-set so that it is easy to modify _mcmcTrack.
+	 *
+	 */
 	vector<bool> _rejectDrop;
+	/** \brief Accept an addition
+	 *
+	 * The state of _mcmcTrack that corresponds to accepting an addition of a predictor.  Pre-set so that it is easy to modify _mcmcTrack.
+	 *
+	 */
 	vector<bool> _acceptAdd;
+	/** \brief Rject an addition
+	 *
+	 * The state of _mcmcTrack that corresponds to rejecting an addition of a predictor.  Pre-set so that it is easy to modify _mcmcTrack.
+	 *
+	 */
 	vector<bool> _rejectAdd;
+	/** \brief Accept a swap
+	 *
+	 * The state of _mcmcTrack that corresponds to accepting a swap of predictors.  Pre-set so that it is easy to modify _mcmcTrack.
+	 *
+	 */
 	vector<bool> _acceptSwap;
+	/** \brief Reject a swap
+	 *
+	 * The state of _mcmcTrack that corresponds to rejecting a swap of predictors.  Pre-set so that it is easy to modify _mcmcTrack.
+	 *
+	 */
 	vector<bool> _rejectSwap;
 	
-	double _numSaves;     // tracking the number of saves; make it double so that no static_cast is necessary for the division at the end
-	string _pepOutFlnam;  // out file for pep
-	string _mcmcPutFlNam; // file name to save the accept/reject statistics
+	/** \brief Number of calls to save()
+	 *
+	 * Tracks the number of times a save function is called.  Before dumping the PEP results, divide each element of _pep by this number.
+	 *
+	 */
+	double _numSaves;
+	/** \brief PEP output file name */
+	string _pepOutFlnam;
+	/** \brief Accept/reject file name
+	 *
+	 * Name of the file where the accept/reject and proposal kind statistics are stored.  This file is appended at each save.  These statistics are useful for checking and trouble-shooting Metropolis chain behavior.
+	 */
+	string _mcmcPutFlNam;
 	
+	/** \brief Rank proposal-generating function
+	 *
+	 * The rank-based Metropolis proposal-generating function proposed in Guan and Stephens \cite guan11 .
+	 *
+	 * \warning This function is not presently used in my implementation of BVSR because I am not sure it is a symmetric proposal.  If it is not, then we would need to come up with a Metropolis-Hastings updating scheme.
+	 */
 	size_t _proposal(const size_t &Ntot, const int &Nmn, const gsl_rng *r); // rank proposal-generating function for Metropolis updating; not clear if it is symmetric so don't use for now
 
 public:
+	/** \brief Default constructor */
 	RanIndexVS();
-	RanIndexVS(const size_t &Ntot, const string &outFlNam, MixP &pr); // preliminary set-up; initiation to be finished with an init() function
+	/** \brief Constructor with a prior
+	 *
+	 * This is a preliminary set-up.  The initiation is finished with the init() member function, after pre-screening of predictors is performed.
+	 *
+	 */
+	RanIndexVS(const size_t &Ntot, const string &outFlNam, MixP &pr);
+	/** \brief Constructor without a prior
+	 *
+	 * This is a preliminary set-up.  The initiation is finished with the init() member function, after pre-screening of predictors is performed.
+	 *
+	 */
 	RanIndexVS(const size_t &Ntot, const string &outFlNam);
 	
+	/** \brief Destructor */
 	~RanIndexVS(){};
 	
 	void props(vector<double> &prp) const;
 	
-	void save(const Grp &y, const BetaGrpBVSR *theta, const SigmaI &SigIe); // not saving to a file (mostly)
+	/** \brief Save PEP
+	 *
+	 * Stores current PEP values and saves Metropolis proposal statistics to a file.
+	 *
+	 * \param[in] Grp& data
+	 * \param[in] BetaGrpBVSR* location parameters
+	 * \param[in] SigmaI& inverse-covariance matrix
+	 *
+	 */
+	void save(const Grp &y, const BetaGrpBVSR *theta, const SigmaI &SigIe);
+	/** \brief Save PEP
+	 *
+	 * Stores current PEP values and saves Metropolis proposal statistics to a file.
+	 *
+	 * \param[in] Grp& data
+	 * \param[in] Grp& location parameters
+	 * \param[in] SigmaI& inverse-covariance matrix
+	 *
+	 */
 	void save(const Grp &y, const Grp &theta, const SigmaI &SigIe);
+	/** \brief Save PEP to a file
+	 *
+	 * Saves posterior exclusion probabilities (PEP) to a file. Name of the file is stored in the _pepOutFlnam variable.
+	 *
+	 */
 	void dump();
+	/** \brief Complete initialization
+	 *
+	 * Initializes the index instance after preliminary screening of predictors in performed by the corresponding BetaGrpBVSR variable.
+	 *
+	 * \param[in] vector< vector<size_t> >& vector to replace the current _idx
+	 * \param[in] vector< vector<size_t> >& a relationship vector; ignored in this class
+	 *
+	 */
 	void init(const vector< vector<size_t> > &idx, const vector< vector<size_t> > &rLD); // idx is _idx, rLD is _relLD
 	
 	void update(const Grp &y, const SigmaI &SigIe, BetaGrpBVSR *theta, const SigmaI &SigIp);
 };
 
-/*
- *	Parameter-expansion variable for 0-mean MVnormMu
- */
+/** @} */
 
+/** \brief Multiplicative redundant parameter
+ *
+ * Implements multiplicative redundant parametrization for analogs of frequentist random-effects models.  It is a multivariate extension of well-established multiplicative data augmentation schemes \cite gelman07 \cite gelman08 (Greenberg, unpublished).
+ * Here, instead of a scalar redundant parameter, I am using a redundant parameter matrix.  This approach introduces additional per-iteration computational burden, but results in much faster model convergence in some cases (Greenberg, unpublished).
+ * Therefore, it should only be used when convergence problems are severe and cannot be eliminated with simpler re-parametrizations.
+ *
+ */
 class Apex {
 private:
+	/** \brief Redundant prameter matrix
+	 *
+	 * A square matrix with dimensions equal to the number of traits.
+	 */
 	gsl_matrix *_Amat;
+	/** \brief Inverse-prior matrix
+	 *
+	 * Diagonal matrix with the same dimensions as _Amat. Diagonal values are set to a small value if a vague prior is desired.
+	 */
 	gsl_matrix *_SigIpr;
+	/** \brief Each fitted value
+	 *
+	 * Each row of _Amat is a vector of regression coefficients updated given all other rows. This pointer addresses a vector of the same length as the dimensions of _Amat contains vectorized fitted matrices of all the other coefficients, \f$ \boldsymbol{\Xi}_{\cdot -m}\boldsymbol{A}_{-m\cdot} \f$.
+	 */
 	vector<vector<double> > *_fitEach;
+	/** \brief Pointer to a PNG
+	 *
+	 * Seeded on construction with the sum of _time(NULL)_ and RTDSC.
+	 */
 	gsl_rng *_r;
 	
 public:
+	/** \brief Default constructor 
+	 *
+	 * All matrices are set to be \f$ 1 \times 1 \f$ with the element equal to 1.
+	 */
 	Apex();
+	/** \brief Dimension-only constructor
+	 *
+	 * Initializes a vague prior with diagonal elements set to \f$ 10^{-6} \f$.
+	 *
+	 * \param[in] size_t& dimension (i.e. number of traits)
+	 * \param[in] vector<vector <double> >& fitted values
+	 */
 	Apex(const size_t &d, vector<vector <double> > &fE);
+	/** \brief Diagonal prior constructor
+	 *
+	 * Initializes a prior with diagonal elements set to the given value.
+	 *
+	 * \param[in] double& inverse-prior value
+	 * \param[in] size_t& dimension (i.e. number of traits)
+	 * \param[in] vector<vector <double> >& fitted values
+	 */
 	Apex(const double &dV, const size_t &d, vector<vector <double> > &fE);
+	/** \brief Covariance prior constructor
+	 *
+	 * Initializes a prior with the given inverse-covariance matrix. Dimension is set to the dimension of the prior matrix.
+	 *
+	 * \param[in] SigmaI& inverse-prior matrix
+	 * \param[in] vector<vector <double> >& fitted values
+	 */
 	Apex(const SigmaI &SigI, vector<vector <double> > &fE);
 	
+	/** \brief Destructor */
 	~Apex();
 	
+	/** \brief Copy constructor
+	 *
+	 * \param[in] Apex& object to be copied
+	 */
 	Apex(const Apex &A);
+	/** \brief Assignement constructor
+	 *
+	 * \param[in] Apex& object to be copied
+	 * \return Apex object
+	 */
 	Apex &operator=(const Apex &A);
 	
+	/** \brief Get redundant parameter matrix */
 	gsl_matrix *getMat(){return _Amat; };
+	/** \brief Get redundant parameter matrix */
 	const gsl_matrix *getMat() const{return _Amat; };
+	/** \brief Set prior value
+	 *
+	 * Sets the diagonal of the inverse-prior matrix to the given value
+	 *
+	 * \param[in] double& inverse-prior value
+	 *
+	 */
 	void setPr(const double &pr);
 	
+	/** \brief Unreplicated Gaussian update
+	 *
+	 * \ingroup updateFun
+	 *
+	 * Gaussian data with no replication. 
+	 *
+	 * \param[in] Grp& data
+	 * \param[in] gsl_matrix* "raw" location parameter matrix
+	 * \param[in] SigmaI& data inverse-covariance matrix
+	 *
+	 */
 	void update(const Grp &y, const gsl_matrix *xi, const SigmaI &SigIm);
+	/** \brief Replicated Gaussian update
+	 *
+	 * \ingroup updateFun
+	 *
+	 * Gaussian data with replication, i.e., the number of rows in \f$ \boldsymbol{Y} \f$ is larger than the number of rows in \f$ \boldsymbol{\Xi} \f$.
+	 *
+	 * \param[in] Grp& data
+	 * \param[in] gsl_matrix* "raw" location parameter matrix
+	 * \param[in] SigmaI& data inverse-covariance matrix
+	 * \param[in] RanIndex& index relating data rows to rows in \f$ \boldsymbol{\Xi} \f$
+	 *
+	 */
 	void update(const Grp &y, const gsl_matrix *xi, const SigmaI &SigIm, const RanIndex &ind);
+	/** \brief Replicated Student-\f$t\f$ update
+	 *
+	 * \ingroup updateFun
+	 *
+	 * Student-\f$t\f$ data with replication, i.e., the number of rows in \f$ \boldsymbol{Y} \f$ is larger than the number of rows in \f$ \boldsymbol{\Xi} \f$.
+	 *
+	 * \param[in] Grp& data
+	 * \param[in] gsl_matrix* "raw" location parameter matrix
+	 * \param[in] Qgrp& Student-\f$t\f$ weights
+	 * \param[in] SigmaI& data inverse-covariance matrix
+	 * \param[in] RanIndex& index relating data rows to rows in \f$ \boldsymbol{\Xi} \f$
+	 *
+	 */
+	void update(const Grp &y, const gsl_matrix *xi, const Qgrp &q, const SigmaI &SigIm, const RanIndex &ind);
 };
 
+/** \defgroup arithmetic Arithmetic operators
+ *
+ * Arithmetic operators for Grp type location parameters.  The matrices addressed by the fMat() member functions are added.  These are essential to build Gibbs samplers with multiple parameters at the same level of hierarchy, such as variable-intercept regressions \cite gelman07 . However, care must be taken because only certain combinations of objects are compatible. These are
+ *
+ * 1. fMat() matrices have the same number of rows.  In this case, they are simply added or subtracted as is.
+ * 2. One of the matrices is a single-row matrix.  In this case, the row is added to each row of the bigger matrix (or subtracted in the appropriate direction).  The resulting MuGrp object will have the same size value matrix as the bigger fMat().
+ * 3. The RanIndex to the lower level of the Grp (or MuGrp) object with the smaller fMat() points to the same number of rows as in the fMat() of the larger object.  In this case, the RanIndex is used to relate the rows of the larger matrix to those of the smaller matrix, the rows of the smaller matrix are re-used as necessary. The resulting MuGrp object has a value matrix of the same size as the larger fMat().
+ * 4. None of the above apply, but the RanIndex to the lower level of each object points to the same number of rows.  In this case, a MuGrp object with a value matrix with that number of rows is created, and the addition/subtraction is performed with rows corresponing to the same lower level of the RanIndex.
+ *
+ * In all other cases, an error is issued and execution is aborted. The number of traits (columns) has to always be the same. Addition is commutative, subtraction is anti-commutative.
+ *
+ * @{
+ */
+/** \brief Addition operator
+ *
+ * \param[in] Grp& first summand
+ * \param[in] Grp& second summand
+ * \return MuGrp object that is the sum of the two input objects
+ *
+ */
 MuGrp operator+(const Grp &m1, const Grp &m2);
+/** \brief Addition operator
+ *
+ * \param[in] MuGrp& first summand
+ * \param[in] Grp& second summand
+ * \return MuGrp object that is the sum of the two input objects
+ *
+ */
+MuGrp operator+(const MuGrp &m1, const Grp &m2);
+/** \brief Addition operator
+ *
+ * \param[in] Grp& first summand
+ * \param[in] MuGrp& second summand
+ * \return MuGrp object that is the sum of the two input objects
+ *
+ */
+MuGrp operator+(const Grp &m1, const MuGrp &m2);
+/** \brief Subtraction operator
+ *
+ * \param[in] Grp& minuend
+ * \param[in] Grp& subtrahend
+ * \return MuGrp object that is the difference between the two input objects
+ *
+ */
 MuGrp operator-(const Grp &m1, const Grp &m2);
+/** \brief Subtraction operator
+ *
+ * \param[in] MuGrp& minuend
+ * \param[in] Grp& subtrahend
+ * \return MuGrp object that is the difference between the two input objects
+ *
+ */
+MuGrp operator-(const MuGrp &m1, const Grp &m2);
+/** \brief Subtraction operator
+ *
+ * \param[in] Grp& minuend
+ * \param[in] MuGrp& subtrahend
+ * \return MuGrp object that is the difference between the two input objects
+ *
+ */
+MuGrp operator-(const Grp &m1, const MuGrp &m2);
 
+/**@} */
+
+/** \defgroup locGrp Groups of location parameters
+ *
+ * Location parameters grouped by common modeling features. They have common priors, common data and prior covariances, and if they are regression coefficients a common set of predictors. 
+ * Values are stored in a matrix with the columns representing traits (or analogous parameters) and rows -- individual location parameters.  The latter are targets of MVnorm classes and are typically modified in Markov chains through update functions implemented in these individual-row objects.
+ *
+ * @{
+ */
+/** \brief Base location parameter group class
+ *
+ * The abstract base location parameter group class.  Cannot be initialized directly.
+ *
+ */
 class Grp {
 	friend MuGrp operator+(const Grp &m1, const Grp &m2);
+	friend MuGrp operator+(const MuGrp &m1, const Grp &m2);
+	friend MuGrp operator+(const Grp &m1, const MuGrp &m2);
 	friend MuGrp operator-(const Grp &m1, const Grp &m2);
+	friend MuGrp operator-(const MuGrp &m1, const Grp &m2);
+	friend MuGrp operator-(const Grp &m1, const MuGrp &m2);
 	friend class MuGrp;
 	
 protected:
+	/** \brief Vector of pointers to value rows
+	 *
+	 * Each individual MVnorm pointer corresponds to a row in _valueMat, which can be modified by invoking update functions that MVnorm class members.
+	 *
+	 */
 	vector<MVnorm *> _theta;
-	gsl_matrix *_valueMat; // the individual _theta members point to rows of this and modify it on initialization and during updates
-	RanIndex *_lowLevel;   // points to the level below; if unset will be 0
-	RanIndex *_upLevel;    // points to the level above; if unset will be 0
-	vector<gsl_rng *> _rV; // vector of RNGs; mostly will be length 1, but occasionally length == num_thread()
+	/** \brief Value matrix
+	 *
+	 * Matrix of location parameter values.  The columns are traits, and rows are individual replicates or regression coefficients corresponding to a given predictor.  Each row is addressed by an individual element of _theta for most classes.  Exceptions are noted in descriptions of those derived classes.
+	 */
+	gsl_matrix *_valueMat;
+	/** \brief Lower level index
+	 *
+	 * If initialized, points to the lower (i.e., data) level in the hierarchy. Otherwise, set to 0.  For regressions, plays the role of the design matrix \f$ \boldsymbol{Z} \f$.
+	 *
+	 */
+	RanIndex *_lowLevel;
+	/** \brief Upper level index
+	 *
+	 * If initialized, points to the upper (i.e., prior) level in the hierarchy. Otherwise, set to 0.
+	 *
+	 */
+	RanIndex *_upLevel;
+	/** \brief Vector of PNG pointers
+	 *
+	 * Typically is of unit length.  However, for derived classes that use multi-threading its length is equal to the number of threads, each thread having its own PNG. PNGS are seeded on construction with the sum of _time(NULL)_ and RTDSC.
+	 */
+	vector<gsl_rng *> _rV;
 	
+	/** \brief Name of the output file */
 	string _outFlNam;
 	
+	/** Default constructor */
 	Grp();
 	
 public:
+	/** \brief Destructor */
 	virtual ~Grp();
 	
-	// improper prior
+	/** \brief Gaussian likelihood, improper prior
+	 *
+	 * \ingroup updateFun
+	 * \ingroup locIP
+	 *
+	 * \param[in] Grp& data
+	 * \param[in] SigmaI& data inverse-covariance
+	 *
+	 */
 	virtual void update(const Grp &, const SigmaI &) = 0;
+	/** \brief Student-\f$t\f$ likelihood, improper prior
+	 *
+	 * \ingroup updateFun
+	 * \ingroup locIP
+	 *
+	 * \param[in] Grp& data
+	 * \param[in] Qgrp& Student-\f$t\f$ weight parameter for data
+	 * \param[in] SigmaI& data inverse-covariance
+	 *
+	 */
 	virtual void update(const Grp &, const Qgrp &, const SigmaI &) = 0;
-	// 0-mean prior
+	/** \brief Gaussian likelihood, 0-mean Gaussian prior
+	 *
+	 * \ingroup updateFun
+	 * \ingroup locZMn
+	 *
+	 * \param[in] Grp& data
+	 * \param[in] SigmaI& data inverse-covariance
+	 * \param[in] SigmaI& prior inverse-covariance
+	 *
+	 */
 	virtual void update(const Grp &, const SigmaI &, const SigmaI &) = 0;
+	/** \brief Student-\f$t\f$ likelihood, 0-mean Gaussian prior
+	 *
+	 * \ingroup updateFun
+	 * \ingroup locZMn
+	 *
+	 * \param[in] Grp& data
+	 * \param[in] Qgrp& Student-\f$t\f$ weight parameter for data
+	 * \param[in] SigmaI& data inverse-covariance
+	 * \param[in] SigmaI& prior inverse-covariance
+	 *
+	 */
 	virtual void update(const Grp &, const Qgrp &, const SigmaI &, const SigmaI &) = 0;
+	/** \brief Gaussian likelihood, 0-mean Student-\f$t\f$ prior
+	 *
+	 * \ingroup updateFun
+	 * \ingroup locZMn
+	 *
+	 * \param[in] Grp& data
+	 * \param[in] SigmaI& data inverse-covariance
+	 * \param[in] Qgrp& Student-\f$t\f$ weight parameter for the prior
+	 * \param[in] SigmaI& prior inverse-covariance
+	 *
+	 */
 	virtual void update(const Grp &, const SigmaI &, const Qgrp &, const SigmaI &) = 0;
+	/** \brief Student-\f$t\f$ likelihood, 0-mean Student-\f$t\f$ prior
+	 *
+	 * \ingroup updateFun
+	 * \ingroup locZMn
+	 *
+	 * \param[in] Grp& data
+	 * \param[in] Qgrp& Student-\f$t\f$ weight parameter for the data
+	 * \param[in] SigmaI& data inverse-covariance
+	 * \param[in] Qgrp& Student-\f$t\f$ weight parameter for the prior
+	 * \param[in] SigmaI& prior inverse-covariance
+	 *
+	 */
 	virtual void update(const Grp &, const Qgrp &, const SigmaI &, const Qgrp &, const SigmaI &) = 0;
-	// non-0-mean prior
+	/** \brief Gaussian likelihood, non-zero mean Gaussian prior
+	 *
+	 * For the relationship to work properly, the _upLevel index of the focal object has to point to the rows of the prior mean matrix.  This is the matrix addressed by dMat().  The relationship to the data is dependent on the derived class.
+	 *
+	 * \ingroup updateFun
+	 * \ingroup locNZMn
+	 *
+	 * \param[in] Grp& data
+	 * \param[in] SigmaI& data inverse-covariance
+	 * \param[in] Grp& prior mean
+	 * \param[in] SigmaI& prior inverse-covariance
+	 *
+	 */
 	virtual void update(const Grp &, const SigmaI &, const Grp &, const SigmaI &) = 0;
+	/** \brief Student-\f$t\f$ likelihood, non-zero mean Gaussian prior
+	 *
+	 * For the relationship to work properly, the _upLevel index of the focal object has to point to the rows of the prior mean matrix.  This is the matrix addressed by dMat().  The relationship to the data is dependent on the derived class.
+	 *
+	 * \ingroup updateFun
+	 * \ingroup locNZMn
+	 *
+	 * \param[in] Grp& data
+	 * \param[in] Qgrp& Student-\f$t\f$ weight parameter for the data
+	 * \param[in] SigmaI& data inverse-covariance
+	 * \param[in] Grp& prior mean
+	 * \param[in] SigmaI& prior inverse-covariance
+	 *
+	 */
 	virtual void update(const Grp &, const Qgrp &, const SigmaI &, const Grp &, const SigmaI &) = 0;
+	/** \brief Gaussian likelihood, non-zero mean Student-\f$t\f$ prior
+	 *
+	 * For the relationship to work properly, the _upLevel index of the focal object has to point to the rows of the prior mean matrix.  This is the matrix addressed by dMat().  The relationship to the data is dependent on the derived class.
+	 *
+	 * \ingroup updateFun
+	 * \ingroup locNZMn
+	 *
+	 * \param[in] Grp& data
+	 * \param[in] SigmaI& data inverse-covariance
+	 * \param[in] Grp& prior mean
+	 * \param[in] Qgrp& Student-\f$t\f$ weight parameter for the prior
+	 * \param[in] SigmaI& prior inverse-covariance
+	 *
+	 */
 	virtual void update(const Grp &, const SigmaI &, const Grp &, const Qgrp &, const SigmaI &) = 0;
+	/** \brief Student-\f$t\f$ likelihood, non-zero mean Student-\f$t\f$ prior
+	 *
+	 * For the relationship to work properly, the _upLevel index of the focal object has to point to the rows of the prior mean matrix.  This is the matrix addressed by dMat().  The relationship to the data is dependent on the derived class.
+	 *
+	 * \ingroup updateFun
+	 * \ingroup locNZMn
+	 *
+	 * \param[in] Grp& data
+	 * \param[in] Qgrp& Student-\f$t\f$ weight parameter for the data
+	 * \param[in] SigmaI& data inverse-covariance
+	 * \param[in] Grp& prior mean
+	 * \param[in] Qgrp& Student-\f$t\f$ weight parameter for the prior
+	 * \param[in] SigmaI& prior inverse-covariance
+	 *
+	 */
 	virtual void update(const Grp &, const Qgrp &, const SigmaI &, const Grp &, const Qgrp &, const SigmaI &) = 0;
 	
+	/** \brief Save to pre-specified file
+	 *
+	 * Saves a sample from the Markov chain for the object by appending to a file.  Unless re-implemented, the current contents of _valueMat are saved. File name is either generic or pre-specified at construction.
+	 */
 	virtual void save();
+	/** \brief Save to file
+	 *
+	 * Saves a sample from the Markov chain for the object by appending to the named file.  Unless re-implemented, the current contents of _valueMat are saved.
+	 *
+	 * \param[in] string& file name
+	 */
 	virtual void save(const string &outFlNam);
+	/** \brief Joint save
+	 *
+	 * Saves the current value of _valueMat to one file and the covariance matrix corresponding to the given inverse-covariance to the other.  Both files are appended.  Has more practical importance in some derived classes.
+	 *
+	 * \param[in] string& mean file name
+	 * \param[in] string& covariance file name
+	 * \param[in] SigmaI& inverse-covariance
+	 *
+	 */
 	virtual void save(const string &outMuFlNam, const string &outSigFlNam, const SigmaI &SigI);
-	virtual void save(const SigmaI &SigI) {};                // these two are for situations where we want to dump to a file only at the end of the run
-	virtual void save(const Grp &y, const SigmaI &SigI) {};  // they have an effect only in the child classes that implement them
+	/** \brief Save with inverse-covariance
+	 *
+	 * Reserved for saving to a variable rather than a file.  Has an effect only in classes where it is re-implemented.
+	 *
+	 * \param[in] SigmaI& inverse-covariance
+	 *
+	 */
+	virtual void save(const SigmaI &SigI) {};
+	/** \brief Save with data and inverse-covariance
+	 *
+	 * Reserved for saving to a variable rather than a file.  Has an effect only in classes where it is re-implemented.
+	 *
+	 * \param[in] Grp& data
+	 * \param[in] SigmaI& inverse-covariance
+	 *
+	 */
+	virtual void save(const Grp &y, const SigmaI &SigI) {};
+	/** \brief Save Mahalanobis distance
+	 *
+	 * Saves Mahalanobis distances of each row to a vector of zeros, given the provided inverse-covariance.
+	 *
+	 * \param[in] string& file name
+	 * \param[in] SigmaI& inverse-covariance
+	 *
+	 */
 	void mhlSave(const string &outFlNam, const SigmaI SigI);
 	
+	/** \brief Dump to a file
+	 *
+	 * Dumps paramter values averaged over the MCMC run to a file in the end of the run.  Has an effect only in derived classes where it is implemented.  In these classes, the name of the file is pre-specified at initialization.
+	 *
+	 */
 	virtual void dump(){}; // dump to a file in cases where save() saves to a matrix
 	
+	/** \brief Get vector of row pointers
+	 *
+	 * \return vector<MVnorm *> vector of objects addressing rows of the value matrix
+	 */
 	const vector<MVnorm *> &dataVec() const{return _theta; };
+	/** \brief Access the value matrix
+	 *
+	 * Gives access to the value matrix.  The internal structure this points to depends on the derived class.
+	 *
+	 * \return gsl_matrix* pointer to a GSL matrix
+	 */
 	virtual const gsl_matrix *dMat() const{return _valueMat; };
+	/** \brief Access the value matrix
+	 *
+	 * Gives access to the value matrix. The internal structure this points to depends on the derived class, and may be different from dMat().
+	 *
+	 * \return gsl_matrix* pointer to a GSL matrix
+	 */
 	virtual const gsl_matrix *fMat() const{return _valueMat; };
-	size_t Ndata() const{return _theta.size(); };
-	size_t phenD() const{return _valueMat->size2; };
 	
-	virtual double lnOddsRat(const Grp &y, const SigmaI &SigI, const size_t i) const {return 0.0; }; // makes sense only for regression classes
+	/** \brief Get number of rows
+	 *
+	 * \return size_t number of rows in the value matrix, corresponds to the number of mean values or regression coefficients
+	 */
+	const size_t Ndata() const{return _valueMat->size1; };
+	/** \brief Get number of traits
+	 *
+	 * \return size_t number of columns in the value matrix, corresponds to the number of traits
+	 */
+	const size_t phenD() const{return _valueMat->size2; };
 	
+	/** \brief Log-odds ratio
+	 *
+	 * Log-odds ration between models with and without the i-th regression coefficient (row).  Makes sense only in regression classes, everywhere else returns zero.
+	 *
+	 * \param[in] Grp& data
+	 * \param[in] SigmaI& data inverse-covariance
+	 * \param[in] size_t index of the element (row)
+	 *
+	 * \return double log-odds ratio
+	 */
+	virtual double lnOddsRat(const Grp &y, const SigmaI &SigI, const size_t i) const {return 0.0; };
+	
+	/** \brief Subscript operator
+	 *
+	 * Get a MVnorm object pointer to a row of the value matrix.
+	 *
+	 * \param[in] size_t row index
+	 *
+	 * \return MVnorm* pointer to an element in the value matrix
+	 */
 	const MVnorm * operator[](const size_t i) const{return _theta[i]; };
+	/** \brief Subscript operator
+	 *
+	 * Get a MVnorm object pointer to a row of the value matrix.
+	 *
+	 * \param[in] size_t row index
+	 *
+	 * \return MVnorm* pointer to an element in the value matrix
+	 */
 	MVnorm * operator[](const size_t i) {return _theta[i]; };
 	
+	/** \brief Group mean
+	 *
+	 * Calculates within-group mean values of the value matrix (by row).  The groups are defined by the upper-level of the given RanIndex variable.  The lower-level number of elements of the index has to be the same as the number of rows in the current object's value matrix.
+	 *
+	 * \param[in] RanIndex& grouping index
+	 * \return MuGrp object with the matrix of means
+	 */
 	virtual MuGrp mean(RanIndex &grp);
+	/** \brief Group mean
+	 *
+	 * Calculates within-group mean values of the value matrix (by row).  The groups are defined by the upper-level of the given RanIndex variable.  The lower-level number of elements of the index has to be the same as the number of rows in the current object's value matrix.
+	 *
+	 * \param[in] RanIndex& grouping index
+	 * \return MuGrp object with the matrix of means
+	 */
 	virtual const MuGrp mean(RanIndex &grp) const;
 	
+	/** \brief Group weighted mean
+	 *
+	 * Calculates within-group weighted mean values of the value matrix (by row).  The groups are defined by the upper-level of the given RanIndex variable.  The lower-level number of elements of the index has to be the same as the number of rows in the current object's value matrix.
+	 * The weights are in the provided Qgrp object.  Typically, they are from a Student-\f$t\f$ model.
+	 *
+	 * \param[in] RanIndex& grouping index
+	 * \param[in] Qgrp& weights
+	 * \return MuGrp object with the matrix of means
+	 */
 	virtual MuGrp mean(RanIndex &grp, const Qgrp &q);
+	/** \brief Group weighted mean
+	 *
+	 * Calculates within-group weighted mean values of the value matrix (by row).  The groups are defined by the upper-level of the given RanIndex variable.  The lower-level number of elements of the index has to be the same as the number of rows in the current object's value matrix.
+	 * The weights are in the provided Qgrp object.  Typically, they are from a Student-\f$t\f$ model.
+	 *
+	 * \param[in] RanIndex& grouping index
+	 * \param[in] Qgrp& weights
+	 * \return MuGrp object with the matrix of means
+	 */
 	virtual const MuGrp mean(RanIndex &grp, const Qgrp &q) const;
 	
+	/** \brief Center the value matrix 
+	 *
+	 * Centering is performed by subtracting the mean for each column from each column in place.
+	 */
 	void center(){ colCenter(_valueMat); };
 	
 };
 
+/** \brief Hierarchical mean
+ *
+ * Standard hierarchical mean parameter of Bayesian hierarchical models \cite gelman04 \cite gelman07 .  Can also be used to store raw data (i.e., the lowest level in the hierarchy or the repsonse in a mixed model; in which case it is not updated), and to implement a Bayesian analog of a frequentist random effect (in which case the prior is zero).
+ *
+ */
 class MuGrp : public Grp {
 	friend MuGrp operator+(const Grp &m1, const Grp &m2);
+	friend MuGrp operator+(const MuGrp &m1, const Grp &m2);
+	friend MuGrp operator+(const Grp &m1, const MuGrp &m2);
 	friend MuGrp operator-(const Grp &m1, const Grp &m2);
+	friend MuGrp operator-(const MuGrp &m1, const Grp &m2);
+	friend MuGrp operator-(const Grp &m1, const MuGrp &m2);
 protected:
 	
 public:
+	/** \brief Default constructor */
 	MuGrp() : Grp(){};
-	MuGrp(RanIndex &low, const size_t &d);  // 0-mean prior constructor
+	/** \brief Deterministic zero-value constructor
+	 *
+	 * Sets all elements of the value matrix to zero.  Can be used to construct a 0-mean prior. No upper level is set and thus this is not typically updated.
+	 *
+	 * \param[in] RanIndex& index to the lower level
+	 * \param[in] size_t& number of traits
+	 */
+	MuGrp(RanIndex &low, const size_t &d);
+	/** \brief Constructor with data from file
+	 *
+	 * Reading in data from a file.  The resulting value matrix has the number of rows equal to the number of groups in the low index and the number of elements in the upper index.  
+	 * Index consistency is required, otherwise an error is issued and the program aborted.  The constructor is deterministic.
+	 *
+	 * \param[in] string& data file name
+	 * \param[in] RanIndex& index to the lower (data) level
+	 * \param[in] RanIndex& index to the upper (prior) level
+	 * \param[in] size_t& number of traits
+	 */
 	MuGrp(const string &datFlNam, RanIndex &low, RanIndex &up, const size_t &d); // RanIndex's are not const because I have a pointer to it as a member
-	MuGrp(const string &datFlNam, RanIndex &up, const size_t d); // for setting up the lowest level deterministically
+	/** \brief Constructor with data from file and no lower level
+	 *
+	 * Reading in data from a file.  The resulting value matrix has the number of rows equal to the number of elements in the upper index.  This constructor is deterministic and can be used to set up the lowest (i.e. data) level of the hierarchy, and not update it.
+	 *
+	 * \param[in] string& data file name
+	 * \param[in] RanIndex& index to the upper (prior) level
+	 * \param[in] size_t& number of traits
+	 */
+	MuGrp(const string &datFlNam, RanIndex &up, const size_t &d);
+	/** \brief Constructor with a vector of MVnorm pointers
+	 *
+	 * Initializes a value matrix with means among the elements of the vector of MVnorm pointers, according to the low index (i.e., the given vector contains the data). Values for the matrix are sampled around the mean values.  The number returned by low.getNgrp() has to be equal to the number returned by up.getNtot(), and is equal to the number of rows in the value matrix.  Violation of any of these conditions results in an error.
+	 *
+	 * \param[in] vector<MVnorm *>& vector of pointers to rows of the value matrix
+	 * \param[in] RanIndex& index to the lower (data) level
+	 * \param[in] RanIndex& index to the upper (prior) level
+	 *
+	 */
 	MuGrp(const vector<MVnorm *> &dat, RanIndex &low, RanIndex &up);
+	/** \brief Constructor with a Grp object
+	 *
+	 * Initializes a value matrix with means among the rows of the matrix in Grp addressed by the dMat() member, according to the low index (i.e., the Grp object contains the data). Values for the matrix are sampled around the mean values.  The number returned by low.getNgrp() has to be equal to the number returned by up.getNtot(), and is equal to the number of rows in the value matrix.  Violation of any of these conditions results in an error.
+	 *
+	 * \param[in] Grp& vector of pointers to rows of the value matrix
+	 * \param[in] RanIndex& index to the lower (data) level
+	 * \param[in] RanIndex& index to the upper (prior) level
+	 *
+	 */
 	MuGrp(const Grp &dat, RanIndex &low, RanIndex &up);
+	/** \brief Constructor with a vector of MVnorm pointers and output file name
+	 *
+	 * Initializes a value matrix with means among the elements of the vector of MVnorm pointers, according to the low index (i.e., the given vector contains the data). Values for the matrix are sampled around the mean values.  The number returned by low.getNgrp() has to be equal to the number returned by up.getNtot(), and is equal to the number of rows in the value matrix.  Violation of any of these conditions results in an error.
+	 *
+	 * \param[in] vector<MVnorm *>& vector of pointers to rows of the value matrix
+	 * \param[in] RanIndex& index to the lower (data) level
+	 * \param[in] RanIndex& index to the upper (prior) level
+	 * \param[in] string& name of the output file
+	 *
+	 */
 	MuGrp(const vector<MVnorm *> &dat, RanIndex &low, RanIndex &up, const string &outFlNam);
+	/** \brief Constructor with a Grp object and output file name
+	 *
+	 * Initializes a value matrix with means among the rows of the matrix in Grp addressed by the dMat() member, according to the low index (i.e., the Grp object contains the data). Values for the matrix are sampled around the mean values.  The number returned by low.getNgrp() has to be equal to the number returned by up.getNtot(), and is equal to the number of rows in the value matrix.  Violation of any of these conditions results in an error.
+	 *
+	 * \param[in] Grp& vector of pointers to rows of the value matrix
+	 * \param[in] RanIndex& index to the lower (data) level
+	 * \param[in] RanIndex& index to the upper (prior) level
+	 * \param[in] string& name of the output file
+	 *
+	 */
 	MuGrp(const Grp &dat, RanIndex &low, RanIndex &up, const string &outFlNam);
-	MuGrp(const Grp &dat, RanIndex &low); // deterministic constructor to calculate means of dat according to groups in low
-	MuGrp(const Grp &dat, const Qgrp &q, RanIndex &low); // deterministic constructor to calculate weighted means of dat according to groups in low
-	MuGrp(const gsl_matrix *dat); // simple deterministic constructor
-	MuGrp(const gsl_matrix *dat, RanIndex &low); // deterministic constructor to calculate means of dat according to groups in low
-	MuGrp(const gsl_matrix *dat, const Qgrp &q, RanIndex &low); // deterministic constructor to calculate weighted means of dat according to groups in low
+	/** \brief Deterministic mean constructor
+	 *
+	 * The value matrix of the resulting object has low.getNgrp() rows and is deterministically set to within-group means.
+	 *
+	 * \param[in] Grp& data object
+	 * \param[in] RanIndex& index that defines groups
+	 *
+	 */
+	MuGrp(const Grp &dat, RanIndex &low);
+	/** \brief Deterministic weighted mean constructor
+	 *
+	 * The value matrix of the resulting object has low.getNgrp() rows and is deterministically set to within-group weighted means. Weghts are in the Qgrp object.  They are typically Student-\f$t\f$ model weights.
+	 *
+	 * \param[in] Grp& data object
+	 * \param[in] Qgrp& weights
+	 * \param[in] RanIndex& index that defines groups
+	 *
+	 */
+	MuGrp(const Grp &dat, const Qgrp &q, RanIndex &low);
+	/** \brief Deterministic constructor with a GSL matrix
+	 *
+	 * Indexes not set.  The given matrix is copied to the value matrix.
+	 *
+	 * \param[in] gsl_matrix* data matrix
+	 */
+	MuGrp(const gsl_matrix *dat);
+	/** \brief Deterministic GSL matrix mean constructor
+	 *
+	 * The value matrix of the resulting object has low.getNgrp() rows and is deterministically set to within-group means.  Mostly used internally in other derived classes.
+	 *
+	 * \param[in] gsl_matrix* data matrix
+	 * \param[in] RanIndex& index that defines groups
+	 */
+	MuGrp(const gsl_matrix *dat, RanIndex &low);
+	/** \brief Deterministic GSL matrix weighted mean constructor
+	 *
+	 * The value matrix of the resulting object has low.getNgrp() rows and is deterministically set to within-group weighted means.  Mostly used internally in other derived classes.
+	 *
+	 * \param[in] gsl_matrix* data matrix
+	 * \param[in] Qgrp& weights
+	 * \param[in] RanIndex& index that defines groups
+	 */
+	MuGrp(const gsl_matrix *dat, const Qgrp &q, RanIndex &low);
 	
+	/** \brief Destructor */
 	virtual ~MuGrp() {};
 	
-	MuGrp(const MuGrp &mG); // copy constructor
-	MuGrp(const Grp &g); // copy constructor
+	/** \brief Copy constructor
+	 *
+	 * \param[in] MuGrp& object to be copied
+	 * \return MuGrp& copy of the object
+	 */
+	MuGrp(const MuGrp &mG);
+	/** \brief Copy constructor
+	 *
+	 * \param[in] Grp& object to be copied
+	 * \return MuGrp& copy of the object
+	 */
+	MuGrp(const Grp &g);
+	/** \brief Assignemnt operator
+	 *
+	 * \param[in] MuGrp& object to be copied
+	 * \return MuGrp& target object
+	 */
 	MuGrp & operator=(const MuGrp &mG);
 	
 	// improper prior
@@ -2142,10 +3242,14 @@ public:
 	const MuGrp mean(RanIndex &grp, const Qgrp &q) const;
 	
 	void update(const Grp &dat, const SigmaI &SigIm, const SigmaI &SigIp);
+	void update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, const SigmaI &SigIp);
 	void update(const Grp &dat, const SigmaI &SigIm, const Qgrp &qPr, const SigmaI &SigIp);
+	void update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, const Qgrp &qPr, const SigmaI &SigIp);
 	
 	void update(const Grp &dat, const SigmaI &SigIm, const Grp &muPr, const SigmaI &SigIp);
+	void update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, const Grp &muPr, const SigmaI &SigIp);
 	void update(const Grp &dat, const SigmaI &SigIm, const Grp &muPr, const Qgrp &qPr, const SigmaI &SigIp);
+	void update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, const Grp &muPr, const Qgrp &qPr, const SigmaI &SigIp);
 };
 
 class MuGrpMiss : public MuGrp {
@@ -2274,14 +3378,14 @@ public:
 	void update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm);
 	// 0-mean prior
 	virtual void update(const Grp &dat, const SigmaI &SigIm, const SigmaI &SigIp);
-	void update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, const SigmaI &SigIp);
+	virtual void update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, const SigmaI &SigIp);
 	virtual void update(const Grp &dat, const SigmaI &SigIm, const Qgrp &qPr, const SigmaI &SigIp);
-	void update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, const Qgrp &qPr, const SigmaI &SigIp);
+	virtual void update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, const Qgrp &qPr, const SigmaI &SigIp);
 	// non-0-mean prior
 	virtual void update(const Grp &dat, const SigmaI &SigIm, const Grp &muPr, const SigmaI &SigIp);
-	void update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, const Grp &muPr, const SigmaI &SigIp);
+	virtual void update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, const Grp &muPr, const SigmaI &SigIp);
 	virtual void update(const Grp &dat, const SigmaI &SigIm, const Grp &muPr, const Qgrp &qPr, const SigmaI &SigIp);
-	void update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, const Grp &muPr, const Qgrp &qPr, const SigmaI &SigIp);
+	virtual void update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, const Grp &muPr, const Qgrp &qPr, const SigmaI &SigIp);
 	
 };
 
@@ -2328,10 +3432,14 @@ public:
 	void save(const string &outFlNam);
 	
 	virtual void update(const Grp &dat, const SigmaI &SigIm, const SigmaI &SigIp);
+	virtual void update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, const SigmaI &SigIp);
 	virtual void update(const Grp &dat, const SigmaI &SigIm, const Qgrp &qPr, const SigmaI &SigIp);
+	virtual void update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, const Qgrp &qPr, const SigmaI &SigIp);
 	
 	virtual void update(const Grp &dat, const SigmaI &SigIm, const Grp &muPr, const SigmaI &SigIp);
+	virtual void update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, const Grp &muPr, const SigmaI &SigIp);
 	virtual void update(const Grp &dat, const SigmaI &SigIm, const Grp &muPr, const Qgrp &qPr, const SigmaI &SigIp);
+	virtual void update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, const Grp &muPr, const Qgrp &qPr, const SigmaI &SigIp);
 };
 
 
@@ -2368,10 +3476,14 @@ public:
 	const gsl_matrix *fMat() const{return _fittedAllAdj; };
 	
 	void update(const Grp &dat, const SigmaI &SigIm, const SigmaI &SigIp) { BetaGrpPEX::update(dat, SigIm, SigIp); };
+	void update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, const SigmaI &SigIp){ BetaGrpPEX::update(dat, q, SigIm, SigIp); };
 	void update(const Grp &dat, const SigmaI &SigIm, const Qgrp &qPr, const SigmaI &SigIp) { BetaGrpPEX::update(dat, SigIm, qPr, SigIp); };
+	void update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, const Qgrp &qPr, const SigmaI &SigIp){ BetaGrpPEX::update(dat, q, SigIm, qPr, SigIp); };
 	
 	void update(const Grp &dat, const SigmaI &SigIm, const Grp &muPr, const SigmaI &SigIp) { BetaGrpPEX::update(dat, SigIm, muPr, SigIp); };
+	void update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, const Grp &muPr, const SigmaI &SigIp){ BetaGrpPEX::update(dat, q, SigIm, muPr, SigIp); };
 	void update(const Grp &dat, const SigmaI &SigIm, const Grp &muPr, const Qgrp &qPr, const SigmaI &SigIp) { BetaGrpPEX::update(dat, SigIm, muPr, qPr, SigIp); };
+	void update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, const Grp &muPr, const Qgrp &qPr, const SigmaI &SigIp){ BetaGrpPEX::update(dat, q, SigIm, muPr, qPr, SigIp); };
 };
 
 class BetaGrpSnp : public MuGrp {
@@ -2622,6 +3734,8 @@ public:
 	// updates handled by BetaGrpFt
 };
 
+// end of the locGrp group
+/** @} */
 
 class SigmaI {
 protected:
@@ -2775,6 +3889,9 @@ public:
 	
 	virtual double alpha() const {return 1.0; };
 	virtual double alpha() {return 1.0; };
+	
+	size_t size() const {return _qVec.size(); };
+	size_t size() {return _qVec.size(); };
 	
 	virtual void update(const Grp &dat, const Grp &mu, const SigmaI &SigI);
 	virtual void update(const Grp &dat, const SigmaI &SigI);

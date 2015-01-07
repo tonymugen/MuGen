@@ -927,7 +927,67 @@ void MVnormMuPEX::update(const Grp &dat, const SigmaI &SigIm, const double &qPr,
 	
 	// prepare the scale matrices
 	gsl_blas_dgemm(CblasNoTrans, CblasTrans, _lowLevel->size(), _A->getMat(), &_tSAprod.matrix, 0.0, SigSum); // getting n_j*_A%*%SigI%*%t(_A) by multiplying _A by t(_tSAprod)
-	gsl_matrix_scale(SigSum, _lowLevel->size());
+	gsl_matrix_memcpy(SigPr, SigIp.getMat());
+	gsl_matrix_scale(SigPr, qPr);
+	gsl_matrix_add(SigSum, SigPr);
+	gsl_linalg_cholesky_decomp(SigSum);
+	gsl_linalg_cholesky_invert(SigSum);
+	
+	// prepare the scaled mean vector
+	gsl_blas_dgemv(CblasNoTrans, 1.0, &_tSAprod.matrix, smVec, 0.0, tmpV); // again, transposing _tSAprod, but because of the dgemv has the vector on the right, while I need it on the left, I use CblasNoTrans
+	gsl_blas_dsymv(CblasLower, 1.0, SigSum, tmpV, 0.0, smVec);
+	
+	gsl_linalg_cholesky_decomp(SigSum);
+	MVgauss(smVec, SigSum, r, &_vec.vector);
+	
+	gsl_vector_free(tmpV);
+	gsl_vector_free(smVec);
+	gsl_matrix_free(SigSum);
+	gsl_matrix_free(SigPr);
+}
+void MVnormMuPEX::update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, const SigmaI &SigIp, const gsl_rng *r){
+	gsl_vector *smVec  = gsl_vector_calloc(_d);
+	gsl_vector *tmpV   = gsl_vector_alloc(_d);
+	gsl_matrix *SigSum = gsl_matrix_alloc(_d, _d);
+	
+	double qSum = 0.0;
+	for (vector<size_t>::const_iterator it = _lowLevel->begin(); it != _lowLevel->end(); ++it) {
+		gsl_blas_daxpy(q[*it], dat[*it]->getVec(), smVec);
+		qSum += q[*it];
+	}
+	
+	// prepare the scale matrices
+	
+	gsl_blas_dgemm(CblasNoTrans, CblasTrans, qSum, _A->getMat(), &_tSAprod.matrix, 0.0, SigSum); // getting sum(q)*_A%*%SigI%*%t(_A) by multiplying _A by t(_tSAprod)
+	gsl_matrix_add(SigSum, SigIp.getMat());
+	gsl_linalg_cholesky_decomp(SigSum);
+	gsl_linalg_cholesky_invert(SigSum);
+	
+	// prepare the scaled mean vector
+	gsl_blas_dgemv(CblasNoTrans, 1.0, &_tSAprod.matrix, smVec, 0.0, tmpV); // again, transposing _tSAprod, but because of the dgemv has the vector on the right, while I need it on the left, I use CblasNoTrans
+	gsl_blas_dsymv(CblasLower, 1.0, SigSum, tmpV, 0.0, smVec);
+	
+	gsl_linalg_cholesky_decomp(SigSum);
+	MVgauss(smVec, SigSum, r, &_vec.vector);
+	
+	gsl_vector_free(tmpV);
+	gsl_vector_free(smVec);
+	gsl_matrix_free(SigSum);
+}
+void MVnormMuPEX::update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, const double &qPr, const SigmaI &SigIp, const gsl_rng *r){
+	gsl_vector *smVec  = gsl_vector_calloc(_d);
+	gsl_vector *tmpV   = gsl_vector_alloc(_d);
+	gsl_matrix *SigSum = gsl_matrix_alloc(_d, _d);
+	gsl_matrix *SigPr  = gsl_matrix_alloc(_d, _d);
+	
+	double qSum = 0.0;
+	for (vector<size_t>::const_iterator it = _lowLevel->begin(); it != _lowLevel->end(); ++it) {
+		gsl_blas_daxpy(q[*it], dat[*it]->getVec(), smVec);
+		qSum += q[*it];
+	}
+	
+	// prepare the scale matrices
+	gsl_blas_dgemm(CblasNoTrans, CblasTrans, qSum, _A->getMat(), &_tSAprod.matrix, 0.0, SigSum); // getting sum(q)*_A%*%SigI%*%t(_A) by multiplying _A by t(_tSAprod)
 	gsl_matrix_memcpy(SigPr, SigIp.getMat());
 	gsl_matrix_scale(SigPr, qPr);
 	gsl_matrix_add(SigSum, SigPr);
@@ -988,7 +1048,6 @@ void MVnormMuPEX::update(const Grp &dat, const SigmaI &SigIm, const Grp &muPr, c
 	
 	// prepare the scale matrices
 	gsl_blas_dgemm(CblasNoTrans, CblasTrans, _lowLevel->size(), _A->getMat(), &_tSAprod.matrix, 0.0, SigSum); // getting n_j*_A%*%SigI%*%t(_A) by multiplying _A by t(_tSAprod)
-	gsl_matrix_scale(SigSum, _lowLevel->size());
 	gsl_matrix_memcpy(SigPr, SigIp.getMat());
 	gsl_matrix_scale(SigPr, qPr);
 	gsl_matrix_add(SigSum, SigPr);
@@ -1008,6 +1067,70 @@ void MVnormMuPEX::update(const Grp &dat, const SigmaI &SigIm, const Grp &muPr, c
 	gsl_matrix_free(SigSum);
 	gsl_matrix_free(SigPr);
 }
+void MVnormMuPEX::update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, const Grp &muPr, const SigmaI &SigIp, const gsl_rng *r){
+	gsl_vector *smVec  = gsl_vector_calloc(_d);
+	gsl_vector *tmpV   = gsl_vector_alloc(_d);
+	gsl_matrix *SigSum = gsl_matrix_alloc(_d, _d);
+	
+	double qSum = 0.0;
+	for (vector<size_t>::const_iterator it = _lowLevel->begin(); it != _lowLevel->end(); ++it) {
+		gsl_blas_daxpy(q[*it], dat[*it]->getVec(), smVec);
+		qSum += q[*it];
+	}
+	
+	// prepare the scale matrices
+	
+	gsl_blas_dgemm(CblasNoTrans, CblasTrans, qSum, _A->getMat(), &_tSAprod.matrix, 0.0, SigSum); // getting sum(q)*_A%*%SigI%*%t(_A) by multiplying _A by t(_tSAprod)
+	gsl_matrix_add(SigSum, SigIp.getMat());
+	gsl_linalg_cholesky_decomp(SigSum);
+	gsl_linalg_cholesky_invert(SigSum);
+	
+	// prepare the scaled mean vector
+	gsl_blas_dgemv(CblasNoTrans, 1.0, &_tSAprod.matrix, smVec, 0.0, tmpV); // again, transposing _tSAprod, but because of the dgemv has the vector on the right, while I need it on the left, I use CblasNoTrans
+	gsl_blas_dsymv(CblasLower, 1.0, SigIp.getMat(), muPr[*_upLevel]->getVec(), 1.0, tmpV);
+	gsl_blas_dsymv(CblasLower, 1.0, SigSum, tmpV, 0.0, smVec);
+	
+	gsl_linalg_cholesky_decomp(SigSum);
+	MVgauss(smVec, SigSum, r, &_vec.vector);
+	
+	gsl_vector_free(tmpV);
+	gsl_vector_free(smVec);
+	gsl_matrix_free(SigSum);
+}
+void MVnormMuPEX::update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, const Grp &muPr, const double &qPr, const SigmaI &SigIp, const gsl_rng *r){
+	gsl_vector *smVec  = gsl_vector_calloc(_d);
+	gsl_vector *tmpV   = gsl_vector_alloc(_d);
+	gsl_matrix *SigSum = gsl_matrix_alloc(_d, _d);
+	gsl_matrix *SigPr  = gsl_matrix_alloc(_d, _d);
+	
+	double qSum = 0.0;
+	for (vector<size_t>::const_iterator it = _lowLevel->begin(); it != _lowLevel->end(); ++it) {
+		gsl_blas_daxpy(q[*it], dat[*it]->getVec(), smVec);
+		qSum += q[*it];
+	}
+	
+	// prepare the scale matrices
+	gsl_blas_dgemm(CblasNoTrans, CblasTrans, qSum, _A->getMat(), &_tSAprod.matrix, 0.0, SigSum); // getting sum(q)*_A%*%SigI%*%t(_A) by multiplying _A by t(_tSAprod)
+	gsl_matrix_memcpy(SigPr, SigIp.getMat());
+	gsl_matrix_scale(SigPr, qPr);
+	gsl_matrix_add(SigSum, SigPr);
+	gsl_linalg_cholesky_decomp(SigSum);
+	gsl_linalg_cholesky_invert(SigSum);
+	
+	// prepare the scaled mean vector
+	gsl_blas_dgemv(CblasNoTrans, 1.0, &_tSAprod.matrix, smVec, 0.0, tmpV); // again, transposing _tSAprod, but because of the dgemv has the vector on the right, while I need it on the left, I use CblasNoTrans
+	gsl_blas_dsymv(CblasLower, 1.0, SigPr, muPr[*_upLevel]->getVec(), 1.0, tmpV);
+	gsl_blas_dsymv(CblasLower, 1.0, SigSum, tmpV, 0.0, smVec);
+	
+	gsl_linalg_cholesky_decomp(SigSum);
+	MVgauss(smVec, SigSum, r, &_vec.vector);
+	
+	gsl_vector_free(tmpV);
+	gsl_vector_free(smVec);
+	gsl_matrix_free(SigSum);
+	gsl_matrix_free(SigPr);
+}
+
 /*
  *	MVnormBetaPEX methods
  */
@@ -1149,6 +1272,81 @@ void MVnormBetaPEX::update(const Grp &dat, const SigmaI &SigIm, const double &qP
 	gsl_vector_free(tmpV);
 	gsl_vector_free(bH);
 }
+void MVnormBetaPEX::update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, const SigmaI &SigIp, const gsl_rng *r){
+	gsl_matrix *rsd    = gsl_matrix_alloc(_N, _d);
+	gsl_matrix *SigSum = gsl_matrix_alloc(_d, _d);
+	gsl_vector *tmpV   = gsl_vector_alloc(_d);
+	gsl_vector *bH     = gsl_vector_alloc(_d);
+	gsl_vector *XQ     = gsl_vector_alloc(_N);
+	double xQx = 0.0;
+	
+	for (int iDat = 0; iDat < _N; iDat++) {
+		gsl_vector_set(XQ, iDat, q[iDat]*gsl_vector_get(&_X.vector, iDat));
+	}
+	gsl_matrix_memcpy(rsd, dat.dMat());
+	gsl_matrix_sub(rsd, &_fitted.matrix);
+	
+	gsl_blas_ddot(XQ, &_X.vector, &xQx);
+	xQx = 1.0/xQx;
+	
+	gsl_blas_dgemm(CblasNoTrans, CblasTrans, xQx, _A->getMat(), &_tSAprod.matrix, 0.0, SigSum); // getting n_j*_A%*%SigI%*%t(_A) by multiplying _A by t(_tSAprod)
+	gsl_matrix_add(SigSum, SigIp.getMat());
+	gsl_linalg_cholesky_decomp(SigSum);
+	gsl_linalg_cholesky_invert(SigSum);
+	
+	gsl_blas_dgemv(CblasTrans, 1.0, rsd, XQ, 0.0, bH);
+	gsl_blas_dgemv(CblasNoTrans, 1.0, &_tSAprod.matrix, bH, 0.0, tmpV); // again, transposing _tSAprod, but because of the dgemv has the vector on the right, while I need it on the left, I use CblasNoTrans
+	gsl_blas_dsymv(CblasLower, 1.0, SigSum, tmpV, 0.0, bH);
+	
+	gsl_linalg_cholesky_decomp(SigSum);
+	MVgauss(bH, SigSum, r, &_vec.vector);
+	
+	gsl_matrix_free(rsd);
+	gsl_matrix_free(SigSum);
+	gsl_vector_free(tmpV);
+	gsl_vector_free(bH);
+	gsl_vector_free(XQ);
+}
+void MVnormBetaPEX::update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, const double &qPr, const SigmaI &SigIp, const gsl_rng *r){
+	gsl_matrix *rsd    = gsl_matrix_alloc(_N, _d);
+	gsl_matrix *SigSum = gsl_matrix_alloc(_d, _d);
+	gsl_matrix *SigPr  = gsl_matrix_alloc(_d, _d);
+	gsl_vector *tmpV   = gsl_vector_alloc(_d);
+	gsl_vector *bH     = gsl_vector_alloc(_d);
+	gsl_vector *XQ     = gsl_vector_alloc(_N);
+	double xQx = 0.0;
+	
+	for (int iDat = 0; iDat < _N; iDat++) {
+		gsl_vector_set(XQ, iDat, q[iDat]*gsl_vector_get(&_X.vector, iDat));
+	}
+	
+	gsl_matrix_memcpy(rsd, dat.dMat());
+	gsl_matrix_sub(rsd, &_fitted.matrix);
+	
+	gsl_blas_ddot(XQ, &_X.vector, &xQx);
+	xQx = 1.0/xQx;
+	
+	gsl_blas_dgemm(CblasNoTrans, CblasTrans, xQx, _A->getMat(), &_tSAprod.matrix, 0.0, SigSum); // getting n_j*_A%*%SigI%*%t(_A) by multiplying _A by t(_tSAprod)
+	gsl_matrix_memcpy(SigPr, SigIp.getMat());
+	gsl_matrix_scale(SigPr, qPr);
+	gsl_matrix_add(SigSum, SigPr);
+	gsl_linalg_cholesky_decomp(SigSum);
+	gsl_linalg_cholesky_invert(SigSum);
+	
+	gsl_blas_dgemv(CblasTrans, 1.0, rsd, XQ, 0.0, bH);
+	gsl_blas_dgemv(CblasNoTrans, 1.0, &_tSAprod.matrix, bH, 0.0, tmpV); // again, transposing _tSAprod, but because of the dgemv has the vector on the right, while I need it on the left, I use CblasNoTrans
+	gsl_blas_dsymv(CblasLower, 1.0, SigSum, tmpV, 0.0, bH);
+	
+	gsl_linalg_cholesky_decomp(SigSum);
+	MVgauss(bH, SigSum, r, &_vec.vector);
+	
+	gsl_matrix_free(rsd);
+	gsl_matrix_free(SigSum);
+	gsl_matrix_free(SigPr);
+	gsl_vector_free(tmpV);
+	gsl_vector_free(bH);
+	gsl_vector_free(XQ);
+}
 
 void MVnormBetaPEX::update(const Grp &dat, const SigmaI &SigIm, const Grp &muPr, const SigmaI &SigIp, const gsl_rng *r){
 	gsl_matrix *rsd    = gsl_matrix_alloc(_N, _d);
@@ -1209,6 +1407,88 @@ void MVnormBetaPEX::update(const Grp &dat, const SigmaI &SigIm, const Grp &muPr,
 	gsl_matrix_free(SigPr);
 	gsl_vector_free(tmpV);
 	gsl_vector_free(bH);
+}
+void MVnormBetaPEX::update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, const Grp &muPr, const SigmaI &SigIp, const gsl_rng *r){
+	gsl_matrix *rsd    = gsl_matrix_alloc(_N, _d);
+	gsl_matrix *SigSum = gsl_matrix_alloc(_d, _d);
+	gsl_vector *tmpV   = gsl_vector_alloc(_d);
+	gsl_vector *bH     = gsl_vector_alloc(_d);
+	gsl_vector *XQ     = gsl_vector_alloc(_N);
+	double xQx = 0.0;
+	
+	for (int iDat = 0; iDat < _N; iDat++) {
+		gsl_vector_set(XQ, iDat, q[iDat]*gsl_vector_get(&_X.vector, iDat));
+	}
+	gsl_matrix_memcpy(rsd, dat.dMat());
+	gsl_matrix_sub(rsd, &_fitted.matrix);
+	
+	gsl_blas_ddot(XQ, &_X.vector, &xQx);
+	xQx = 1.0/xQx;
+	
+	gsl_matrix_memcpy(rsd, dat.dMat());
+	gsl_matrix_sub(rsd, &_fitted.matrix);
+	
+	gsl_blas_dgemm(CblasNoTrans, CblasTrans, xQx, _A->getMat(), &_tSAprod.matrix, 0.0, SigSum); // getting n_j*_A%*%SigI%*%t(_A) by multiplying _A by t(_tSAprod)
+	gsl_matrix_add(SigSum, SigIp.getMat());
+	gsl_linalg_cholesky_decomp(SigSum);
+	gsl_linalg_cholesky_invert(SigSum);
+	
+	gsl_blas_dgemv(CblasTrans, 1.0, rsd, XQ, 0.0, bH);
+	gsl_blas_dgemv(CblasNoTrans, 1.0, &_tSAprod.matrix, bH, 0.0, tmpV); // again, transposing _tSAprod, but because of the dgemv has the vector on the right, while I need it on the left, I use CblasNoTrans
+	gsl_blas_dsymv(CblasLower, 1.0, SigIp.getMat(), muPr[*_upLevel]->getVec(), 1.0, tmpV);
+	
+	gsl_blas_dsymv(CblasLower, 1.0, SigSum, tmpV, 0.0, bH);
+	
+	gsl_linalg_cholesky_decomp(SigSum);
+	MVgauss(bH, SigSum, r, &_vec.vector);
+	
+	gsl_matrix_free(rsd);
+	gsl_matrix_free(SigSum);
+	gsl_vector_free(tmpV);
+	gsl_vector_free(bH);
+	gsl_vector_free(XQ);
+}
+void MVnormBetaPEX::update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, const Grp &muPr, const double &qPr, const SigmaI &SigIp, const gsl_rng *r){
+	gsl_matrix *rsd    = gsl_matrix_alloc(_N, _d);
+	gsl_matrix *SigSum = gsl_matrix_alloc(_d, _d);
+	gsl_matrix *SigPr  = gsl_matrix_alloc(_d, _d);
+	gsl_vector *tmpV   = gsl_vector_alloc(_d);
+	gsl_vector *bH     = gsl_vector_alloc(_d);
+	gsl_vector *XQ     = gsl_vector_alloc(_N);
+	double xQx = 0.0;
+	
+	for (int iDat = 0; iDat < _N; iDat++) {
+		gsl_vector_set(XQ, iDat, q[iDat]*gsl_vector_get(&_X.vector, iDat));
+	}
+	
+	gsl_matrix_memcpy(rsd, dat.dMat());
+	gsl_matrix_sub(rsd, &_fitted.matrix);
+	
+	gsl_blas_ddot(XQ, &_X.vector, &xQx);
+	xQx = 1.0/xQx;
+	
+	gsl_blas_dgemm(CblasNoTrans, CblasTrans, xQx, _A->getMat(), &_tSAprod.matrix, 0.0, SigSum); // getting n_j*_A%*%SigI%*%t(_A) by multiplying _A by t(_tSAprod)
+	gsl_matrix_memcpy(SigPr, SigIp.getMat());
+	gsl_matrix_scale(SigPr, qPr);
+	gsl_matrix_add(SigSum, SigPr);
+	gsl_linalg_cholesky_decomp(SigSum);
+	gsl_linalg_cholesky_invert(SigSum);
+	
+	gsl_blas_dgemv(CblasTrans, 1.0, rsd, XQ, 0.0, bH);
+	gsl_blas_dgemv(CblasNoTrans, 1.0, &_tSAprod.matrix, bH, 0.0, tmpV); // again, transposing _tSAprod, but because of the dgemv has the vector on the right, while I need it on the left, I use CblasNoTrans
+	gsl_blas_dsymv(CblasLower, 1.0, SigPr, muPr[*_upLevel]->getVec(), 1.0, tmpV);
+	
+	gsl_blas_dsymv(CblasLower, 1.0, SigSum, tmpV, 0.0, bH);
+	
+	gsl_linalg_cholesky_decomp(SigSum);
+	MVgauss(bH, SigSum, r, &_vec.vector);
+	
+	gsl_matrix_free(rsd);
+	gsl_matrix_free(SigSum);
+	gsl_matrix_free(SigPr);
+	gsl_vector_free(tmpV);
+	gsl_vector_free(bH);
+	gsl_vector_free(XQ);
 }
 
 /*
@@ -3746,8 +4026,11 @@ RanIndex::RanIndex(const size_t &Ntot){
 
 RanIndex::RanIndex(const size_t &Ntot, const size_t &Nup){
 	if (Nup > Ntot) {
-		cout << "ERROR more upper levels than lower levels when initializing a one-to-one RanIndex" << endl;
+		cerr << "ERROR: more upper levels than lower levels when initializing a one-to-one RanIndex" << endl;
 		exit(1);
+	}
+	else if (Nup < Ntot){
+		cerr << "WARNING: number of upper elements " << Nup << " is smaller than the number of lower elements " << Ntot << "; " << Ntot - Nup << " elements ignored" << endl;
 	}
 	_idx.resize(Nup);
 	for (size_t iLN = 0; iLN < Ntot; iLN++) {
@@ -3771,9 +4054,15 @@ RanIndex::RanIndex(const size_t &Ntot, const size_t &Nup, const string &fileNam)
 	gsl_vector_int_fread(indIn, tmp);
 	fclose(indIn);
 	int mnVal = gsl_vector_int_min(tmp);
+	int mxVal = gsl_vector_int_max(tmp);
 	
-	if (mnVal == 1) {
-		gsl_vector_int_add_constant(tmp, -1); // if the saved array is base-1 (as in R)
+	if ((mnVal == 1) && (mxVal == Nup) ) {
+		cerr << "WARNING: Looks like the saved array is base-1.  Converting to base-0" << endl;
+		gsl_vector_int_add_constant(tmp, -1); // looks like the saved array is base-1 (as in R)
+	}
+	else if (mxVal > (Nup -1)){
+		cerr << "ERROR: the upper-level index is out of range.  Max value " << mxVal << " is bigger than " << Nup - 1 << endl;
+		exit(-1);
 	}
 	else if (mnVal != 0) { cerr << "WARNING: hierarchical index may not be base-1 or base-0.  Check for errors." << endl; }
 	
@@ -3812,9 +4101,15 @@ RanIndex::RanIndex(const size_t &Ntot, const size_t &Nup, FILE *fileStr){
 	gsl_vector_int_fread(fileStr, tmp);
 	
 	int mnVal = gsl_vector_int_min(tmp);
+	int mxVal = gsl_vector_int_max(tmp);
 	
-	if (mnVal == 1) {
-		gsl_vector_int_add_constant(tmp, -1); // if the saved array is base-1 (as in R)
+	if ((mnVal == 1) && (mxVal == Nup) ) {
+		cerr << "WARNING: Looks like the saved array is base-1.  Converting to base-0" << endl;
+		gsl_vector_int_add_constant(tmp, -1); // looks like the saved array is base-1 (as in R)
+	}
+	else if (mxVal > (Nup -1)){
+		cerr << "ERROR: the upper-level index is out of range.  Max value " << mxVal << " is bigger than " << Nup - 1 << endl;
+		exit(-1);
 	}
 	else if (mnVal != 0) { cerr << "WARNING: hierarchical index may not be base-1 or base-0.  Check for errors." << endl; }
 	
@@ -3843,7 +4138,7 @@ const vector<double> RanIndex::props() const{
 	return res;
 }
 
-void RanIndex::init(const vector< vector<size_t> > &idx, const vector< vector<size_t> > &rLD){ // rLD ignored here
+void RanIndex::init(const vector< vector<size_t> > &idx, const vector< vector<size_t> > &rLD) { // rLD ignored here
 	_idx = idx;
 	
 	// now re-populate _locInd using the new _idx
@@ -4429,7 +4724,7 @@ void RanIndexVS::update(const Grp &y, const SigmaI &SigIe, BetaGrpBVSR *theta, c
 }
 
 /*
-	Apex methods
+ *	Apex methods
  */
 Apex::Apex(){
 	_Amat = gsl_matrix_alloc(1, 1);
@@ -4470,7 +4765,6 @@ Apex::Apex(const SigmaI &SigI, vector<vector <double> > &fE){
 	_SigIpr = gsl_matrix_alloc(SigI.getMat()->size1, SigI.getMat()->size2);
 	gsl_matrix_memcpy(_SigIpr, SigI.getMat());
 	_Amat = gsl_matrix_calloc(_SigIpr->size1, _SigIpr->size2);
-	gsl_matrix_set_all(_Amat, 1.0);
 	gsl_vector_view diag = gsl_matrix_diagonal(_Amat);
 	gsl_vector_set_all(&diag.vector, 1.0);
 	_fitEach = &fE;
@@ -4600,7 +4894,58 @@ void Apex::update(const Grp &y, const gsl_matrix *xi, const SigmaI &SigIm, const
 	gsl_matrix_free(ft);
 	gsl_vector_free(tmp);
 }
-
+void Apex::update(const Grp &y, const gsl_matrix *xi, const Qgrp &q, const SigmaI &SigIm, const RanIndex &ind){
+	double xQx = 0.0;
+	gsl_matrix *SigSum = gsl_matrix_alloc(_SigIpr->size1, _SigIpr->size2);
+	gsl_vector *tmp    = gsl_vector_alloc(_Amat->size2);
+	gsl_matrix *xiLg   = gsl_matrix_alloc(y.dMat()->size1, y.dMat()->size2);
+	gsl_vector *xiQ    = gsl_vector_alloc(y.dMat()->size1);
+	
+	for (size_t iUp = 0; iUp < xi->size1; iUp++) {
+		gsl_vector_const_view xiRw = gsl_matrix_const_row(xi, iUp);
+		for (vector<size_t>::const_iterator lwIt = ind[iUp].begin(); lwIt != ind[iUp].end(); ++lwIt) {
+			gsl_matrix_set_row(xiLg, *lwIt, &xiRw.vector);
+		}
+	}
+	
+	gsl_matrix *ft = gsl_matrix_alloc(y.dMat()->size1, y.dMat()->size2);
+	
+	for (size_t iRw = 0; iRw < _Amat->size1; iRw++) {
+		gsl_matrix_view ftMat = gsl_matrix_view_array((*_fitEach)[iRw].data(), y.dMat()->size1, y.dMat()->size2);
+		gsl_matrix_memcpy(ft, y.dMat());
+		gsl_matrix_sub(ft, &ftMat.matrix);
+		
+		gsl_vector_view Arw  = gsl_matrix_row(_Amat, iRw);
+		gsl_vector_view muPr = gsl_matrix_row(_SigIpr, iRw);  // i_m%*%Sig_A is the same as the m-th row of Sig_A
+		gsl_vector_const_view xiCol = gsl_matrix_const_column(xiLg, iRw); // the iRw refers to a row if A, which corresponds to a column of xi
+		
+		for (size_t iXQ = 0; iXQ < xiQ->size; iXQ++) {
+			gsl_vector_set(xiQ, iXQ, gsl_matrix_get(xiLg, iXQ, iRw)*q[iXQ]);
+		}
+		
+		gsl_blas_ddot(xiQ, &xiCol.vector, &xQx);
+		
+		gsl_matrix_memcpy(SigSum, SigIm.getMat());
+		gsl_matrix_scale(SigSum, xQx);
+		gsl_matrix_add(SigSum, _SigIpr);
+		gsl_linalg_cholesky_decomp(SigSum);
+		gsl_linalg_cholesky_invert(SigSum);
+		
+		gsl_blas_dgemv(CblasTrans, 1.0, ft, xiQ, 0.0, tmp);
+		gsl_blas_dsymv(CblasLower, 1.0, SigIm.getMat(), tmp, 0.0, &Arw.vector);
+		gsl_vector_add(&Arw.vector, &muPr.vector);
+		gsl_blas_dsymv(CblasLower, 1.0, SigSum, &Arw.vector, 0.0, tmp);
+		
+		gsl_linalg_cholesky_decomp(SigSum);
+		MVgauss(tmp, SigSum, _r, &Arw.vector);
+		
+	}
+	
+	gsl_matrix_free(SigSum);
+	gsl_matrix_free(xiLg);
+	gsl_matrix_free(ft);
+	gsl_vector_free(tmp);
+}
 
 /*
  *	arithmetic operators for Grp classes
@@ -4613,16 +4958,18 @@ MuGrp operator+(const Grp &m1, const Grp &m2){
 		return res;
 	}
 	else if ((m1.fMat())->size1 > (m2.fMat())->size1){
-		MuGrp res(m1);
 		
 		if (m2.fMat()->size1 == 1) {
+			MuGrp res(m1);
 			gsl_vector_const_view m2Row = gsl_matrix_const_row(m2.fMat(), 0);
 			for (size_t iRw = 0; iRw < res._valueMat->size1; iRw++) {
 				gsl_vector_view resRow = gsl_matrix_row(res._valueMat, iRw);
 				gsl_vector_add(&resRow.vector, &m2Row.vector);
 			}
+			return res;
 		}
 		else if ((m1.fMat())->size1 == (m2._lowLevel)->getNtot()) { // this is the case where the m2 index directly points to levels of m1, so figuring out the correspondence is straight-forward
+			MuGrp res(m1);
 			for (size_t iRw2 = 0; iRw2 < (m2.fMat())->size1; iRw2++) {
 				gsl_vector_const_view m2Row = gsl_matrix_const_row(m2.fMat(), iRw2);
 				for (vector<size_t>::const_iterator lwIt = (*(m2._lowLevel))[iRw2].begin(); lwIt != (*(m2._lowLevel))[iRw2].end(); ++lwIt) {
@@ -4630,33 +4977,39 @@ MuGrp operator+(const Grp &m1, const Grp &m2){
 					gsl_vector_add(&resRow.vector, &m2Row.vector);
 				}
 			}
-			
+			return res;
 		}
 		else if ((m1._lowLevel)->getNtot() == (m2._lowLevel)->getNtot()){ // this is the case where m1 and m2 point to the same underlying level.  We have to use that lower level to figure out which level of m2 corresponds to which m1 trough their mutual targets
-			for (size_t m1Lev = 0; m1Lev < (m1.fMat())->size1; m1Lev++) {
-				gsl_vector_const_view m2Row = gsl_matrix_const_row( m2.fMat(), (m2._lowLevel)->priorInd( ((*(res._lowLevel))[m1Lev])[0] ) );
-				gsl_vector_view resRow = gsl_matrix_row(res._valueMat, m1Lev);
+			gsl_matrix *tmp = gsl_matrix_calloc((m1._lowLevel)->getNtot(), m1.fMat()->size2);
+			MuGrp res(tmp);
+			gsl_matrix_free(tmp);
+			for (size_t iRw = 0; iRw < res._valueMat->size1; iRw++) {
+				gsl_vector_view resRow = gsl_matrix_row(res._valueMat, iRw);
+				gsl_matrix_get_row(&resRow.vector, m1.fMat(), (m1._lowLevel)->priorInd(iRw));
+				gsl_vector_const_view m2Row = gsl_matrix_const_row(m2.fMat(), (m2._lowLevel)->priorInd(iRw));
 				gsl_vector_add(&resRow.vector, &m2Row.vector);
 			}
+			return res;
 		}
 		else {
-			cerr << "ADDITION OPERATOR ERROR: Cannot relate m1 levels to m2 in addition with m1 > m2" << endl;
+			cerr << "ADDITION OPERATOR ERROR: Cannot relate m1 rows to m2 in addition with m1 > m2" << endl;
 			exit(1);
 		}
 		
-		return res;
 	}
 	else {
-		MuGrp res(m2);
 		
 		if (m1.fMat()->size1 == 1) {
+			MuGrp res(m2);
 			gsl_vector_const_view m1Row = gsl_matrix_const_row(m1.fMat(), 0);
 			for (size_t iRw = 0; iRw < res._valueMat->size1; iRw++) {
 				gsl_vector_view resRow = gsl_matrix_row(res._valueMat, iRw);
 				gsl_vector_add(&resRow.vector, &m1Row.vector);
 			}
+			return res;
 		}
 		else if ((m2.fMat())->size1 == (m1._lowLevel)->getNtot()) {
+			MuGrp res(m2);
 			for (size_t iRw1 = 0; iRw1 < (m1.fMat())->size1; iRw1++) {
 				gsl_vector_const_view m1Row = gsl_matrix_const_row(m1.fMat(), iRw1);
 				for (vector<size_t>::const_iterator lwIt = (*(m1._lowLevel))[iRw1].begin(); lwIt != (*(m1._lowLevel))[iRw1].end(); ++lwIt) {
@@ -4664,21 +5017,201 @@ MuGrp operator+(const Grp &m1, const Grp &m2){
 					gsl_vector_add(&resRow.vector, &m1Row.vector);
 				}
 			}
-			
+			return res;
 		}
 		else if ((m1._lowLevel)->getNtot() == (m2._lowLevel)->getNtot()){
-			for (size_t m2Lev = 0; m2Lev < (m2.fMat())->size1; m2Lev++) {
-				gsl_vector_const_view m1Row = gsl_matrix_const_row( m1.fMat(), (m1._lowLevel)->priorInd( ((*(res._lowLevel))[m2Lev])[0] ) );
-				gsl_vector_view resRow = gsl_matrix_row(res._valueMat, m2Lev);
+			gsl_matrix *tmp = gsl_matrix_calloc((m1._lowLevel)->getNtot(), m1.fMat()->size2);
+			MuGrp res(tmp);
+			gsl_matrix_free(tmp);
+			for (size_t iRw = 0; iRw < res._valueMat->size1; iRw++) {
+				gsl_vector_view resRow = gsl_matrix_row(res._valueMat, iRw);
+				gsl_matrix_get_row(&resRow.vector, m2.fMat(), (m2._lowLevel)->priorInd(iRw));
+				gsl_vector_const_view m1Row = gsl_matrix_const_row(m1.fMat(), (m1._lowLevel)->priorInd(iRw));
 				gsl_vector_add(&resRow.vector, &m1Row.vector);
 			}
+			return res;
 		}
 		else {
-			cerr << "ADDITION OPERATOR ERROR: Cannot relate m1 levels to m2 in addition with m1 < m2" << endl;
+			cerr << "ADDITION OPERATOR ERROR: Cannot relate m1 rows to m2 in addition with m1 < m2" << endl;
 			exit(1);
 		}
 		
+	}
+	
+}
+MuGrp operator+(const MuGrp &m1, const Grp &m2){
+	if ((m1.fMat())->size1 == (m2.fMat())->size1) {
+		MuGrp res(m1);
+		gsl_matrix_add(res._valueMat, m2.fMat());
 		return res;
+	}
+	else if ((m1.fMat())->size1 > (m2.fMat())->size1){
+		
+		if (m2.fMat()->size1 == 1) {
+			MuGrp res(m1);
+			gsl_vector_const_view m2Row = gsl_matrix_const_row(m2.fMat(), 0);
+			for (size_t iRw = 0; iRw < res._valueMat->size1; iRw++) {
+				gsl_vector_view resRow = gsl_matrix_row(res._valueMat, iRw);
+				gsl_vector_add(&resRow.vector, &m2Row.vector);
+			}
+			return res;
+		}
+		else if ((m1.fMat())->size1 == (m2._lowLevel)->getNtot()) { // this is the case where the m2 index directly points to levels of m1, so figuring out the correspondence is straight-forward
+			MuGrp res(m1);
+			for (size_t iRw2 = 0; iRw2 < (m2.fMat())->size1; iRw2++) {
+				gsl_vector_const_view m2Row = gsl_matrix_const_row(m2.fMat(), iRw2);
+				for (vector<size_t>::const_iterator lwIt = (*(m2._lowLevel))[iRw2].begin(); lwIt != (*(m2._lowLevel))[iRw2].end(); ++lwIt) {
+					gsl_vector_view resRow = gsl_matrix_row(res._valueMat, *lwIt);
+					gsl_vector_add(&resRow.vector, &m2Row.vector);
+				}
+			}
+			return res;
+		}
+		else if ((m1._lowLevel)->getNtot() == (m2._lowLevel)->getNtot()){ // this is the case where m1 and m2 point to the same underlying level.  We have to use that lower level to figure out which level of m2 corresponds to which m1 trough their mutual targets
+			gsl_matrix *tmp = gsl_matrix_calloc((m1._lowLevel)->getNtot(), m1.fMat()->size2);
+			MuGrp res(tmp);
+			gsl_matrix_free(tmp);
+			for (size_t iRw = 0; iRw < res._valueMat->size1; iRw++) {
+				gsl_vector_view resRow = gsl_matrix_row(res._valueMat, iRw);
+				gsl_matrix_get_row(&resRow.vector, m1.fMat(), (m1._lowLevel)->priorInd(iRw));
+				gsl_vector_const_view m2Row = gsl_matrix_const_row(m2.fMat(), (m2._lowLevel)->priorInd(iRw));
+				gsl_vector_add(&resRow.vector, &m2Row.vector);
+			}
+			return res;
+		}
+		else {
+			cerr << "ADDITION OPERATOR ERROR: Cannot relate m1 rows to m2 in addition with m1 > m2" << endl;
+			exit(1);
+		}
+		
+	}
+	else {
+		
+		if (m1.fMat()->size1 == 1) {
+			MuGrp res(m2);
+			gsl_vector_const_view m1Row = gsl_matrix_const_row(m1.fMat(), 0);
+			for (size_t iRw = 0; iRw < res._valueMat->size1; iRw++) {
+				gsl_vector_view resRow = gsl_matrix_row(res._valueMat, iRw);
+				gsl_vector_add(&resRow.vector, &m1Row.vector);
+			}
+			return res;
+		}
+		else if ((m2.fMat())->size1 == (m1._lowLevel)->getNtot()) {
+			MuGrp res(m2);
+			for (size_t iRw1 = 0; iRw1 < (m1.fMat())->size1; iRw1++) {
+				gsl_vector_const_view m1Row = gsl_matrix_const_row(m1.fMat(), iRw1);
+				for (vector<size_t>::const_iterator lwIt = (*(m1._lowLevel))[iRw1].begin(); lwIt != (*(m1._lowLevel))[iRw1].end(); ++lwIt) {
+					gsl_vector_view resRow = gsl_matrix_row(res._valueMat, *lwIt);
+					gsl_vector_add(&resRow.vector, &m1Row.vector);
+				}
+			}
+			return res;
+		}
+		else if ((m1._lowLevel)->getNtot() == (m2._lowLevel)->getNtot()){
+			gsl_matrix *tmp = gsl_matrix_calloc((m1._lowLevel)->getNtot(), m1.fMat()->size2);
+			MuGrp res(tmp);
+			gsl_matrix_free(tmp);
+			for (size_t iRw = 0; iRw < res._valueMat->size1; iRw++) {
+				gsl_vector_view resRow = gsl_matrix_row(res._valueMat, iRw);
+				gsl_matrix_get_row(&resRow.vector, m2.fMat(), (m2._lowLevel)->priorInd(iRw));
+				gsl_vector_const_view m1Row = gsl_matrix_const_row(m1.fMat(), (m1._lowLevel)->priorInd(iRw));
+				gsl_vector_add(&resRow.vector, &m1Row.vector);
+			}
+			return res;
+		}
+		else {
+			cerr << "ADDITION OPERATOR ERROR: Cannot relate m1 rows to m2 in addition with m1 < m2" << endl;
+			exit(1);
+		}
+		
+	}
+	
+}
+MuGrp operator+(const Grp &m1, const MuGrp &m2){
+	if ((m1.fMat())->size1 == (m2.fMat())->size1) {
+		MuGrp res(m1);
+		gsl_matrix_add(res._valueMat, m2.fMat());
+		return res;
+	}
+	else if ((m1.fMat())->size1 > (m2.fMat())->size1){
+		
+		if (m2.fMat()->size1 == 1) {
+			MuGrp res(m1);
+			gsl_vector_const_view m2Row = gsl_matrix_const_row(m2.fMat(), 0);
+			for (size_t iRw = 0; iRw < res._valueMat->size1; iRw++) {
+				gsl_vector_view resRow = gsl_matrix_row(res._valueMat, iRw);
+				gsl_vector_add(&resRow.vector, &m2Row.vector);
+			}
+			return res;
+		}
+		else if ((m1.fMat())->size1 == (m2._lowLevel)->getNtot()) { // this is the case where the m2 index directly points to levels of m1, so figuring out the correspondence is straight-forward
+			MuGrp res(m1);
+			for (size_t iRw2 = 0; iRw2 < (m2.fMat())->size1; iRw2++) {
+				gsl_vector_const_view m2Row = gsl_matrix_const_row(m2.fMat(), iRw2);
+				for (vector<size_t>::const_iterator lwIt = (*(m2._lowLevel))[iRw2].begin(); lwIt != (*(m2._lowLevel))[iRw2].end(); ++lwIt) {
+					gsl_vector_view resRow = gsl_matrix_row(res._valueMat, *lwIt);
+					gsl_vector_add(&resRow.vector, &m2Row.vector);
+				}
+			}
+			return res;
+		}
+		else if ((m1._lowLevel)->getNtot() == (m2._lowLevel)->getNtot()){ // this is the case where m1 and m2 point to the same underlying level.  We have to use that lower level to figure out which level of m2 corresponds to which m1 trough their mutual targets
+			gsl_matrix *tmp = gsl_matrix_calloc((m1._lowLevel)->getNtot(), m1.fMat()->size2);
+			MuGrp res(tmp);
+			gsl_matrix_free(tmp);
+			for (size_t iRw = 0; iRw < res._valueMat->size1; iRw++) {
+				gsl_vector_view resRow = gsl_matrix_row(res._valueMat, iRw);
+				gsl_matrix_get_row(&resRow.vector, m1.fMat(), (m1._lowLevel)->priorInd(iRw));
+				gsl_vector_const_view m2Row = gsl_matrix_const_row(m2.fMat(), (m2._lowLevel)->priorInd(iRw));
+				gsl_vector_add(&resRow.vector, &m2Row.vector);
+			}
+			return res;
+		}
+		else {
+			cerr << "ADDITION OPERATOR ERROR: Cannot relate m1 rows to m2 in addition with m1 > m2" << endl;
+			exit(1);
+		}
+		
+	}
+	else {
+		
+		if (m1.fMat()->size1 == 1) {
+			MuGrp res(m2);
+			gsl_vector_const_view m1Row = gsl_matrix_const_row(m1.fMat(), 0);
+			for (size_t iRw = 0; iRw < res._valueMat->size1; iRw++) {
+				gsl_vector_view resRow = gsl_matrix_row(res._valueMat, iRw);
+				gsl_vector_add(&resRow.vector, &m1Row.vector);
+			}
+			return res;
+		}
+		else if ((m2.fMat())->size1 == (m1._lowLevel)->getNtot()) {
+			MuGrp res(m2);
+			for (size_t iRw1 = 0; iRw1 < (m1.fMat())->size1; iRw1++) {
+				gsl_vector_const_view m1Row = gsl_matrix_const_row(m1.fMat(), iRw1);
+				for (vector<size_t>::const_iterator lwIt = (*(m1._lowLevel))[iRw1].begin(); lwIt != (*(m1._lowLevel))[iRw1].end(); ++lwIt) {
+					gsl_vector_view resRow = gsl_matrix_row(res._valueMat, *lwIt);
+					gsl_vector_add(&resRow.vector, &m1Row.vector);
+				}
+			}
+			return res;
+		}
+		else if ((m1._lowLevel)->getNtot() == (m2._lowLevel)->getNtot()){
+			gsl_matrix *tmp = gsl_matrix_calloc((m1._lowLevel)->getNtot(), m1.fMat()->size2);
+			MuGrp res(tmp);
+			gsl_matrix_free(tmp);
+			for (size_t iRw = 0; iRw < res._valueMat->size1; iRw++) {
+				gsl_vector_view resRow = gsl_matrix_row(res._valueMat, iRw);
+				gsl_matrix_get_row(&resRow.vector, m2.fMat(), (m2._lowLevel)->priorInd(iRw));
+				gsl_vector_const_view m1Row = gsl_matrix_const_row(m1.fMat(), (m1._lowLevel)->priorInd(iRw));
+				gsl_vector_add(&resRow.vector, &m1Row.vector);
+			}
+			return res;
+		}
+		else {
+			cerr << "ADDITION OPERATOR ERROR: Cannot relate m1 rows to m2 in addition with m1 < m2" << endl;
+			exit(1);
+		}
+		
 	}
 	
 }
@@ -4690,16 +5223,18 @@ MuGrp operator-(const Grp &m1, const Grp &m2){
 		return res;
 	}
 	else if ((m1.fMat())->size1 > (m2.fMat())->size1){
-		MuGrp res(m1);
 		
 		if (m2.fMat()->size1 == 1) {
+			MuGrp res(m1);
 			gsl_vector_const_view m2Row = gsl_matrix_const_row(m2.fMat(), 0);
 			for (size_t iRw = 0; iRw < res._valueMat->size1; iRw++) {
 				gsl_vector_view resRow = gsl_matrix_row(res._valueMat, iRw);
 				gsl_vector_sub(&resRow.vector, &m2Row.vector);
 			}
+			return res;
 		}
 		else if ((m1.fMat())->size1 == (m2._lowLevel)->getNtot()) { // this is the case where the m2 index directly points to levels of m1, so figuring out the correspondence is straight-forward
+			MuGrp res(m1);
 			for (size_t iRw2 = 0; iRw2 < (m2.fMat())->size1; iRw2++) {
 				gsl_vector_const_view m2Row = gsl_matrix_const_row(m2.fMat(), iRw2);
 				for (vector<size_t>::const_iterator lwIt = (*(m2._lowLevel))[iRw2].begin(); lwIt != (*(m2._lowLevel))[iRw2].end(); ++lwIt) {
@@ -4707,74 +5242,248 @@ MuGrp operator-(const Grp &m1, const Grp &m2){
 					gsl_vector_sub(&resRow.vector, &m2Row.vector);
 				}
 			}
-			
+			return res;
 		}
 		else if ((m1._lowLevel)->getNtot() == (m2._lowLevel)->getNtot()){ // this is the case where m1 and m2 point to the same underlying level.  We have to use that lower level to figure out which level of m2 corresponds to which m1 trough their mutual targets
-			for (size_t m1Lev = 0; m1Lev < (m1.fMat())->size1; m1Lev++) {
-				gsl_vector_const_view m2Row = gsl_matrix_const_row( m2.fMat(), (m2._lowLevel)->priorInd( ((*(res._lowLevel))[m1Lev])[0] ) );
-				gsl_vector_view resRow = gsl_matrix_row(res._valueMat, m1Lev);
+			gsl_matrix *tmp = gsl_matrix_calloc((m1._lowLevel)->getNtot(), m1.fMat()->size2);
+			MuGrp res(tmp);
+			gsl_matrix_free(tmp);
+			for (size_t iRw = 0; iRw < res._valueMat->size1; iRw++) {
+				gsl_vector_view resRow = gsl_matrix_row(res._valueMat, iRw);
+				gsl_matrix_get_row(&resRow.vector, m1.fMat(), (m1._lowLevel)->priorInd(iRw));
+				gsl_vector_const_view m2Row = gsl_matrix_const_row(m2.fMat(), (m2._lowLevel)->priorInd(iRw));
 				gsl_vector_sub(&resRow.vector, &m2Row.vector);
 			}
+			return res;
 		}
 		else {
-			cerr << "SUBTRACTION OPERATOR ERROR: Cannot relate m1 levels to m2 in subtraction with m1 > m2" << endl;
+			cerr << "SUBTRACTION OPERATOR ERROR: Cannot relate m1 rows to m2 in subtraction with m1 > m2" << endl;
 			exit(1);
 		}
 		
-		return res;
 	}
 	else {
-		MuGrp res;
-		gsl_matrix_free(res._valueMat);
-		res._valueMat = gsl_matrix_alloc(m2.fMat()->size1, m2.fMat()->size2);
-		res._theta.resize(m2.fMat()->size1);
 		
 		if (m1.fMat()->size1 == 1) {
+			gsl_matrix *tmp = gsl_matrix_alloc(m2.fMat()->size1, m2.fMat()->size2);
+			MuGrp res(tmp);
+			gsl_matrix_free(tmp);
 			gsl_vector_const_view m1Row = gsl_matrix_const_row(m1.fMat(), 0);
 			for (size_t iRw = 0; iRw < res._valueMat->size1; iRw++) {
-				delete res._theta[iRw];
-				res._theta[iRw] = new MVnormMu(res._valueMat, iRw);
 				gsl_matrix_set_row(res._valueMat, iRw, &m1Row.vector);
 			}
 			gsl_matrix_sub(res._valueMat, m2.fMat());
+			return res;
 		}
 		else if ((m2.fMat())->size1 == (m1._lowLevel)->getNtot()) {
+			gsl_matrix *tmp = gsl_matrix_alloc(m2.fMat()->size1, m2.fMat()->size2);
+			MuGrp res(tmp);
+			gsl_matrix_free(tmp);
 			for (size_t iRw1 = 0; iRw1 < (m1.fMat())->size1; iRw1++) {
 				gsl_vector_const_view m1Row = gsl_matrix_const_row(m1.fMat(), iRw1);
 				for (vector<size_t>::const_iterator lwIt = (*(m1._lowLevel))[iRw1].begin(); lwIt != (*(m1._lowLevel))[iRw1].end(); ++lwIt) {
-					delete res._theta[*lwIt];
-					res._theta[*lwIt] = new MVnormMu(res._valueMat, *lwIt);
 					gsl_matrix_set_row(res._valueMat, *lwIt, &m1Row.vector);
 				}
 			}
 			gsl_matrix_sub(res._valueMat, m2.fMat());
-			
+			return res;
 		}
 		else if ((m1._lowLevel)->getNtot() == (m2._lowLevel)->getNtot()){
-			for (size_t m2Lev = 0; m2Lev < (m2.fMat())->size1; m2Lev++) {
-				gsl_vector_const_view m1Row = gsl_matrix_const_row( m1.fMat(), (m1._lowLevel)->priorInd( ((*(res._lowLevel))[m2Lev])[0] ) );
-				delete res._theta[m2Lev];
-				res._theta[m2Lev] = new MVnormMu(res._valueMat, m2Lev);
-				gsl_matrix_set_row(res._valueMat, m2Lev, &m1Row.vector);
+			gsl_matrix *tmp = gsl_matrix_calloc((m1._lowLevel)->getNtot(), m1.fMat()->size2);
+			MuGrp res(tmp);
+			gsl_matrix_free(tmp);
+			for (size_t iRw = 0; iRw < res._valueMat->size1; iRw++) {
+				gsl_vector_view resRow = gsl_matrix_row(res._valueMat, iRw);
+				gsl_matrix_get_row(&resRow.vector, m1.fMat(), (m1._lowLevel)->priorInd(iRw));
+				gsl_vector_const_view m2Row = gsl_matrix_const_row(m2.fMat(), (m2._lowLevel)->priorInd(iRw));
+				gsl_vector_sub(&resRow.vector, &m2Row.vector);
 			}
-			gsl_matrix_sub(res._valueMat, m2.fMat());
+			return res;
 		}
 		else {
-			cerr << "SUBTRACTION OPERATOR ERROR: Cannot relate m1 levels to m2 in subtraction with m1 < m2" << endl;
+			cerr << "SUBTRACTION OPERATOR ERROR: Cannot relate m1 rows to m2 in subtraction with m1 < m2" << endl;
+			exit(1);
+		}
+	}
+}
+MuGrp operator-(const MuGrp &m1, const Grp &m2){
+	if ((m1.fMat())->size1 == (m2.fMat())->size1) {
+		MuGrp res(m1);
+		gsl_matrix_sub(res._valueMat, m2.fMat());
+		return res;
+	}
+	else if ((m1.fMat())->size1 > (m2.fMat())->size1){
+		
+		if (m2.fMat()->size1 == 1) {
+			MuGrp res(m1);
+			gsl_vector_const_view m2Row = gsl_matrix_const_row(m2.fMat(), 0);
+			for (size_t iRw = 0; iRw < res._valueMat->size1; iRw++) {
+				gsl_vector_view resRow = gsl_matrix_row(res._valueMat, iRw);
+				gsl_vector_sub(&resRow.vector, &m2Row.vector);
+			}
+			return res;
+		}
+		else if ((m1.fMat())->size1 == (m2._lowLevel)->getNtot()) { // this is the case where the m2 index directly points to levels of m1, so figuring out the correspondence is straight-forward
+			MuGrp res(m1);
+			for (size_t iRw2 = 0; iRw2 < (m2.fMat())->size1; iRw2++) {
+				gsl_vector_const_view m2Row = gsl_matrix_const_row(m2.fMat(), iRw2);
+				for (vector<size_t>::const_iterator lwIt = (*(m2._lowLevel))[iRw2].begin(); lwIt != (*(m2._lowLevel))[iRw2].end(); ++lwIt) {
+					gsl_vector_view resRow = gsl_matrix_row(res._valueMat, *lwIt);
+					gsl_vector_sub(&resRow.vector, &m2Row.vector);
+				}
+			}
+			return res;
+		}
+		else if ((m1._lowLevel)->getNtot() == (m2._lowLevel)->getNtot()){ // this is the case where m1 and m2 point to the same underlying level.  We have to use that lower level to figure out which level of m2 corresponds to which m1 trough their mutual targets
+			gsl_matrix *tmp = gsl_matrix_calloc((m1._lowLevel)->getNtot(), m1.fMat()->size2);
+			MuGrp res(tmp);
+			gsl_matrix_free(tmp);
+			for (size_t iRw = 0; iRw < res._valueMat->size1; iRw++) {
+				gsl_vector_view resRow = gsl_matrix_row(res._valueMat, iRw);
+				gsl_matrix_get_row(&resRow.vector, m1.fMat(), (m1._lowLevel)->priorInd(iRw));
+				gsl_vector_const_view m2Row = gsl_matrix_const_row(m2.fMat(), (m2._lowLevel)->priorInd(iRw));
+				gsl_vector_sub(&resRow.vector, &m2Row.vector);
+			}
+			return res;
+		}
+		else {
+			cerr << "SUBTRACTION OPERATOR ERROR: Cannot relate m1 rows to m2 in subtraction with m1 > m2" << endl;
 			exit(1);
 		}
 		
-		for (size_t iRw1 = 0; iRw1 < (m1.fMat())->size1; iRw1++) {
-			gsl_vector_const_view m1Row = gsl_matrix_const_row(m1.fMat(), iRw1);
-			for (vector<size_t>::const_iterator lwIt = (*(m1._lowLevel))[iRw1].begin(); lwIt != (*(m1._lowLevel))[iRw1].end(); ++lwIt) {
-				delete res._theta[*lwIt];
-				res._theta[*lwIt] = new MVnormMu(res._valueMat, *lwIt);
-				gsl_matrix_set_row(res._valueMat, *lwIt, &m1Row.vector);
-			}
-		}
-		gsl_matrix_sub(res._valueMat, m2.fMat());
+	}
+	else {
 		
+		if (m1.fMat()->size1 == 1) {
+			gsl_matrix *tmp = gsl_matrix_alloc(m2.fMat()->size1, m2.fMat()->size2);
+			MuGrp res(tmp);
+			gsl_matrix_free(tmp);
+			gsl_vector_const_view m1Row = gsl_matrix_const_row(m1.fMat(), 0);
+			for (size_t iRw = 0; iRw < res._valueMat->size1; iRw++) {
+				gsl_matrix_set_row(res._valueMat, iRw, &m1Row.vector);
+			}
+			gsl_matrix_sub(res._valueMat, m2.fMat());
+			return res;
+		}
+		else if ((m2.fMat())->size1 == (m1._lowLevel)->getNtot()) {
+			gsl_matrix *tmp = gsl_matrix_alloc(m2.fMat()->size1, m2.fMat()->size2);
+			MuGrp res(tmp);
+			gsl_matrix_free(tmp);
+			for (size_t iRw1 = 0; iRw1 < (m1.fMat())->size1; iRw1++) {
+				gsl_vector_const_view m1Row = gsl_matrix_const_row(m1.fMat(), iRw1);
+				for (vector<size_t>::const_iterator lwIt = (*(m1._lowLevel))[iRw1].begin(); lwIt != (*(m1._lowLevel))[iRw1].end(); ++lwIt) {
+					gsl_matrix_set_row(res._valueMat, *lwIt, &m1Row.vector);
+				}
+			}
+			gsl_matrix_sub(res._valueMat, m2.fMat());
+			return res;
+		}
+		else if ((m1._lowLevel)->getNtot() == (m2._lowLevel)->getNtot()){
+			gsl_matrix *tmp = gsl_matrix_calloc((m1._lowLevel)->getNtot(), m1.fMat()->size2);
+			MuGrp res(tmp);
+			gsl_matrix_free(tmp);
+			for (size_t iRw = 0; iRw < res._valueMat->size1; iRw++) {
+				gsl_vector_view resRow = gsl_matrix_row(res._valueMat, iRw);
+				gsl_matrix_get_row(&resRow.vector, m1.fMat(), (m1._lowLevel)->priorInd(iRw));
+				gsl_vector_const_view m2Row = gsl_matrix_const_row(m2.fMat(), (m2._lowLevel)->priorInd(iRw));
+				gsl_vector_sub(&resRow.vector, &m2Row.vector);
+			}
+			return res;
+		}
+		else {
+			cerr << "SUBTRACTION OPERATOR ERROR: Cannot relate m1 rows to m2 in subtraction with m1 < m2" << endl;
+			exit(1);
+		}
+	}
+}
+MuGrp operator-(const Grp &m1, const MuGrp &m2){
+	if ((m1.fMat())->size1 == (m2.fMat())->size1) {
+		MuGrp res(m1);
+		gsl_matrix_sub(res._valueMat, m2.fMat());
 		return res;
+	}
+	else if ((m1.fMat())->size1 > (m2.fMat())->size1){
+		
+		if (m2.fMat()->size1 == 1) {
+			MuGrp res(m1);
+			gsl_vector_const_view m2Row = gsl_matrix_const_row(m2.fMat(), 0);
+			for (size_t iRw = 0; iRw < res._valueMat->size1; iRw++) {
+				gsl_vector_view resRow = gsl_matrix_row(res._valueMat, iRw);
+				gsl_vector_sub(&resRow.vector, &m2Row.vector);
+			}
+			return res;
+		}
+		else if ((m1.fMat())->size1 == (m2._lowLevel)->getNtot()) { // this is the case where the m2 index directly points to levels of m1, so figuring out the correspondence is straight-forward
+			MuGrp res(m1);
+			for (size_t iRw2 = 0; iRw2 < (m2.fMat())->size1; iRw2++) {
+				gsl_vector_const_view m2Row = gsl_matrix_const_row(m2.fMat(), iRw2);
+				for (vector<size_t>::const_iterator lwIt = (*(m2._lowLevel))[iRw2].begin(); lwIt != (*(m2._lowLevel))[iRw2].end(); ++lwIt) {
+					gsl_vector_view resRow = gsl_matrix_row(res._valueMat, *lwIt);
+					gsl_vector_sub(&resRow.vector, &m2Row.vector);
+				}
+			}
+			return res;
+		}
+		else if ((m1._lowLevel)->getNtot() == (m2._lowLevel)->getNtot()){ // this is the case where m1 and m2 point to the same underlying level.  We have to use that lower level to figure out which level of m2 corresponds to which m1 trough their mutual targets
+			gsl_matrix *tmp = gsl_matrix_calloc((m1._lowLevel)->getNtot(), m1.fMat()->size2);
+			MuGrp res(tmp);
+			gsl_matrix_free(tmp);
+			for (size_t iRw = 0; iRw < res._valueMat->size1; iRw++) {
+				gsl_vector_view resRow = gsl_matrix_row(res._valueMat, iRw);
+				gsl_matrix_get_row(&resRow.vector, m1.fMat(), (m1._lowLevel)->priorInd(iRw));
+				gsl_vector_const_view m2Row = gsl_matrix_const_row(m2.fMat(), (m2._lowLevel)->priorInd(iRw));
+				gsl_vector_sub(&resRow.vector, &m2Row.vector);
+			}
+			return res;
+		}
+		else {
+			cerr << "SUBTRACTION OPERATOR ERROR: Cannot relate m1 rows to m2 in subtraction with m1 > m2" << endl;
+			exit(1);
+		}
+		
+	}
+	else {
+		
+		if (m1.fMat()->size1 == 1) {
+			gsl_matrix *tmp = gsl_matrix_alloc(m2.fMat()->size1, m2.fMat()->size2);
+			MuGrp res(tmp);
+			gsl_matrix_free(tmp);
+			gsl_vector_const_view m1Row = gsl_matrix_const_row(m1.fMat(), 0);
+			for (size_t iRw = 0; iRw < res._valueMat->size1; iRw++) {
+				gsl_matrix_set_row(res._valueMat, iRw, &m1Row.vector);
+			}
+			gsl_matrix_sub(res._valueMat, m2.fMat());
+			return res;
+		}
+		else if ((m2.fMat())->size1 == (m1._lowLevel)->getNtot()) {
+			gsl_matrix *tmp = gsl_matrix_alloc(m2.fMat()->size1, m2.fMat()->size2);
+			MuGrp res(tmp);
+			gsl_matrix_free(tmp);
+			for (size_t iRw1 = 0; iRw1 < (m1.fMat())->size1; iRw1++) {
+				gsl_vector_const_view m1Row = gsl_matrix_const_row(m1.fMat(), iRw1);
+				for (vector<size_t>::const_iterator lwIt = (*(m1._lowLevel))[iRw1].begin(); lwIt != (*(m1._lowLevel))[iRw1].end(); ++lwIt) {
+					gsl_matrix_set_row(res._valueMat, *lwIt, &m1Row.vector);
+				}
+			}
+			gsl_matrix_sub(res._valueMat, m2.fMat());
+			return res;
+		}
+		else if ((m1._lowLevel)->getNtot() == (m2._lowLevel)->getNtot()){
+			gsl_matrix *tmp = gsl_matrix_calloc((m1._lowLevel)->getNtot(), m1.fMat()->size2);
+			MuGrp res(tmp);
+			gsl_matrix_free(tmp);
+			for (size_t iRw = 0; iRw < res._valueMat->size1; iRw++) {
+				gsl_vector_view resRow = gsl_matrix_row(res._valueMat, iRw);
+				gsl_matrix_get_row(&resRow.vector, m1.fMat(), (m1._lowLevel)->priorInd(iRw));
+				gsl_vector_const_view m2Row = gsl_matrix_const_row(m2.fMat(), (m2._lowLevel)->priorInd(iRw));
+				gsl_vector_sub(&resRow.vector, &m2Row.vector);
+			}
+			return res;
+		}
+		else {
+			cerr << "SUBTRACTION OPERATOR ERROR: Cannot relate m1 rows to m2 in subtraction with m1 < m2" << endl;
+			exit(1);
+		}
 	}
 }
 
@@ -4939,7 +5648,7 @@ MuGrp::MuGrp(const string &datFlNam, RanIndex &low, RanIndex &up, const size_t &
 		for (size_t j = 0; j < d; j++) {
 			gsl_vector_set(tmpSd, j, fabs(gsl_vector_get(tmpMn, j)));
 		}
-		_theta[iEl] = new MVnormMu(_valueMat, iEl, tmpSd, _rV[0], low[iEl], _upLevel->priorInd(iEl));
+		_theta[iEl] = new MVnormMu(_valueMat, iEl, tmpSd, _rV[0], (*_lowLevel)[iEl], _upLevel->priorInd(iEl));
 	}
 		
 	gsl_matrix_free(tmpIn);
@@ -4947,7 +5656,7 @@ MuGrp::MuGrp(const string &datFlNam, RanIndex &low, RanIndex &up, const size_t &
 	gsl_vector_free(tmpMn);
 }
 
-MuGrp::MuGrp(const string &datFlNam, RanIndex &up, const size_t d){
+MuGrp::MuGrp(const string &datFlNam, RanIndex &up, const size_t &d){
 	gsl_matrix_free(_valueMat);
 	_valueMat = gsl_matrix_alloc(up.getNtot(), d);
 	_lowLevel = 0;
@@ -4973,6 +5682,10 @@ MuGrp::MuGrp(const vector<MVnorm *> &dat, RanIndex &low, RanIndex &up){
 		cerr << "ERROR: # of elements in index to the upper level is wrong!!!" << endl;
 		exit(1);
 	}
+	else if (low.getNtot() != dat.size()){
+		cerr << "ERROR: the number of rows in data does not correspond to the number of points in the low index!!!" << endl;
+		exit(1);
+	}
 	_lowLevel = &low;
 	_upLevel  = &up;
 	
@@ -4992,7 +5705,7 @@ MuGrp::MuGrp(const vector<MVnorm *> &dat, RanIndex &low, RanIndex &up){
 		for (size_t j = 0; j < dat[0]->len(); j++) {
 			gsl_vector_set(tmpSd, j, fabs(gsl_vector_get(tmpMn, j)));
 		}
-		_theta[iEl] = new MVnormMu(_valueMat, iEl, tmpSd, _rV[0], low[iEl], _upLevel->priorInd(iEl));
+		_theta[iEl] = new MVnormMu(_valueMat, iEl, tmpSd, _rV[0], (*_lowLevel)[iEl], _upLevel->priorInd(iEl));
 	}
 	
 	gsl_vector_free(tmpSd);
@@ -5002,6 +5715,10 @@ MuGrp::MuGrp(const vector<MVnorm *> &dat, RanIndex &low, RanIndex &up){
 MuGrp::MuGrp(const vector<MVnorm *> &dat, RanIndex &low, RanIndex &up, const string &outFlNam){
 	if (low.getNgrp() != up.getNtot()) {
 		cerr << "ERROR: # of elements in index to the upper level is wrong!!!" << endl;
+		exit(1);
+	}
+	else if (low.getNtot() != dat.size()){
+		cerr << "ERROR: the number of rows in data does not correspond to the number of points in the low index!!!" << endl;
 		exit(1);
 	}
 	_lowLevel = &low;
@@ -5025,7 +5742,7 @@ MuGrp::MuGrp(const vector<MVnorm *> &dat, RanIndex &low, RanIndex &up, const str
 		for (size_t j = 0; j < dat[0]->len(); j++) {
 			gsl_vector_set(tmpSd, j, fabs(gsl_vector_get(tmpMn, j)));
 		}
-		_theta[iEl] = new MVnormMu(_valueMat, iEl, tmpSd, _rV[0], low[iEl], _upLevel->priorInd(iEl));
+		_theta[iEl] = new MVnormMu(_valueMat, iEl, tmpSd, _rV[0], (*_lowLevel)[iEl], _upLevel->priorInd(iEl));
 	}
 		
 	gsl_vector_free(tmpSd);
@@ -5038,6 +5755,10 @@ MuGrp::MuGrp(const Grp &dat, RanIndex &low, RanIndex &up){
 		cerr << "ERROR: # of elements in index to the upper level is wrong!!!" << endl;
 		exit(1);
 	}
+	else if (low.getNtot() != dat.Ndata()){
+		cerr << "ERROR: the number of rows in data does not correspond to the number of points in the low index!!!" << endl;
+		exit(1);
+	}
 	_lowLevel = &low;
 	_upLevel  = &up;
 	
@@ -5051,7 +5772,8 @@ MuGrp::MuGrp(const Grp &dat, RanIndex &low, RanIndex &up){
 	for (size_t iEl = 0; iEl < low.getNgrp(); iEl++) {
 		gsl_vector_set_zero(tmpMn);
 		for (vector<size_t>::const_iterator el = low[iEl].begin(); el != low[iEl].end(); ++el) {
-			gsl_vector_add(tmpMn, dat[*el]->getVec());
+			gsl_vector_const_view tmpRow = gsl_matrix_const_row(dat.dMat(), *el);
+			gsl_vector_add(tmpMn, &tmpRow.vector);
 		}
 		gsl_vector_scale(tmpMn, 1.0/low[iEl].size());
 		gsl_matrix_set_row(_valueMat, iEl, tmpMn);
@@ -5059,7 +5781,7 @@ MuGrp::MuGrp(const Grp &dat, RanIndex &low, RanIndex &up){
 		for (size_t j = 0; j < dat[0]->len(); j++) {
 			gsl_vector_set(tmpSd, j, fabs(gsl_vector_get(tmpMn, j)));
 		}
-		_theta[iEl] = new MVnormMu(_valueMat, iEl, tmpSd, _rV[0], low[iEl], _upLevel->priorInd(iEl));
+		_theta[iEl] = new MVnormMu(_valueMat, iEl, tmpSd, _rV[0], (*_lowLevel)[iEl], _upLevel->priorInd(iEl));
 	}
 	
 	
@@ -5070,6 +5792,10 @@ MuGrp::MuGrp(const Grp &dat, RanIndex &low, RanIndex &up){
 MuGrp::MuGrp(const Grp &dat, RanIndex &low, RanIndex &up, const string &outFlNam){
 	if (low.getNgrp() != up.getNtot()) {
 		cerr << "ERROR: # of elements in index to the upper level is wrong!!!" << endl;
+		exit(1);
+	}
+	else if (low.getNtot() != dat.Ndata()){
+		cerr << "ERROR: the number of rows in data does not correspond to the number of points in the low index!!!" << endl;
 		exit(1);
 	}
 	_lowLevel = &low;
@@ -5087,7 +5813,8 @@ MuGrp::MuGrp(const Grp &dat, RanIndex &low, RanIndex &up, const string &outFlNam
 	for (size_t iEl = 0; iEl < low.getNgrp(); iEl++) {
 		gsl_vector_set_zero(tmpMn);
 		for (vector<size_t>::const_iterator el = low[iEl].begin(); el != low[iEl].end(); ++el) {
-			gsl_vector_add(tmpMn, dat[*el]->getVec());
+			gsl_vector_const_view tmpRow = gsl_matrix_const_row(dat.dMat(), *el);
+			gsl_vector_add(tmpMn, &tmpRow.vector);
 		}
 		gsl_vector_scale(tmpMn, 1.0/low[iEl].size());
 		gsl_matrix_set_row(_valueMat, iEl, tmpMn);
@@ -5095,7 +5822,7 @@ MuGrp::MuGrp(const Grp &dat, RanIndex &low, RanIndex &up, const string &outFlNam
 		for (size_t j = 0; j < dat[0]->len(); j++) {
 			gsl_vector_set(tmpSd, j, fabs(gsl_vector_get(tmpMn, j)));
 		}
-		_theta[iEl] = new MVnormMu(_valueMat, iEl, tmpSd, _rV[0], low[iEl], _upLevel->priorInd(iEl));
+		_theta[iEl] = new MVnormMu(_valueMat, iEl, tmpSd, _rV[0], (*_lowLevel)[iEl], _upLevel->priorInd(iEl));
 	}
 		
 	gsl_vector_free(tmpSd);
@@ -5106,12 +5833,10 @@ MuGrp::MuGrp(const Grp &dat, RanIndex &low, RanIndex &up, const string &outFlNam
 MuGrp::MuGrp(const Grp &dat, RanIndex &low) : Grp(){
 	
 	gsl_matrix_free(_valueMat);
-#ifdef MYDEBUG
 	if (low.getNtot() != dat.dMat()->size1) {
 		cerr << "RanIndex low has different number of elements (" << low.getNtot() << ") than Grp object dat has rows in _valueMat (" << dat.dMat()->size1 << ") in file " << __FILE__ << " on line " << __LINE__ << endl;
 		exit(1);
 	}
-#endif
 	
 	_theta.resize(low.getNgrp());
 	_valueMat = gsl_matrix_calloc(low.getNgrp(), dat.phenD());
@@ -5120,13 +5845,14 @@ MuGrp::MuGrp(const Grp &dat, RanIndex &low) : Grp(){
  	for (size_t iEl = 0; iEl < low.getNgrp(); iEl++) {
 		gsl_vector_view vlRw = gsl_matrix_row(_valueMat, iEl);
 		for (vector<size_t>::const_iterator el = low[iEl].begin(); el != low[iEl].end(); ++el) {
-			gsl_vector_add(&vlRw.vector, dat[*el]->getVec());
+			gsl_vector_const_view tmpRow = gsl_matrix_const_row(dat.dMat(), *el);
+			gsl_vector_add(&vlRw.vector, &tmpRow.vector);
 		}
 		gsl_vector_scale(&vlRw.vector, 1.0/low[iEl].size());
 	}
 	
 	for (size_t iMn = 0; iMn < low.getNgrp(); iMn++) {
-		_theta[iMn] = new MVnormMu(_valueMat, iMn, low[iMn], 0);
+		_theta[iMn] = new MVnormMu(_valueMat, iMn, (*_lowLevel)[iMn], 0);
 		
 	}
 	
@@ -5136,6 +5862,14 @@ MuGrp::MuGrp(const Grp &dat, const Qgrp &q, RanIndex &low) : Grp(){
 	
 	gsl_matrix_free(_valueMat);
 	gsl_vector *tmpVl = gsl_vector_alloc(dat.phenD());
+	if (low.getNtot() != dat.dMat()->size1) {
+		cerr << "RanIndex low has different number of elements (" << low.getNtot() << ") than Grp object dat has rows in _valueMat (" << dat.dMat()->size1 << ") in file " << __FILE__ << " on line " << __LINE__ << endl;
+		exit(1);
+	}
+	else if (q.size() != dat.dMat()->size1) {
+		cerr << "Weighting object Qgrp has different number of elements (" << q.size() << ") than Grp object dat has rows in _valueMat (" << dat.dMat()->size1 << ") in file " << __FILE__ << " on line " << __LINE__ << endl;
+		exit(1);
+	}
 	
 	_theta.resize(low.getNgrp());
 	_valueMat = gsl_matrix_calloc(low.getNgrp(), dat.phenD());
@@ -5146,7 +5880,8 @@ MuGrp::MuGrp(const Grp &dat, const Qgrp &q, RanIndex &low) : Grp(){
 		double qSum = 0.0;
 		for (vector<size_t>::const_iterator el = low[iEl].begin(); el != low[iEl].end(); ++el) {
 			qSum += q[*el];
-			gsl_vector_memcpy(tmpVl, dat[*el]->getVec());
+			gsl_vector_const_view tmpRow = gsl_matrix_const_row(dat.dMat(), *el);
+			gsl_vector_memcpy(tmpVl, &tmpRow.vector);
 			gsl_vector_scale(tmpVl, q[*el]);
 			gsl_vector_add(&vlRw.vector, tmpVl);
 		}
@@ -5156,7 +5891,7 @@ MuGrp::MuGrp(const Grp &dat, const Qgrp &q, RanIndex &low) : Grp(){
 	}
 	
 	for (size_t iMn = 0; iMn < low.getNgrp(); iMn++) {
-		_theta[iMn] = new MVnormMu(_valueMat, iMn, low[iMn], 0);
+		_theta[iMn] = new MVnormMu(_valueMat, iMn, (*_lowLevel)[iMn], 0);
 		
 	}
 	
@@ -5182,6 +5917,10 @@ MuGrp::MuGrp(const gsl_matrix *dat) : Grp(){
 MuGrp::MuGrp(const gsl_matrix *dat, RanIndex &low) : Grp(){
 	
 	gsl_matrix_free(_valueMat);
+	if (low.getNtot() != dat->size1) {
+		cerr << "RanIndex low has different number of elements (" << low.getNtot() << ") than GSL matrix dat has rows (" << dat->size1 << ") in file " << __FILE__ << " on line " << __LINE__ << endl;
+		exit(1);
+	}
 	
 	_theta.resize(low.getNgrp());
 	_valueMat = gsl_matrix_calloc(low.getNgrp(), dat->size2);
@@ -5199,7 +5938,7 @@ MuGrp::MuGrp(const gsl_matrix *dat, RanIndex &low) : Grp(){
 	}
 	
 	for (size_t iMn = 0; iMn < low.getNgrp(); iMn++) {
-		_theta[iMn] = new MVnormMu(_valueMat, iMn, low[iMn], 0);
+		_theta[iMn] = new MVnormMu(_valueMat, iMn, (*_lowLevel)[iMn], 0);
 		
 	}
 	
@@ -5209,6 +5948,14 @@ MuGrp::MuGrp(const gsl_matrix *dat, const Qgrp &q, RanIndex &low) : Grp(){
 	
 	gsl_matrix_free(_valueMat);
 	gsl_vector *tmpVl = gsl_vector_alloc(dat->size2);
+	if (low.getNtot() != dat->size1) {
+		cerr << "RanIndex low has different number of elements (" << low.getNtot() << ") than the GSL matrix dat has rows (" << dat->size1 << ") in file " << __FILE__ << " on line " << __LINE__ << endl;
+		exit(1);
+	}
+	else if (q.size() != dat->size1) {
+		cerr << "Weighting object Qgrp has different number of elements (" << q.size() << ") than the GSL matrix dat has rows (" << dat->size1 << ") in file " << __FILE__ << " on line " << __LINE__ << endl;
+		exit(1);
+	}
 	
 	_theta.resize(low.getNgrp());
 	_valueMat = gsl_matrix_calloc(low.getNgrp(), dat->size2);
@@ -5229,7 +5976,7 @@ MuGrp::MuGrp(const gsl_matrix *dat, const Qgrp &q, RanIndex &low) : Grp(){
 	}
 	
 	for (size_t iMn = 0; iMn < low.getNgrp(); iMn++) {
-		_theta[iMn] = new MVnormMu(_valueMat, iMn, low[iMn], 0);
+		_theta[iMn] = new MVnormMu(_valueMat, iMn, (*_lowLevel)[iMn], 0);
 		
 	}
 	
@@ -5346,11 +6093,15 @@ MuGrpPEX::MuGrpPEX() : _outSigFlNam("MuPEXsig.gbin"), MuGrp(){
 MuGrpPEX::MuGrpPEX(const Grp &dat, RanIndex &low, RanIndex &up, const double &sPr, const int &nThr) : _outSigFlNam("MuPEXsig.gbin"), MuGrp(){
 	gsl_matrix_free(_valueMat);
 	
-	_ftA.resize(dat.Ndata());
+	_ftA.resize(dat.phenD());
 	_nThr = nThr;
 	
 	if (low.getNgrp() != up.getNtot()) {
 		cerr << "ERROR: # of elements in index to the upper level is wrong!!!" << endl;
+		exit(1);
+	}
+	else if (low.getNtot() != dat.Ndata()){
+		cerr << "ERROR: the number of rows in data does not correspond to the number of points in the low index!!!" << endl;
 		exit(1);
 	}
 	_lowLevel = &low;
@@ -5382,9 +6133,11 @@ MuGrpPEX::MuGrpPEX(const Grp &dat, RanIndex &low, RanIndex &up, const double &sP
 		
 	}
 	
+	for (size_t jCl = 0; jCl < _valueMat->size2; jCl++) {
+		_ftA[jCl].resize(dat.Ndata()*dat.phenD());
+	}
 	for (size_t iMn = 0; iMn < low.getNgrp(); iMn++) {
-		_ftA[iMn].resize(dat.Ndata()*dat.phenD());
-		_theta[iMn] = new MVnormMuPEX(_valueMat, iMn, tmpSd, _rV[0], low[iMn], _upLevel->priorInd(iMn), _A, _tSigIAt);
+		_theta[iMn] = new MVnormMuPEX(_valueMat, iMn, tmpSd, _rV[0], (*_lowLevel)[iMn], _upLevel->priorInd(iMn), _A, _tSigIAt);
 	}
 	
 	_updateFitted();
@@ -5396,11 +6149,15 @@ MuGrpPEX::MuGrpPEX(const Grp &dat, RanIndex &low, RanIndex &up, const double &sP
 MuGrpPEX::MuGrpPEX(const Grp &dat, RanIndex &low, RanIndex &up, const string outMuFlNam, const double &sPr, const int &nThr) : _outSigFlNam("MuPEXsig.gbin"), MuGrp(){
 	gsl_matrix_free(_valueMat);
 	
-	_ftA.resize(dat.Ndata());
+	_ftA.resize(dat.phenD());
 	_nThr = nThr;
 	
 	if (low.getNgrp() != up.getNtot()) {
 		cerr << "ERROR: # of elements in index to the upper level is wrong!!!" << endl;
+		exit(1);
+	}
+	else if (low.getNtot() != dat.Ndata()){
+		cerr << "ERROR: the number of rows in data does not correspond to the number of points in the low index!!!" << endl;
 		exit(1);
 	}
 	_lowLevel = &low;
@@ -5433,9 +6190,11 @@ MuGrpPEX::MuGrpPEX(const Grp &dat, RanIndex &low, RanIndex &up, const string out
 		
 	}
 	
+	for (size_t jCl = 0; jCl < _valueMat->size2; jCl++) {
+		_ftA[jCl].resize(dat.Ndata()*dat.phenD());
+	}
 	for (size_t iMn = 0; iMn < low.getNgrp(); iMn++) {
-		_ftA[iMn].resize(dat.Ndata()*dat.phenD());
-		_theta[iMn] = new MVnormMuPEX(_valueMat, iMn, tmpSd, _rV[0], low[iMn], _upLevel->priorInd(iMn), _A, _tSigIAt);
+		_theta[iMn] = new MVnormMuPEX(_valueMat, iMn, tmpSd, _rV[0], (*_lowLevel)[iMn], _upLevel->priorInd(iMn), _A, _tSigIAt);
 	}
 	
 	_updateFitted();
@@ -5452,6 +6211,10 @@ MuGrpPEX::MuGrpPEX(const Grp &dat, RanIndex &low, RanIndex &up, const string out
 	
 	if (low.getNgrp() != up.getNtot()) {
 		cerr << "ERROR: # of elements in index to the upper level is wrong!!!" << endl;
+		exit(1);
+	}
+	else if (low.getNtot() != dat.Ndata()){
+		cerr << "ERROR: the number of rows in data does not correspond to the number of points in the low index!!!" << endl;
 		exit(1);
 	}
 	_lowLevel = &low;
@@ -5487,7 +6250,7 @@ MuGrpPEX::MuGrpPEX(const Grp &dat, RanIndex &low, RanIndex &up, const string out
 	
 	for (size_t iMn = 0; iMn < low.getNgrp(); iMn++) {
 		_ftA[iMn].resize(dat.Ndata()*dat.phenD());
-		_theta[iMn] = new MVnormMuPEX(_valueMat, iMn, tmpSd, _rV[0], low[iMn], _upLevel->priorInd(iMn), _A, _tSigIAt);
+		_theta[iMn] = new MVnormMuPEX(_valueMat, iMn, tmpSd, _rV[0], (*_lowLevel)[iMn], _upLevel->priorInd(iMn), _A, _tSigIAt);
 	}
 	
 	_updateFitted();
@@ -5605,6 +6368,16 @@ void MuGrpPEX::update(const Grp &dat, const SigmaI &SigIm, const SigmaI &SigIp){
 	_A.update(dat, _valueMat, SigIm, *_lowLevel);
 	_updateFitted();
 }
+void MuGrpPEX::update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, const SigmaI &SigIp){
+	gsl_blas_dsymm(CblasRight, CblasLower, 1.0, SigIm.getMat(), _A.getMat(), 0.0, _tSigIAt);
+	
+	for (vector<MVnorm *>::const_iterator elm = _theta.begin(); elm != _theta.end(); ++elm) {
+		(*elm)->update(dat, q, SigIm, SigIp, _rV[0]);
+	}
+	
+	_A.update(dat, _valueMat, q, SigIm, *_lowLevel);
+	_updateFitted();
+}
 void MuGrpPEX::update(const Grp &dat, const SigmaI &SigIm, const Qgrp &qPr, const SigmaI &SigIp){
 	gsl_blas_dsymm(CblasRight, CblasLower, 1.0, SigIm.getMat(), _A.getMat(), 0.0, _tSigIAt);
 	
@@ -5613,6 +6386,16 @@ void MuGrpPEX::update(const Grp &dat, const SigmaI &SigIm, const Qgrp &qPr, cons
 	}
 	
 	_A.update(dat, _valueMat, SigIm, *_lowLevel);
+	_updateFitted();
+}
+void MuGrpPEX::update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, const Qgrp &qPr, const SigmaI &SigIp){
+	gsl_blas_dsymm(CblasRight, CblasLower, 1.0, SigIm.getMat(), _A.getMat(), 0.0, _tSigIAt);
+	
+	for (int iTh = 0; iTh < _theta.size(); iTh++) {
+		_theta[iTh]->update(dat, q, SigIm, qPr[iTh], SigIp, _rV[0]);
+	}
+	
+	_A.update(dat, _valueMat, q, SigIm, *_lowLevel);
 	_updateFitted();
 }
 
@@ -5628,6 +6411,18 @@ void MuGrpPEX::update(const Grp &dat, const SigmaI &SigIm, const Grp &muPr, cons
 	_updateFitted();
 	
 }
+void MuGrpPEX::update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, const Grp &muPr, const SigmaI &SigIp){
+	
+	gsl_blas_dsymm(CblasRight, CblasLower, 1.0, SigIm.getMat(), _A.getMat(), 0.0, _tSigIAt);
+	
+	for (vector<MVnorm *>::const_iterator elm = _theta.begin(); elm != _theta.end(); ++elm) {
+		(*elm)->update(dat, q, SigIm, muPr, SigIp, _rV[0]);
+	}
+	
+	_A.update(dat, _valueMat, q, SigIm, *_lowLevel);
+	_updateFitted();
+	
+}
 void MuGrpPEX::update(const Grp &dat, const SigmaI &SigIm, const Grp &muPr, const Qgrp &qPr, const SigmaI &SigIp){
 	gsl_blas_dsymm(CblasRight, CblasLower, 1.0, SigIm.getMat(), _A.getMat(), 0.0, _tSigIAt);
 	
@@ -5636,6 +6431,17 @@ void MuGrpPEX::update(const Grp &dat, const SigmaI &SigIm, const Grp &muPr, cons
 	}
 	
 	_A.update(dat, _valueMat, SigIm, *_lowLevel);
+	_updateFitted();
+	
+}
+void MuGrpPEX::update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, const Grp &muPr, const Qgrp &qPr, const SigmaI &SigIp){
+	gsl_blas_dsymm(CblasRight, CblasLower, 1.0, SigIm.getMat(), _A.getMat(), 0.0, _tSigIAt);
+	
+	for (int iTh = 0; iTh < _theta.size(); iTh++) {
+		_theta[iTh]->update(dat, q, SigIm, muPr, qPr[iTh], SigIp, _rV[0]);
+	}
+	
+	_A.update(dat, _valueMat, q, SigIm, *_lowLevel);
 	_updateFitted();
 	
 }
@@ -7699,15 +8505,17 @@ BetaGrpPEX::~BetaGrpPEX() {
 }
 
 void BetaGrpPEX::_finishConstruct(const double &Spr){
+	_ftA.resize(_valueMat->size2);
 	_tSigIAt = gsl_matrix_alloc(_valueMat->size2, _valueMat->size2);
 	_A       = Apex(Spr, _valueMat->size2, _ftA);
 	
 	_fittedAllAdj = gsl_matrix_alloc(_fittedAll->size1, _fittedAll->size2);
 	gsl_matrix_memcpy(_fittedAllAdj, _fittedAll);
 	
-	_ftA.resize(_theta.size());
+	for (size_t jCl = 0; jCl < _valueMat->size2; jCl++) {
+		_ftA[jCl].resize(_Xmat->size1*_valueMat->size2);
+	}
 	for (size_t iMn = 0; iMn < _theta.size(); iMn++) {
-		_ftA[iMn].resize(_Xmat->size1*_valueMat->size2);
 		delete _theta[iMn];
 		_theta[iMn] = new MVnormBetaPEX(_valueMat->size2, _Xmat, iMn, _fittedEach[iMn], _upLevel->priorInd(iMn), _valueMat, iMn, _A, _tSigIAt);
 	}
@@ -7861,6 +8669,25 @@ void BetaGrpPEX::update(const Grp &dat, const SigmaI &SigIm, const SigmaI &SigIp
 	}
 
 }
+void BetaGrpPEX::update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, const SigmaI &SigIp){
+	gsl_blas_dsymm(CblasRight, CblasLower, 1.0, SigIm.getMat(), _A.getMat(), 0.0, _tSigIAt);
+	
+#pragma omp parallel for num_threads(_nThr)
+	for (int iEl = 0; iEl < _theta.size(); iEl++) {
+		_theta[iEl]->update(dat, q, SigIm, SigIp, _rV[omp_get_thread_num()]);
+	}
+	
+	_updateFitted();
+	_finishFitted();
+	_updateAfitted();
+	if (_lowLevel) {
+		_A.update(dat, _fittedAll, q, SigIm, *_lowLevel);
+	}
+	else {
+		_A.update(dat, _fittedAll, SigIm);
+	}
+	
+}
 void BetaGrpPEX::update(const Grp &dat, const SigmaI &SigIm, const Qgrp &qPr, const SigmaI &SigIp){
 	gsl_blas_dsymm(CblasRight, CblasLower, 1.0, SigIm.getMat(), _A.getMat(), 0.0, _tSigIAt);
 	
@@ -7874,6 +8701,24 @@ void BetaGrpPEX::update(const Grp &dat, const SigmaI &SigIm, const Qgrp &qPr, co
 	_updateAfitted();
 	if (_lowLevel) {
 		_A.update(dat, _fittedAll, SigIm, *_lowLevel);
+	}
+	else {
+		_A.update(dat, _fittedAll, SigIm);
+	}
+}
+void BetaGrpPEX::update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, const Qgrp &qPr, const SigmaI &SigIp){
+	gsl_blas_dsymm(CblasRight, CblasLower, 1.0, SigIm.getMat(), _A.getMat(), 0.0, _tSigIAt);
+	
+#pragma omp parallel for num_threads(_nThr)
+	for (int iEl = 0; iEl < _theta.size(); iEl++) {
+		_theta[iEl]->update(dat, q, SigIm, qPr[iEl], SigIp, _rV[omp_get_thread_num()]);
+	}
+	
+	_updateFitted();
+	_finishFitted();
+	_updateAfitted();
+	if (_lowLevel) {
+		_A.update(dat, _fittedAll, q, SigIm, *_lowLevel);
 	}
 	else {
 		_A.update(dat, _fittedAll, SigIm);
@@ -7898,6 +8743,24 @@ void BetaGrpPEX::update(const Grp &dat, const SigmaI &SigIm, const Grp &muPr, co
 		_A.update(dat, _fittedAll, SigIm);
 	}
 }
+void BetaGrpPEX::update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, const Grp &muPr, const SigmaI &SigIp){
+	gsl_blas_dsymm(CblasRight, CblasLower, 1.0, SigIm.getMat(), _A.getMat(), 0.0, _tSigIAt);
+	
+#pragma omp parallel for num_threads(_nThr)
+	for (int iEl = 0; iEl < _theta.size(); iEl++) {
+		_theta[iEl]->update(dat, q, SigIm, muPr, SigIp, _rV[omp_get_thread_num()]);
+	}
+	
+	_updateFitted();
+	_finishFitted();
+	_updateAfitted();
+	if (_lowLevel) {
+		_A.update(dat, _fittedAll, q, SigIm, *_lowLevel);
+	}
+	else {
+		_A.update(dat, _fittedAll, SigIm);
+	}
+}
 void BetaGrpPEX::update(const Grp &dat, const SigmaI &SigIm, const Grp &muPr, const Qgrp &qPr, const SigmaI &SigIp){
 	gsl_blas_dsymm(CblasRight, CblasLower, 1.0, SigIm.getMat(), _A.getMat(), 0.0, _tSigIAt);
 	
@@ -7911,6 +8774,24 @@ void BetaGrpPEX::update(const Grp &dat, const SigmaI &SigIm, const Grp &muPr, co
 	_updateAfitted();
 	if (_lowLevel) {
 		_A.update(dat, _fittedAll, SigIm, *_lowLevel);
+	}
+	else {
+		_A.update(dat, _fittedAll, SigIm);
+	}
+}
+void BetaGrpPEX::update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, const Grp &muPr, const Qgrp &qPr, const SigmaI &SigIp){
+	gsl_blas_dsymm(CblasRight, CblasLower, 1.0, SigIm.getMat(), _A.getMat(), 0.0, _tSigIAt);
+	
+#pragma omp parallel for num_threads(_nThr)
+	for (int iEl = 0; iEl < _theta.size(); iEl++) {
+		_theta[iEl]->update(dat, q, SigIm, muPr, qPr[iEl], SigIp, _rV[omp_get_thread_num()]);
+	}
+	
+	_updateFitted();
+	_finishFitted();
+	_updateAfitted();
+	if (_lowLevel) {
+		_A.update(dat, _fittedAll, q, SigIm, *_lowLevel);
 	}
 	else {
 		_A.update(dat, _fittedAll, SigIm);
@@ -9036,7 +9917,10 @@ void BetaGrpSnpMiss::dump(){
 		}
 		vector< vector<size_t> > presInd(_Npred);
 		
-		for (size_t XiRw = 0; XiRw < _Ystore->size1; XiRw++) { // reading in one row (line of predictor) at a time so that two whole SNP matrix worth of stuff is not in memory at once;  remember that SNPs are saved in row-major
+		size_t Nrw;
+		_lowLevel ? Nrw = _lowLevel->getNgrp() : Nrw = _Ystore->size1;
+		
+		for (size_t XiRw = 0; XiRw < Nrw; XiRw++) { // reading in one row (line of predictor) at a time so that two whole SNP matrix worth of stuff is not in memory at once;  remember that SNPs are saved in row-major
 			gsl_vector_fread(prdIn, tmpX);
 			for (size_t XjCl = 0; XjCl < _Npred; XjCl++) {
 				if (gsl_vector_get(tmpX, XjCl) > _absLab) { // absLab labels the missing data, has to be smaller than the smallest real value
@@ -9271,7 +10155,10 @@ void BetaGrpSnpMissCV::dump(){
 		}
 		vector< vector<size_t> > presInd(_Npred);
 		
-		for (size_t XiRw = 0; XiRw < _Ystore->size1; XiRw++) { // reading in one row (line of predictor) at a time so that two whole SNP matrix worth of stuff is not in memory at once;  remember that SNPs are saved in row-major
+		size_t Nrw;
+		_lowLevel ? Nrw = _lowLevel->getNgrp() : Nrw = _Ystore->size1;
+		
+		for (size_t XiRw = 0; XiRw < Nrw; XiRw++) { // reading in one row (line of predictor) at a time so that two whole SNP matrix worth of stuff is not in memory at once;  remember that SNPs are saved in row-major
 			gsl_vector_fread(prdIn, tmpX);
 			for (size_t XjCl = 0; XjCl < _Npred; XjCl++) {
 				if (gsl_vector_get(tmpX, XjCl) > _absLab) { // absLab labels the missing data, has to be smaller than the smallest real value
@@ -9516,7 +10403,10 @@ void BetaGrpPSRmiss::dump(){
 		}
 		vector< vector<size_t> > presInd(_Npred);
 		
-		for (size_t XiRw = 0; XiRw < _Ystore->size1; XiRw++) { // reading in one row (line of predictor) at a time so that two whole SNP matrix worth of stuff is not in memory at once;  remember that SNPs are saved in row-major
+		size_t Nrw;
+		_lowLevel ? Nrw = _lowLevel->getNgrp() : Nrw = _Ystore->size1;
+		
+		for (size_t XiRw = 0; XiRw < Nrw; XiRw++) { // reading in one row (line of predictor) at a time so that two whole SNP matrix worth of stuff is not in memory at once;  remember that SNPs are saved in row-major
 			gsl_vector_fread(prdIn, tmpX);
 			for (size_t XjCl = 0; XjCl < _Npred; XjCl++) {
 				if (gsl_vector_get(tmpX, XjCl) > _absLab) { // absLab labels the missing data, has to be smaller than the smallest real value
@@ -12166,7 +13056,7 @@ void SigmaI::save(const string &fileNam, const Apex &A, const char *how){
 }
 
 /*
-	SigmaIblk methods
+ *	SigmaIblk methods
  */
 
 SigmaIblk::SigmaIblk() : SigmaI() , _blkStart(1, 0){
