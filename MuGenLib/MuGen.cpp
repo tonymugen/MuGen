@@ -2,11 +2,22 @@
  *  libMuGen.cpp
  *  libMuGen
  *
- *  Created by ajg67 on 10/30/12.
- *  Copyright (c) 2012 SEELE. All rights reserved.
+ *  Copyright (c) 2015 Anthony J. Greenberg
  *
- *  Methods for the MuGenLib classes.  Using gsl_vector and gsl_matrix pointers to store vectors and matrices,
- *  which enables linear algebra etc manipulations
+ *  This file is part of the MuGen library.
+ *
+ *  MuGen is free software: you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation, either version 3 of the License, or
+ *  (at your option) any later version.
+ *
+ *  MuGen is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU General Public License for more details.
+ *
+ *  You should have received a copy of the GNU General Public License
+ *  along with MuGen.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include <gsl/gsl_errno.h>
 #include <gsl/gsl_matrix.h>
@@ -7027,6 +7038,11 @@ BetaGrpFt::BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npre
 }
 
 BetaGrpFt::BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npred, RanIndex &up, const int &nThr) : _numSaves(0.0), _nThr(nThr), Grp(){
+	if (Npred != up.getNtot()) {
+		cerr << "ERROR: number of predictors " << Npred << " is not equal to the number of elements " << up.getNtot() << " in the prior index in BetaGrpFt initialization." << endl;
+		exit(-1);
+	}
+	
 	_fittedEach.resize(Npred);
 	_fittedAll  = gsl_matrix_calloc(rsp.Ndata(), rsp.phenD());
 	_Xmat       = gsl_matrix_alloc(rsp.Ndata(), Npred);
@@ -7035,6 +7051,7 @@ BetaGrpFt::BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npre
 	
 	_upLevel = &up;
 	
+
 	if (_nThr > 1) {
 		const gsl_rng_type *T = gsl_rng_mt19937;
 		_rV.resize(_nThr);
@@ -7084,6 +7101,23 @@ BetaGrpFt::BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npre
 BetaGrpFt::BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npred, RanIndex &low, RanIndex &up, const int &nThr) : _numSaves(0.0), _nThr(nThr), Grp(){
 	//	the _lowLevel RanIndex plays the role of the design matrix, and relates the unique values of the predictor (low.getNgrp()x1) to the predictor for all the rsp rows
 	//  the _fittedAll matrix still has only the unique rows; this is for efficiency when adding it to other Grp classes
+	
+	if (Npred != up.getNtot()) {
+		cerr << "ERROR: number of predictors " << Npred << " is not equal to the number of elements " << up.getNtot() << " in the prior index in BetaGrpFt initialization." << endl;
+		exit(-1);
+	}
+	else if (Npred != low.getNgrp()){
+		cerr << "ERROR: number of predictors " << Npred << " is not equal to the number of groups " << low.getNgrp() << " in the replication index in BetaGrpFt initialization." << endl;
+		exit(-1);
+	}
+	else if (up.getNtot() != low.getNgrp()) {
+		cerr << "ERROR: number of groups " << low.getNgrp() << " in the replication index is not equal to the number of elements " << up.getNtot() << " in the prior index in BetaGrpFt initialization." << endl;
+		exit(-1);
+	}
+	else if (low.getNtot() != rsp.dMat()->size1){
+		cerr << "ERROR: number of elements " << low.getNgrp() << " in the replication index is not equal to the number of rows " << rsp.dMat()->size1 << " in the response matrix in BetaGrpFt initialization." << endl;
+		exit(-1);
+	}
 	
 	_fittedEach.resize(Npred);
 	_fittedAll  = gsl_matrix_calloc(low.getNgrp(), rsp.phenD());
@@ -7206,6 +7240,11 @@ BetaGrpFt::BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npre
 }
 
 BetaGrpFt::BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npred, RanIndex &up, const string &outFlNam, const int &nThr) : _numSaves(0.0), _nThr(nThr), Grp(){
+	if (Npred != up.getNtot()) {
+		cerr << "ERROR: number of predictors " << Npred << " is not equal to the number of elements " << up.getNtot() << " in the prior index in BetaGrpFt initialization." << endl;
+		exit(-1);
+	}
+
 	_fittedEach.resize(Npred);
 	_fittedAll  = gsl_matrix_calloc(rsp.Ndata(), rsp.phenD());
 	_Xmat       = gsl_matrix_alloc(rsp.Ndata(), Npred);
@@ -7263,6 +7302,22 @@ BetaGrpFt::BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npre
 
 BetaGrpFt::BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npred, RanIndex &low, RanIndex &up, const string &outFlNam, const int &nThr) : _numSaves(0.0), _nThr(nThr), Grp(){
 	//	the _lowLevel RanIndex plays the role of the design matrix, and relates the unique values of the predictor (low.getNgrp()x1) to the predictor for all the rsp rows
+	if (Npred != up.getNtot()) {
+		cerr << "ERROR: number of predictors " << Npred << " is not equal to the number of elements " << up.getNtot() << " in the prior index in BetaGrpFt initialization." << endl;
+		exit(-1);
+	}
+	else if (Npred != low.getNgrp()){
+		cerr << "ERROR: number of predictors " << Npred << " is not equal to the number of groups " << low.getNgrp() << " in the replication index in BetaGrpFt initialization." << endl;
+		exit(-1);
+	}
+	else if (up.getNtot() != low.getNgrp()) {
+		cerr << "ERROR: number of groups " << low.getNgrp() << " in the replication index is not equal to the number of elements " << up.getNtot() << " in the prior index in BetaGrpFt initialization." << endl;
+		exit(-1);
+	}
+	else if (low.getNtot() != rsp.dMat()->size1){
+		cerr << "ERROR: number of elements " << low.getNgrp() << " in the replication index is not equal to the number of rows " << rsp.dMat()->size1 << " in the response matrix in BetaGrpFt initialization." << endl;
+		exit(-1);
+	}
 	
 	_fittedEach.resize(Npred);
 	_fittedAll  = gsl_matrix_calloc(low.getNgrp(), rsp.phenD());
@@ -7386,6 +7441,11 @@ BetaGrpFt::BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npre
 	gsl_matrix_free(y);
 }
 BetaGrpFt::BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npred, const double &absLab, RanIndex &up, const int &nThr) :  _numSaves(0.0), _nThr(nThr), Grp() {
+	if (Npred != up.getNtot()) {
+		cerr << "ERROR: number of predictors " << Npred << " is not equal to the number of elements " << up.getNtot() << " in the prior index in BetaGrpFt initialization." << endl;
+		exit(-1);
+	}
+	
 	_fittedEach.resize(Npred);
 	_fittedAll  = gsl_matrix_calloc(rsp.Ndata(), rsp.phenD());
 	_Xmat       = gsl_matrix_alloc(rsp.Ndata(), Npred);
@@ -7439,6 +7499,23 @@ BetaGrpFt::BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npre
 	gsl_matrix_free(y);
 }
 BetaGrpFt::BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npred, const double &absLab, RanIndex &low, RanIndex &up, const int &nThr) :  _numSaves(0.0), _nThr(nThr), Grp() {
+	if (Npred != up.getNtot()) {
+		cerr << "ERROR: number of predictors " << Npred << " is not equal to the number of elements " << up.getNtot() << " in the prior index in BetaGrpFt initialization." << endl;
+		exit(-1);
+	}
+	else if (Npred != low.getNgrp()){
+		cerr << "ERROR: number of predictors " << Npred << " is not equal to the number of groups " << low.getNgrp() << " in the replication index in BetaGrpFt initialization." << endl;
+		exit(-1);
+	}
+	else if (up.getNtot() != low.getNgrp()) {
+		cerr << "ERROR: number of groups " << low.getNgrp() << " in the replication index is not equal to the number of elements " << up.getNtot() << " in the prior index in BetaGrpFt initialization." << endl;
+		exit(-1);
+	}
+	else if (low.getNtot() != rsp.dMat()->size1){
+		cerr << "ERROR: number of elements " << low.getNgrp() << " in the replication index is not equal to the number of rows " << rsp.dMat()->size1 << " in the response matrix in BetaGrpFt initialization." << endl;
+		exit(-1);
+	}
+
 	_fittedEach.resize(Npred);
 	_fittedAll  = gsl_matrix_calloc(low.getNgrp(), rsp.phenD());
 	_Xmat       = gsl_matrix_alloc(low.getNtot(), Npred);
@@ -7557,6 +7634,11 @@ BetaGrpFt::BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npre
 
 }
 BetaGrpFt::BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npred, const double &absLab, RanIndex &up, const string &outFlNam, const int &nThr) :  _numSaves(0.0), _nThr(nThr), Grp() {
+	if (Npred != up.getNtot()) {
+		cerr << "ERROR: number of predictors " << Npred << " is not equal to the number of elements " << up.getNtot() << " in the prior index in BetaGrpFt initialization." << endl;
+		exit(-1);
+	}
+
 	_fittedEach.resize(Npred);
 	_fittedAll  = gsl_matrix_calloc(rsp.Ndata(), rsp.phenD());
 	_Xmat       = gsl_matrix_alloc(rsp.Ndata(), Npred);
@@ -7612,6 +7694,23 @@ BetaGrpFt::BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npre
 	gsl_matrix_free(y);
 }
 BetaGrpFt::BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npred, const double &absLab, RanIndex &low, RanIndex &up, const string &outFlNam, const int &nThr) :  _numSaves(0.0), _nThr(nThr), Grp() {
+	if (Npred != up.getNtot()) {
+		cerr << "ERROR: number of predictors " << Npred << " is not equal to the number of elements " << up.getNtot() << " in the prior index in BetaGrpFt initialization." << endl;
+		exit(-1);
+	}
+	else if (Npred != low.getNgrp()){
+		cerr << "ERROR: number of predictors " << Npred << " is not equal to the number of groups " << low.getNgrp() << " in the replication index in BetaGrpFt initialization." << endl;
+		exit(-1);
+	}
+	else if (up.getNtot() != low.getNgrp()) {
+		cerr << "ERROR: number of groups " << low.getNgrp() << " in the replication index is not equal to the number of elements " << up.getNtot() << " in the prior index in BetaGrpFt initialization." << endl;
+		exit(-1);
+	}
+	else if (low.getNtot() != rsp.dMat()->size1){
+		cerr << "ERROR: number of elements " << low.getNgrp() << " in the replication index is not equal to the number of rows " << rsp.dMat()->size1 << " in the response matrix in BetaGrpFt initialization." << endl;
+		exit(-1);
+	}
+
 	_fittedEach.resize(Npred);
 	_fittedAll  = gsl_matrix_calloc(low.getNgrp(), rsp.phenD());
 	_Xmat       = gsl_matrix_alloc(low.getNtot(), Npred);
@@ -7682,6 +7781,11 @@ BetaGrpFt::BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npre
  *	constructors with rank pre-selection
  */
 BetaGrpFt::BetaGrpFt(const Grp &rsp, const SigmaI &SigI, const string &predFlNam, const size_t &Npred, const double &Nmul, const double &rSqMax, RanIndex &up, const string &outFlNam, const int &nThr) : _numSaves(0.0), _nThr(nThr), Grp(){
+	if (Npred != up.getNtot()) {
+		cerr << "ERROR: number of predictors " << Npred << " is not equal to the number of elements " << up.getNtot() << " in the prior index in BetaGrpFt initialization." << endl;
+		exit(-1);
+	}
+
 	gsl_matrix_free(_valueMat);
 	_fittedAll = gsl_matrix_calloc(rsp.Ndata(), rsp.phenD());
 	_Xmat      = gsl_matrix_alloc(rsp.Ndata(), Npred);
@@ -7750,6 +7854,23 @@ BetaGrpFt::BetaGrpFt(const Grp &rsp, const SigmaI &SigI, const string &predFlNam
 }
 
 BetaGrpFt::BetaGrpFt(const Grp &rsp, const SigmaI &SigI, const string &predFlNam, const size_t &Npred, const double &Nmul, const double &rSqMax, RanIndex &low, RanIndex &up, const string &outFlNam, const int &nThr) : _numSaves(0.0), _nThr(nThr), Grp(){
+	if (Npred != up.getNtot()) {
+		cerr << "ERROR: number of predictors " << Npred << " is not equal to the number of elements " << up.getNtot() << " in the prior index in BetaGrpFt initialization." << endl;
+		exit(-1);
+	}
+	else if (Npred != low.getNgrp()){
+		cerr << "ERROR: number of predictors " << Npred << " is not equal to the number of groups " << low.getNgrp() << " in the replication index in BetaGrpFt initialization." << endl;
+		exit(-1);
+	}
+	else if (up.getNtot() != low.getNgrp()) {
+		cerr << "ERROR: number of groups " << low.getNgrp() << " in the replication index is not equal to the number of elements " << up.getNtot() << " in the prior index in BetaGrpFt initialization." << endl;
+		exit(-1);
+	}
+	else if (low.getNtot() != rsp.dMat()->size1){
+		cerr << "ERROR: number of elements " << low.getNgrp() << " in the replication index is not equal to the number of rows " << rsp.dMat()->size1 << " in the response matrix in BetaGrpFt initialization." << endl;
+		exit(-1);
+	}
+
 	gsl_matrix_free(_valueMat);
 	_fittedAll  = gsl_matrix_calloc(low.getNgrp(), rsp.phenD());
 	_Xmat       = gsl_matrix_alloc(low.getNgrp(), Npred);
@@ -7828,6 +7949,11 @@ BetaGrpFt::BetaGrpFt(const Grp &rsp, const SigmaI &SigI, const string &predFlNam
 }
 
 BetaGrpFt::BetaGrpFt(const Grp &rsp, const SigmaI &SigI, const string &predFlNam, const size_t &Npred, const double &Nmul, const double &rSqMax, const double &absLab, RanIndex &up, const string &outFlNam, const int &nThr) :  _numSaves(0.0), _nThr(nThr), Grp() {
+	if (Npred != up.getNtot()) {
+		cerr << "ERROR: number of predictors " << Npred << " is not equal to the number of elements " << up.getNtot() << " in the prior index in BetaGrpFt initialization." << endl;
+		exit(-1);
+	}
+	
 	gsl_matrix_free(_valueMat);
 	_fittedAll  = gsl_matrix_calloc(rsp.Ndata(), rsp.phenD());
 	_Xmat       = gsl_matrix_alloc(rsp.Ndata(), Npred);
@@ -7895,6 +8021,23 @@ BetaGrpFt::BetaGrpFt(const Grp &rsp, const SigmaI &SigI, const string &predFlNam
 	gsl_matrix_free(y);
 }
 BetaGrpFt::BetaGrpFt(const Grp &rsp, const SigmaI &SigI, const string &predFlNam, const size_t &Npred, const double &Nmul, const double &rSqMax, const double &absLab, RanIndex &low, RanIndex &up, const string &outFlNam, const int &nThr) :  _numSaves(0.0), _nThr(nThr), Grp() {
+	if (Npred != up.getNtot()) {
+		cerr << "ERROR: number of predictors " << Npred << " is not equal to the number of elements " << up.getNtot() << " in the prior index in BetaGrpFt initialization." << endl;
+		exit(-1);
+	}
+	else if (Npred != low.getNgrp()){
+		cerr << "ERROR: number of predictors " << Npred << " is not equal to the number of groups " << low.getNgrp() << " in the replication index in BetaGrpFt initialization." << endl;
+		exit(-1);
+	}
+	else if (up.getNtot() != low.getNgrp()) {
+		cerr << "ERROR: number of groups " << low.getNgrp() << " in the replication index is not equal to the number of elements " << up.getNtot() << " in the prior index in BetaGrpFt initialization." << endl;
+		exit(-1);
+	}
+	else if (low.getNtot() != rsp.dMat()->size1){
+		cerr << "ERROR: number of elements " << low.getNgrp() << " in the replication index is not equal to the number of rows " << rsp.dMat()->size1 << " in the response matrix in BetaGrpFt initialization." << endl;
+		exit(-1);
+	}
+
 	gsl_matrix_free(_valueMat);
 	_fittedAll  = gsl_matrix_calloc(low.getNgrp(), rsp.phenD());
 	_Xmat       = gsl_matrix_alloc(low.getNgrp(), Npred);
@@ -8052,13 +8195,6 @@ BetaGrpFt::~BetaGrpFt(){
 	gsl_matrix_free(_Xmat);
 }
 
-/*
- *	this is to calculate C = R%*%gamma, multiple times, dropping none or one of the gammas each time.
- *	Products (R[i,m]*gamma[m,j]) are in common for all the manipulations and need only be calculated once
- *	the difference each time is only in the sums. As an additional shortcut, we sum the whole thing (R%*%gamma) and then
- *	subtract each R[i,m]*gamma[m,j] (m in 1..Npc).  This is much faster than re-doing partial sums Npc times (roughly Npc^2 vs 2Npc).
- *  Independently confirmed that it is doing the right thing by comparing to GSL dgemm results.
- */
 void BetaGrpFt::_updateFitted(){
 	if (_lowLevel) {
 #pragma omp parallel num_threads(_nThr)
@@ -8521,9 +8657,6 @@ void BetaGrpPEX::_finishConstruct(const double &Spr){
 	}
 }
 
-/*
- *	making XB out of X[Xi]
- */
 void BetaGrpPEX::_finishFitted(){
 	if (_lowLevel) {
 #pragma omp parallel num_threads(_nThr)
@@ -8559,7 +8692,7 @@ void BetaGrpPEX::_finishFitted(){
 	
 }
 
-void BetaGrpPEX::_updateAfitted(){ // separate X%*%Xi%*%A for each trait
+void BetaGrpPEX::_updateAfitted(){ 
 	if (_lowLevel) {
 #pragma omp parallel num_threads(_nThr)
 		{

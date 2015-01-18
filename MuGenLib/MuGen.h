@@ -1,19 +1,30 @@
 /*
-*  libMuGen.h
-*  libMuGen
-*
-*  Created by ajg67 on 10/30/12.
-*  Copyright (c) 2012 SEELE. All rights reserved.
-*
-*  Classes for Hierarchical Bayesian quantitative-genetic models.  Using gsl_vector and gsl_matrix as internal storage types.
-*
-*
-*/
+ *  libMuGen.h
+ *  libMuGen
+ *
+ *  Copyright (c) 2015 Anthony J. Greenberg
+ *
+ *  This file is part of the MuGen library.
+ *
+ *  MuGen is free software: you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation, either version 3 of the License, or
+ *  (at your option) any later version.
+ *
+ *  MuGen is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU General Public License for more details.
+ *
+ *  You should have received a copy of the GNU General Public License
+ *  along with MuGen.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
 /// C++ classes for Hierarchical Bayesian Multi-trait quantitative-genetic models.
 /** \file
  * \author Anthony J. Greenberg
- * \copyright GNU public license
+ * \copyright Released under the GNU public license
  * \version 0.9.0
  * 
  * MuGen is a library that implements a comprehensive approach to Bayesian inference of multi-trait models for quantitative genetics.  It enables genome-wide association 
@@ -3207,33 +3218,144 @@ public:
 	
 };
 
+/** \brief "Random effect" with parameter expansion
+ *
+ * An implementation of a multivariate extension (Greenberg, unpublished) of the multiplicative PEX scheme for "random effects" model \cite gelman07 \cite gelman08 .  This object has to be outside the model hierarchy, i.e. have the same prior for all rows.
+ * Variables are divided into "raw" and "adjusted" as in \cite gelman07 . "Adjusted" variables are on the correct scale for interpretation.  The "raw" value matrix is denoted \f$ \boldsymbol{\Xi} \f$ and the redundant parameter matrix (implemented in the Apex class) is \f$ \boldsymbol{A} \f$.
+ *
+ */
 class MuGrpPEX : public MuGrp {
 protected:
+	/** \brief Adjusted value matrix
+	 *
+	 * The location paramter of interest, i.e. \f$ \boldsymbol{\Xi A} \f$.
+	 */
 	gsl_matrix *_adjValMat;
-	gsl_matrix *_tSigIAt;   // t(SigIm%*%t(_A)) that is in common among all individual MVnormMuPEX's
+	/** \brief Scaled inverse-covariance
+	 *
+	 * The matrix \f$ \left( \boldsymbol{\Sigma}^{-1}\boldsymbol{A}^T \right)^T \f$ that is common for sampling each row of the value matrix.
+	 */
+	gsl_matrix *_tSigIAt;
+	/** \brief Redundant parameter matrix */
 	Apex _A;
+	/** \brief Fitted values
+	 *
+	 * Vector of vectorized individual fitted matrices \f$ \boldsymbol{\Xi}_{\cdot -m}\boldsymbol{A}_{-m\cdot} \f$.
+	 *
+	 */
 	vector<vector<double> > _ftA;
+	/** \brief number of threads */
 	int _nThr;
 	
-	string _outSigFlNam; // file name to save the Sigma that goes with this Mu
+	/** \brief Covariance output file name
+	 *
+	 * This is to save the adjusted prior covariance matrix associated with this object.  Saving from the SigmaI object gives the raw matrix.
+	 */
+	string _outSigFlNam;
 	
+	/** \defgroup fitFun Functions to update fitted values
+	 *
+	 * Protected member functions of the derived Grp classes that implement multiple regressions in some form. In Gibbs sampling for multiple regression, it is necessary to calculate partial fitted matrices of the form \f$ \boldsymbol{X}_{\cdot -k}\boldsymbol{B}_{-k \cdot} \f$ for each \f$k\f$-th predictor (i.e., product for all but the \f$k\f$-th predictor),
+	 * as well as the complete fitted matrix \f$ \boldsymbol{C} = \boldsymbol{XB} \f$.  Here, \f$ \boldsymbol{X} \f$ is the predictor matrix and \f$ \boldsymbol{B} \f$ is the matrix of regression coefficients.  This process is typically the bottleneck of the Gibbs sampler when even a moderate number of predictors (\f$ \geq 100 \f$) are in the model.
+	 * The key idea in implementing these functions is that the multiplications required to calculate all the partial matrix products
+	 * are also necessary for computing the complete fitted matrix.  Thus, elements of the complete matrix
+	 * \f[
+	 *     c_{i,j} = \sum_k x_{i,k}\beta_{k,j}
+	 * \f]
+	 * are calculated first, then the individual \f$ x_{i,k}\beta_{k,j} \f$ are subtracted to get the required partial fitted matrices. Further speed-ups are achieved by parallelizing the calculations by row of the regression coefficient matrix (i.e. by individual predictor).
+	 *
+	 * @{
+	 */
+	/** \brief Update adjusted values
+	 *
+	 * Creates the adjusted value matrix and the individual \f$ \boldsymbol{\Xi}_{\cdot -m}\boldsymbol{A}_{-m\cdot} \f$.
+	 */
 	void _updateFitted();
+	/** @} */
 	
 public:
+	/** \brief Default constructor */
 	MuGrpPEX();
+	/** \brief Full constructor
+	 *
+	 * Initializing constructor that provides starting values for the location parameter and redundant parameter matrices.
+	 *
+	 * \param[in] Grp& data
+	 * \param[in] RanIndex& index to the lower (data) level
+	 * \param[in] RanIndex& index to the upper (prior) level
+	 * \param[in] double& inverse-prior for the redundant parameter matrix
+	 * \param[in] int& number of threads
+	 *
+	 */
 	MuGrpPEX(const Grp &dat, RanIndex &low, RanIndex &up, const double &Spr, const int &nThr);
+	/** \brief Full constructor with location parameter file name
+	 *
+	 * Initializing constructor that provides starting values for the location parameter and redundant parameter matrices.  Sets the name of the file where the  adjusted location parameter chains will be saved.
+	 *
+	 * \param[in] Grp& data
+	 * \param[in] RanIndex& index to the lower (data) level
+	 * \param[in] RanIndex& index to the upper (prior) level
+	 * \param[in] string& output file name
+	 * \param[in] double& inverse-prior for the redundant parameter matrix
+	 * \param[in] int& number of threads
+	 *
+	 */
 	MuGrpPEX(const Grp &dat, RanIndex &low, RanIndex &up, const string outMuFlNam, const double &Spr, const int &nThr);
+	/** \brief Full constructor with location parameter and covariance file names
+	 *
+	 * Initializing constructor that provides starting values for the location parameter and redundant parameter matrices.  Sets the name of the files where the adjusted location parameter and covariance matrix chains will be saved.
+	 *
+	 * \param[in] Grp& data
+	 * \param[in] RanIndex& index to the lower (data) level
+	 * \param[in] RanIndex& index to the upper (prior) level
+	 * \param[in] string& output location file name
+	 * \param[in] string& output covariance file name
+	 * \param[in] double& inverse-prior for the redundant parameter matrix
+	 * \param[in] int& number of threads
+	 *
+	 */
 	MuGrpPEX(const Grp &dat, RanIndex &low, RanIndex &up, const string outMuFlNam, const string outSigFlNam, const double &Spr, const int &nThr);
 	
+	/** \brief Destructor */
 	~MuGrpPEX();
 	
+	/** \brief Copy constructor
+	 *
+	 * \param[in] MuGrpPEX& object to be copied
+	 * \return MuGrpPEX object
+	 */
 	MuGrpPEX(const MuGrpPEX &mGp);
+	/** \brief Assignment operator
+	 *
+	 * \param[in] MuGrpPEX& object to be copied
+	 * \return MuGrpPEX& target object
+	 */
 	MuGrpPEX &operator=(const MuGrpPEX &mGp);
 	
-	const gsl_matrix *fMat() const{return _adjValMat; }; // _adjValMat returns the interesting values muPEX%*%A, but the dMat() still returns _valueMat that stores the "raw" (per Gelman and Hill) values
-	void save(); // interested in saving the adjusted values, so the fMat()
-	void save(const SigmaI &SigI); // saving the location parameters and the cognate Sigma
+	/** \brief Access the adjusted value matrix
+	 *
+	 * \return gsl_matrix* pointer to the adjusted value matrix
+	 */
+	const gsl_matrix *fMat() const{return _adjValMat; };
+	/** \brief Save the adjusted values
+	 *
+	 * Appends the current adjusted mean values to the file whose name was set during construction.
+	 */
+	void save();
+	/** \brief Save with the covariance matrix
+	 *
+	 * Appends the current adjusted mean values and prior covariance matrix to the files whose names were set during construction.
+	 */
+	void save(const SigmaI &SigI);
+	/** \brief Access the redundant parameter
+	 *
+	 * \return Apex& the redundant parameter matrix
+	 */
 	Apex &getA(){return _A; };
+	/** \brief Set the inverse-prior for the redundant parameter matrix
+	 *
+	 * \param[in] double& inverse-prior value
+	 */
 	void setApr(const double &pr){_A.setPr(pr); };
 	
 	MuGrp mean(RanIndex &grp);
@@ -3252,21 +3374,68 @@ public:
 	void update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, const Grp &muPr, const Qgrp &qPr, const SigmaI &SigIp);
 };
 
+/** \brief Data with missing phenotype values
+ *
+ * Implements missing phenotypic (responce) data imputation.  This object has to be at the bottom of the hierarchy, so there is no index to the lower level.
+ */
 class MuGrpMiss : public MuGrp {
 protected:
+	/** \brief Index of the rows with missing data */
 	vector<size_t> _misInd;
 	
 public:
+	/** \brief Default constructor */
 	MuGrpMiss() : MuGrp() {};
+	/** \brief Full constructor
+	 *
+	 * Reads data and indexes that show which data are missing from files.  Matrix index has the same dimensions as the value matrix and has "1" in places where the data are missing and "0" otherwise.
+	 * The vector missing data index indicates the number of data points missing in each row (zero for rows with all data present).  The data file can have any double-precision value in place of missing data.
+	 * These values are ignored and replaced by the overall mean at construction, but subsequently updated.
+	 *
+	 * \param[in] string& data file name
+	 * \param[in] string& matrix missing data index file name
+	 * \param[in] string& vector missing data index file name
+	 * \param[in] RanIndex& index pointing to the prior (next level in the hierarchy)
+	 * \param[in] size_t& number of traits
+	 */
 	MuGrpMiss(const string &datFlNam, const string &misMatFlNam, const string &misVecFlNam, RanIndex &up, const size_t &d);
 	
+	/** \brief Destructor */
 	~MuGrpMiss() {};
 	
+	/** \brief Copy constructor
+	 *
+	 * \param[in] MuGrpMiss& object to be copied
+	 * \return MuGrpMiss object
+	 */
 	MuGrpMiss(const MuGrpMiss &mG); // copy constructor
+	/** \brief Assignment operator
+	 *
+	 * \param[in] MuGrpMiss& object to be copied
+	 * \return MuGrpMiss& target object
+	 */
 	MuGrpMiss & operator=(const MuGrpMiss &mG);
 	
-	// only Gaussian updates work for imputation (in general)
+	/** \brief Standard Gaussian imputation
+	 *
+	 * If some data are present, performs standard Gaussian marginal imputation (desribed in, e.g., \cite chatfield80 ) with the provided Grp object as a mean and the SigmaI object as the inverse-covariance.
+	 * If no data for a row are present, simply replaces the row values by a Gaussian sample with mean and inverse-covariance provided.  Rows with no missing data are ignored.
+	 *
+	 * \param[in] Grp& mean
+	 * \param[in] SigmaI& inverse-covariance
+	 */
 	virtual void update(const Grp &mu, const SigmaI &SigIm);
+	/** \brief Gaussian imputation with a prior
+	 *
+	 * If some data are present, performs Gaussian marginal imputation (desribed in, e.g., \cite chatfield80 ) with the provided Grp object as a mean and the SigmaI object as the inverse-covariance, but with a 0-mean prior.
+	 * If no data for a row are present, simply replaces the row values by a Gaussian sample with mean and inverse-covariance provided.  Rows with no missing data are ignored.
+	 *
+	 * \warning Has not been extensively tested
+	 *
+	 * \param[in] Grp& mean
+	 * \param[in] SigmaI& inverse-covariance
+	 * \param[in] SigmaI& prior inverse-covariance
+	 */
 	virtual void update(const Grp &mu, const SigmaI &SigIm, const SigmaI &SigIp);
 	
 	size_t nMis() const{return _misInd.size();};
@@ -3275,99 +3444,527 @@ public:
 
 /** \brief Data with measurement error
  *
+ * If some phenotypes are measured with known error (e.g., technical replicates that are not idividually available), these can be sampled rather than used as point estimates. A mix of traits with and without measurement error is allowed.
+ * This class has to be on the bottom of the model hierarchy.
+ *
+ * \warning Has not been extensively tested, and there are indications that there are bugs.
  */
-
 class MuGrpEE : public MuGrp {
 protected:
+	/** \brief Matrix of error variances
+	 *
+	 * The matrix has the same number of rows as the value matrix, and the number of columns no larger than the value matrix.
+	 */
 	gsl_matrix *_errorVar;
-	vector<size_t> _errInd; // each row is the same
+	/** \brief Trait index
+	 *
+	 * Contains indexes of the traits that have measurment errors.  Only one index for all rows, i.e. once a trait has measurment error all samples must have a non-zero error variance.
+	 */
+	vector<size_t> _errInd;
 	
 public:
+	/** \brief Default constructor */
 	MuGrpEE() : MuGrp() {_errorVar = gsl_matrix_alloc(1, 1); };
+	/** \brief Constructor with index read from a file
+	 *
+	 * The data, error variances and the index identifying traits with errors are read from files.  The index file must be a white-space separated text file.
+	 *
+	 * \param[in] string& data file name
+	 * \param[in] string& variance file name
+	 * \param[in] string& index values file name
+	 * \param[in] RainIndex& upper level (prior) index
+	 * \param[in] size_t& number of traits
+	 */
 	MuGrpEE(const string &datFlNam, const string &varFlNam, const string &indFlNam, RanIndex &up, const size_t &d);
+	/** \brief Constructor with index vector
+	 *
+	 * The data and error variances are read from files, but the index identifying traits with errors is provided in a vector.
+	 *
+	 * \param[in] string& data file name
+	 * \param[in] string& variance file name
+	 * \param[in] vector<size_t>& index values file name
+	 * \param[in] RainIndex& upper level (prior) index
+	 * \param[in] size_t& number of traits
+	 */
 	MuGrpEE(const string &datFlNam, const string &varFlNam, const vector<size_t> &varInd, RanIndex &up, const size_t &d);
 	
+	/** \brief Destructor */
 	~MuGrpEE() {gsl_matrix_free(_errorVar); };
 	
+	/** \brief Copy constructor
+	 *
+	 * \param[in] MuGrpEE& object to be copied
+	 * \return MuGrpEE object
+	 */
 	MuGrpEE(const MuGrpEE &mG); // copy constructor
+	/** \brief Assignment operator
+	 *
+	 * \param[in] MuGrpEE& object to be copied
+	 * \return MuGrpEE& target object
+	 */
 	MuGrpEE & operator=(const MuGrpEE &mG);
 	
-	// all of these are actually priors
+	/** \brief Gaussian prior
+	 *
+	 * The Grp object contains the prior means and the SigmaI object -- the prior inverse-covariance for the sampling of data values.  The upper index of the object must have the same number of groups as the number of rows in the prior matrix addressed by fMat().
+	 * While the sampling is independent, the prior inverse variances for each trait are taken from the diagonal of the inverse-covariance matrix (in the SigmaI object), and are thus influenced by any correlated traits.
+	 *
+	 * \param[in] Grp& prior mean
+	 * \param[in] SigmaI& prior inverse-covariance
+	 */
 	virtual void update(const Grp &muPr, const SigmaI &SigIm);
+	/** \brief Student-\f$t\f$ prior
+	 *
+	 * The Grp object contains the prior means and the SigmaI object -- the prior inverse-covariance for the sampling of data values.  The upper index of the object must have the same number of groups as the number of rows in the prior matrix addressed by fMat().
+	 * While the sampling is independent, the prior inverse variances for each trait are taken from the diagonal of the inverse-covariance matrix (in the SigmaI object), and are thus influenced by any correlated traits.
+	 *
+	 * \param[in] Grp& prior mean
+	 * \param[in] Qgrp& Student-\f$t\f$ weights
+	 * \param[in] SigmaI& prior inverse-covariance
+	 */
 	virtual void update(const Grp &muPr, const Qgrp &q, const SigmaI &SigIm);
 	
 };
 
 /** \brief Data with measurement error and missing phenotypes
  *
+ * Some traits have measurment errors, some (possibly an overlapping set) are missing.  Sampling with error is done only for the present phenotypes, thus not all rows have the same number of traits with error variances.
  */
-
 class MuGrpEEmiss : public MuGrpMiss {
 protected:
+	/** \brief Measurement errors
+	 *
+	 * The length of the vector is equal to the number of rows of the value matrix.  For each row, the error variances are in a list that has as many members as there are non-missing phenotypes with errors.
+	 */
 	vector< list<double> > _errorVar;
+	/** \brief Error index
+	 *
+	 * The same configuration as the variance vector of lists, but containing indexes of the elements of the value matrix that have measurement errors.
+	 */
 	vector< list<size_t> > _missErrMat;
 	
 public:
+	/** \brief Default constructor */
 	MuGrpEEmiss() : MuGrpMiss() {};
+	/** \brief Constructor with index read from a file
+	 *
+	 * The data, error variances and the index identifying traits with errors are read from files.  The index file must be a white-space separated text file.  The index is initially the same for each row, but then the values corresponding to missing phenotypes are dropped for relevant rows.
+	 *
+	 * \param[in] string& data file name
+	 * \param[in] string& variance file name
+	 * \param[in] string& index values file name
+	 * \param[in] string& matrix missing data index file name
+	 * \param[in] string& vector missing data index file name
+	 * \param[in] RainIndex& upper level (prior) index
+	 * \param[in] size_t& number of traits
+	 */
 	MuGrpEEmiss(const string &datFlNam, const string &varFlNam, const string &indFlNam, const string &misMatFlNam, const string &misVecFlNam, RanIndex &up, const size_t &d);
+	/** \brief Constructor with index vector
+	 *
+	 * The data and error variances are read from files, but the index identifying traits with errors is provided in a vector.  The index is initially the same for each row, but then the values corresponding to missing phenotypes are dropped for relevant rows.
+	 *
+	 * \param[in] string& data file name
+	 * \param[in] string& variance file name
+	 * \param[in] vector<size_t>& index values
+	 * \param[in] string& matrix missing data index file name
+	 * \param[in] string& vector missing data index file name
+	 * \param[in] RainIndex& upper level (prior) index
+	 * \param[in] size_t& number of traits
+	 */
 	MuGrpEEmiss(const string &datFlNam, const string &varFlNam, const vector<size_t> &varInd, const string &misMatFlNam, const string &misVecFlNam, RanIndex &up, const size_t &d);
 	
+	/** \brief Destructor */
 	~MuGrpEEmiss() { };
 	
+	/** \brief Copy constructor
+	 *
+	 * \param[in] MuGrpEEmiss& object to be copied
+	 * \return MuGrpEEmiss object
+	 */
 	MuGrpEEmiss(const MuGrpEEmiss &mG); // copy constructor
+	/** \brief Assignment operator
+	 *
+	 * \param[in] MuGrpEEmiss& object to be copied
+	 * \return MuGrpEEmiss& target object
+	 */
 	MuGrpEEmiss & operator=(const MuGrpEEmiss &mG);
 	
-	// all of these are actually priors
 	void update(const Grp &muPr, const SigmaI &SigIm);
 	void update(const Grp &muPr, const Qgrp &q, const SigmaI &SigIm);
 	
 };
 
+/** \brief Multivariate multiple regression
+ *
+ * Implements multivariate (multitrait) regression with multiple predictors.  A single predictor is treated as a special case internally, the user does not have to do anything different.  A variety for penalized regression methods is available, implemented through priors and pre-selection of variables, although the latter is still experimental.
+ * As the number of predictors grows, the computational burden increases and updates involving these objects become bottlenecks in the Markov chain computation.  Therefore, great care has been taken to optimize computation for this class, sometimes at the expense of error checking.
+ *
+ */
 class BetaGrpFt : public Grp {
 protected:
-	vector< vector<double> > _fittedEach; // each member of the outer vector stores the element-specific fitted matrix as vector in the row-major format, to be accessed as a matrix_view of an array
+	/** \brief Partial fitted value matrices
+	 *
+	 * Each member of the vector stores the element-specific fitted matrix (\f$ \boldsymbol{X}_{\cdot -k}\boldsymbol{B}_{-k \cdot} \f$) as a vector in the row-major format, to be accessed as a matrix_view of an array. If there is only one predictor, this is empty.
+	 * If there is replication (i.e. the index to the lower level is initialized), these matrices have the same number of rows as the response (equivalent to \f$ \boldsymbol{Z}\boldsymbol{X}_{\cdot -k}\boldsymbol{B}_{-k \cdot} \f$, where \f$ \boldsymbol{Z} \f$ is the design matrix).
+	 */
+	vector< vector<double> > _fittedEach;
+	/** \brief Matrix of fitted values
+	 *
+	 * The \f$ \boldsymbol{XB} matrix \f$. In cases where the index to the lower level is initialized, i.e. there is replication in the response, this matrix has the same number of rows as the number of unique values of the predictor.
+	 */
 	gsl_matrix *_fittedAll;
-	gsl_matrix *_valueSum; // sum of all the saved estimates; allocated only if needed (under the condition that _numSaves != 0.0)
+	/** \brief Sample storage matrix
+	 *
+	 * Stores Markov chain samples of the value matrix if we want only the point estimates in the end. Stores the sum of all the estimates saved up to now; allocated only if needed (under the condition that _numSaves != 0.0)
+	 */
+	gsl_matrix *_valueSum;
+	/** \brief Predictor matrix
+	 *
+	 * Individual predictors are in columns.  If there is replication, the number of rows is expanded to fit the number of rows in the response matrix (\f$ \boldsymbol{Z}\boldsymbol{X}\boldsymbol{B} \f$).
+	 */
 	gsl_matrix *_Xmat;
+	/** \brief Number of threads */
 	int _nThr;
 	
-	double _numSaves;      // number of saves made, to calculate the mean at the end; double b/c will need to divide a matrix of doubles by it
+	/** \brief Number of saves
+	 *
+	 * Number of saves made, to calculate the mean at the end.
+	 */
+	double _numSaves;
 	
+	/** \brief Update fitted values */
 	virtual void _updateFitted();
-	void _rankPred(const gsl_matrix *y, const SigmaI &SigI, gsl_vector *XtX, gsl_permutation *prm);  // ranking the predictors in preparation for throwing out the ones below a certain rank
+	/** \brief Rank predictors
+	 *
+	 * Ranking the predictors by the size of their effects in preparation for eliminating the ones below a certain rank.
+	 *
+	 * \param[in] gsl_matrix* data (response)
+	 * \param[in] SigmaI& data inverse-covariance
+	 * \param[in] gsl_vector* vector of regression scales \f$ \left( \boldsymbol{x}^T\boldsymbol{x} \right)^{-1} \f$
+	 * \param[out] gsl_permutation* predictor ranks
+	 */
+	void _rankPred(const gsl_matrix *y, const SigmaI &SigI, gsl_vector *XtX, gsl_permutation *prm);
+	/** \brief Rank predictors with missing data.
+	 *
+	 * Ranking the predictors by the size of their effects in preparation for eliminating the ones below a certain rank.  Missing predictor values are labeled by a given value.
+	 *
+	 * \param[in] gsl_matrix* data (response)
+	 * \param[in] SigmaI& data inverse-covariance
+	 * \param[in] double& missing data label
+	 * \param[in] gsl_vector* vector of regression scales \f$ \left( \boldsymbol{x}^T\boldsymbol{x} \right)^{-1} \f$
+	 * \param[out] gsl_permutation* predictor ranks
+	 */
 	void _rankPred(const gsl_matrix *y, const SigmaI &SigI, const double &absLab, gsl_vector *XtX, gsl_permutation *prm);
-	void _ldToss(const gsl_vector *var, const gsl_permutation *prm, const double &rSqMax, const size_t &Npck, vector< vector<size_t> > &idx, vector< vector<size_t> > &rLd, gsl_matrix *Xpck);  // tossing the predictors in LD with top hits, noting their identity and topping off the selection with "unlinked" SNPs
-	virtual double _MGkernel(const Grp &dat, const SigmaI &SigI) const;   // MV Gaussian kernel calculation for all Xbeta
-	virtual double _MGkernel(const Grp &dat, const SigmaI &SigI, const size_t &prInd) const;  // MV Gaussian kernel, dropping predictor prInd
+	/** \brief Testing candidates for correlation
+	 *
+	 * Goes through the list of "top" predictors and eliminates lower-ranked candidates correlated with them.  If any candidates are eliminated, the list of top predictors is augmented with predictors previously discarded.
+	 * The identity of the predictors eliminated for correlation is saved.  The correlation among predictors arises, for example, when estimating SNP effect in genetics (GWAS).
+	 *
+	 * \warning Tested only superficially
+	 *
+	 * \param[in] gsl_vector* \f$ \left( \boldsymbol{x}^T\boldsymbol{x} \right)^{-1} \f$
+	 * \param[in] gsl_permutation* predictor ranks
+	 * \param[in] double& \f$ r^2 \f$ cut-off
+	 * \param[in] size_t& number of predictors to pick
+	 * \param[out] vector< vector<size_t> >& index of picked predictors
+	 * \param[out] vector< vector<size_t> >& index relating dropped correlated predictors to their group-defining predictor
+	 * \param[out] gsl_matrix* matrix of picked predictor values
+	 */
+	void _ldToss(const gsl_vector *var, const gsl_permutation *prm, const double &rSqMax, const size_t &Npck, vector< vector<size_t> > &idx, vector< vector<size_t> > &rLd, gsl_matrix *Xpck);
+	/** \brief Gaussian kernel
+	 *
+	 * Calculates the multivariate Gaussian kernel value for all regression coefficients in the model.
+	 *
+	 * \param[in] Grp& data
+	 * \param[in] SigmaI& inverse-covariance
+	 *
+	 * \return double kernel value
+	 */
+	virtual double _MGkernel(const Grp &dat, const SigmaI &SigI) const;
+	/** \brief Gaussian kernel dropping one predictor
+	 *
+	 * Calculates the multivariate Gaussian kernel value for all regression coefficients in the model, except for the one indicated.
+	 *
+	 * \param[in] Grp& data
+	 * \param[in] SigmaI& inverse-covariance
+	 * \param[in] size_t& index of the dropped predictor
+	 *
+	 * \return double kernel value
+	 */
+	virtual double _MGkernel(const Grp &dat, const SigmaI &SigI, const size_t &prInd) const;
 public:
+	/** \brief Default constructor */
 	BetaGrpFt();
+	/** \brief Simple constructor
+	 *
+	 * Reads the predictor from a file and initiates regression coefficients using the provided response data.  Number of rows of the predictor is equal to the number of rows in the response (no replication).
+	 * No upper index is specified, so this object will implement a regression with an improper flat prior.  Caution is advised if the number of predictors approaches the number of rows in the response, since inference will not be well-conditioned.
+	 *
+	 * \param[in] Grp& response
+	 * \param[in] srting& predictor file name
+	 * \param[in] size_t& number of predictors
+	 * \param[in] int& number of threads
+	 */
 	BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npred, const int &nThr);
+	/** \brief Simple constructor with a prior index
+	 *
+	 * Reads the predictor from a file and initiates regression coefficients using the provided response data.  Number of rows of the predictor is equal to the number of rows in the response (no replication).
+	 *
+	 * \param[in] Grp& response
+	 * \param[in] srting& predictor file name
+	 * \param[in] size_t& number of predictors
+	 * \param[in] RanIndex& index to the prior
+	 * \param[in] int& number of threads
+	 */
 	BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npred, RanIndex &up, const int &nThr);
+	/** \brief Simple constructor with a prior index and replication
+	 *
+	 * Reads the predictor from a file and initiates regression coefficients using the provided response data.  Number of rows of the predictor is equal to the number of groups in the lower (data) index.
+	 * The number of rows in the response is equal to the number of elements in the low index.
+	 *
+	 * \param[in] Grp& response
+	 * \param[in] srting& predictor file name
+	 * \param[in] size_t& number of predictors
+	 * \param[in] RanIndex& replication index
+	 * \param[in] RanIndex& index to the prior
+	 * \param[in] int& number of threads
+	 */
 	BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npred, RanIndex &low, RanIndex &up, const int &nThr);
+	/** \brief Simple constructor with output file name
+	 *
+	 * Reads the predictor from a file and initiates regression coefficients using the provided response data.  Number of rows of the predictor is equal to the number of rows in the response (no replication).
+	 * No upper index is specified, so this object will implement a regression with an improper flat prior.  Caution is advised if the number of predictors approaches the number of rows in the response, since inference will not be well-conditioned.
+	 *
+	 * \param[in] Grp& response
+	 * \param[in] srting& predictor file name
+	 * \param[in] size_t& number of predictors
+	 * \param[in] string& output file name
+	 * \param[in] int& number of threads
+	 */
 	BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npred, const string &outFlNam, const int &nThr);
+	/** \brief Simple constructor with a prior index and output file name
+	 *
+	 * Reads the predictor from a file and initiates regression coefficients using the provided response data.  Number of rows of the predictor is equal to the number of rows in the response (no replication).
+	 *
+	 * \param[in] Grp& response
+	 * \param[in] srting& predictor file name
+	 * \param[in] size_t& number of predictors
+	 * \param[in] RanIndex& index to the prior
+	 * \param[in] string& output file name
+	 * \param[in] int& number of threads
+	 */
 	BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npred, RanIndex &up, const string &outFlNam, const int &nThr);
+	/** \brief Simple constructor with a prior index, replication and output file name
+	 *
+	 * Reads the predictor from a file and initiates regression coefficients using the provided response data.  Number of rows of the predictor is equal to the number of groups in the lower (data) index.
+	 * The number of rows in the response is equal to the number of elements in the low index
+	 *
+	 * \param[in] Grp& response
+	 * \param[in] srting& predictor file name
+	 * \param[in] size_t& number of predictors
+	 * \param[in] RanIndex& replication index
+	 * \param[in] RanIndex& index to the prior
+	 * \param[in] string& output file name
+	 * \param[in] int& number of threads
+	 */
 	BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npred, RanIndex &low, RanIndex &up, const string &outFlNam, const int &nThr);
 	
-	// with missing predictor values (labeled by absLab)
+	/** \brief Missing data constructor
+	 *
+	 * Reads the predictor from a file and initiates regression coefficients using the provided response data. Predictor has missing data labeled by the provided value.  Number of rows of the predictor is equal to the number of rows in the response (no replication).
+	 * No upper index is specified, so this object will implement a regression with an improper flat prior.  Caution is advised if the number of predictors approaches the number of rows in the response, since inference will not be well-conditioned.
+	 *
+	 * \param[in] Grp& response
+	 * \param[in] srting& predictor file name
+	 * \param[in] size_t& number of predictors
+	 * \param[in] double& missing data label
+	 * \param[in] int& number of threads
+	 */
 	BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npred, const double &absLab, const int &nThr);
+	/** \brief Missing data constructor with a prior index
+	 *
+	 * Reads the predictor from a file and initiates regression coefficients using the provided response data. Predictor has missing data labeled by the provided value.  Number of rows of the predictor is equal to the number of rows in the response (no replication).
+	 *
+	 * \param[in] Grp& response
+	 * \param[in] srting& predictor file name
+	 * \param[in] size_t& number of predictors
+	 * \param[in] double& missing data label
+	 * \param[in] RanIndex& index to the prior
+	 * \param[in] int& number of threads
+	 */
 	BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npred, const double &absLab, RanIndex &up, const int &nThr);
+	/** \brief Missing data constructor with a prior index and replication
+	 *
+	 * Reads the predictor from a file and initiates regression coefficients using the provided response data. Predictor has missing data labeled by the provided value.  Number of rows of the predictor is equal to the number of groups in the lower (data) index.
+	 * The number of rows in the response is equal to the number of elements in the low index
+	 *
+	 * \param[in] Grp& response
+	 * \param[in] srting& predictor file name
+	 * \param[in] size_t& number of predictors
+	 * \param[in] double& missing data label
+	 * \param[in] RanIndex& replication index
+	 * \param[in] RanIndex& index to the prior
+	 * \param[in] int& number of threads
+	 */
 	BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npred, const double &absLab, RanIndex &low, RanIndex &up, const int &nThr);
+	/** \brief Missing data constructor with output file name
+	 *
+	 * Reads the predictor from a file and initiates regression coefficients using the provided response data. Predictor has missing data labeled by the provided value.  Number of rows of the predictor is equal to the number of rows in the response (no replication).
+	 * No upper index is specified, so this object will implement a regression with an improper flat prior.  Caution is advised if the number of predictors approaches the number of rows in the response, since inference will not be well-conditioned.
+	 *
+	 * \param[in] Grp& response
+	 * \param[in] srting& predictor file name
+	 * \param[in] size_t& number of predictors
+	 * \param[in] double& missing data label
+	 * \param[in] string& output file name
+	 * \param[in] int& number of threads
+	 */
 	BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npred, const double &absLab, const string &outFlNam, const int &nThr);
+	/** \brief Missing data constructor with a prior index and output file name
+	 *
+	 * Reads the predictor from a file and initiates regression coefficients using the provided response data. Predictor has missing data labeled by the provided value.  Number of rows of the predictor is equal to the number of rows in the response (no replication).
+	 *
+	 * \param[in] Grp& response
+	 * \param[in] srting& predictor file name
+	 * \param[in] size_t& number of predictors
+	 * \param[in] double& missing data label
+	 * \param[in] RanIndex& index to the prior
+	 * \param[in] string& output file name
+	 * \param[in] int& number of threads
+	 */
 	BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npred, const double &absLab, RanIndex &up, const string &outFlNam, const int &nThr);
+	/** \brief Missing data constructor with a prior index, replication and output file name
+	 *
+	 * Reads the predictor from a file and initiates regression coefficients using the provided response data. Predictor has missing data labeled by the provided value.  Number of rows of the predictor is equal to the number of groups in the lower (data) index.
+	 * The number of rows in the response is equal to the number of elements in the low index
+	 *
+	 * \param[in] Grp& response
+	 * \param[in] srting& predictor file name
+	 * \param[in] size_t& number of predictors
+	 * \param[in] double& missing data label
+	 * \param[in] RanIndex& replication index
+	 * \param[in] RanIndex& index to the prior
+	 * \param[in] string& output file name
+	 * \param[in] int& number of threads
+	 */
 	BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npred, const double &absLab, RanIndex &low, RanIndex &up, const string &outFlNam, const int &nThr);
 	
-	// pre-screening of predictors based on initial rank.  Unlike BVSR, there is no update of the selected set
+	/** \brief Selection constructor
+	 *
+	 * Unlike the previous constructors, selection-type constructors pre-screen predictors for association with any of the traits (using Hoteling-like multi-trait statistics), and keeps only the specified proportion in the model.  
+	 * The candidate predictors are further screened for between-predictor correlation and only ones with \f$ r^2 \f$ below the provided threshold are kept in the model.  This among-predictor correlation often arises in SNP data, where there is likage disequilbrium (LD) among markers.
+	 * Once the predictors are picked, the updating proceeds like for other BetaGrpFt objects, i.e. the set remains the same (unlike variable selection).
+	 *
+	 * \warning This set of models is still experimental and has not been extenisively tested.  For example, it seems clear that the rest of the model has to be pre-run to convergence before initializing this kind of object.  Furthermore, the initializeing predictor probably has to be a mean of several (\f$ \sim 50 \f$) MCMC samples.
+	 *
+	 * \param[in] Grp& response
+	 * \param[in] SigmaI& data inverse-covariance
+	 * \param[in] srting& predictor file name
+	 * \param[in] size_t& number of predictors
+	 * \param[in] double& fraction of predictors to retain, as a fraction of the number of data points
+	 * \param[in] double& \f$ r^2 \f$ cut-off for among-predictor correlation
+	 * \param[in] RanIndex& index to the prior
+	 * \param[in] string& output file name
+	 * \param[in] int& number of threads
+	 *
+	 */
 	BetaGrpFt(const Grp &rsp, const SigmaI &SigI, const string &predFlNam, const size_t &Npred, const double &Nmul, const double &rSqMax, RanIndex &up, const string &outFlNam, const int &nThr);
+	/** \brief Selection constructor with replication
+	 *
+	 * Unlike the previous constructors, selection-type constructors pre-screen predictors for association with any of the traits (using Hoteling-like multi-trait statistics), and keeps only the specified proportion in the model.
+	 * The candidate predictors are further screened for between-predictor correlation and only ones with \f$ r^2 \f$ below the provided threshold are kept in the model.  This among-predictor correlation often arises in SNP data, where there is likage disequilbrium (LD) among markers.
+	 * Once the predictors are picked, the updating proceeds like for other BetaGrpFt objects, i.e. the set remains the same (unlike variable selection).
+	 *
+	 * \warning This set of models is still experimental and has not been extenisively tested.  For example, it seems clear that the rest of the model has to be pre-run to convergence before initializing this kind of object.  Furthermore, the initializeing predictor probably has to be a mean of several (\f$ \sim 50 \f$) MCMC samples.
+	 *
+	 * \param[in] Grp& response
+	 * \param[in] SigmaI& data inverse-covariance
+	 * \param[in] srting& predictor file name
+	 * \param[in] size_t& number of predictors
+	 * \param[in] double& fraction of predictors to retain, as a fraction of the number of data points
+	 * \param[in] double& \f$ r^2 \f$ cut-off for among-predictor correlation
+	 * \param[in] RanIndex& replication index
+	 * \param[in] RanIndex& index to the prior
+	 * \param[in] string& output file name
+	 * \param[in] int& number of threads
+	 *
+	 */
 	BetaGrpFt(const Grp &rsp, const SigmaI &SigI, const string &predFlNam, const size_t &Npred, const double &Nmul, const double &rSqMax, RanIndex &low, RanIndex &up, const string &outFlNam, const int &nThr);
+	/** \brief Selection constructor with missing predictor data
+	 *
+	 * Unlike the previous constructors, selection-type constructors pre-screen predictors for association with any of the traits (using Hoteling-like multi-trait statistics), and keeps only the specified proportion in the model.
+	 * The candidate predictors are further screened for between-predictor correlation and only ones with \f$ r^2 \f$ below the provided threshold are kept in the model.  This among-predictor correlation often arises in SNP data, where there is likage disequilbrium (LD) among markers.
+	 * Once the predictors are picked, the updating proceeds like for other BetaGrpFt objects, i.e. the set remains the same (unlike variable selection).  Missing predictor data are filled in by mean imputation.
+	 *
+	 * \warning This set of models is still experimental and has not been extenisively tested.  For example, it seems clear that the rest of the model has to be pre-run to convergence before initializing this kind of object.  Furthermore, the initializeing predictor probably has to be a mean of several (\f$ \sim 50 \f$) MCMC samples.
+	 *
+	 * \param[in] Grp& response
+	 * \param[in] SigmaI& data inverse-covariance
+	 * \param[in] srting& predictor file name
+	 * \param[in] size_t& number of predictors
+	 * \param[in] double& fraction of predictors to retain, as a fraction of the number of data points
+	 * \param[in] double& \f$ r^2 \f$ cut-off for among-predictor correlation
+	 * \param[in] double& missing data label
+	 * \param[in] RanIndex& index to the prior
+	 * \param[in] string& output file name
+	 * \param[in] int& number of threads
+	 *
+	 */
 	BetaGrpFt(const Grp &rsp, const SigmaI &SigI, const string &predFlNam, const size_t &Npred, const double &Nmul, const double &rSqMax, const double &absLab, RanIndex &up, const string &outFlNam, const int &nThr);
+	/** \brief Selection constructor with missing predictor data and replication
+	 *
+	 * Unlike the previous constructors, selection-type constructors pre-screen predictors for association with any of the traits (using Hoteling-like multi-trait statistics), and keeps only the specified proportion in the model.
+	 * The candidate predictors are further screened for between-predictor correlation and only ones with \f$ r^2 \f$ below the provided threshold are kept in the model.  This among-predictor correlation often arises in SNP data, where there is likage disequilbrium (LD) among markers.
+	 * Once the predictors are picked, the updating proceeds like for other BetaGrpFt objects, i.e. the set remains the same (unlike variable selection).  Missing predictor data are filled in by mean imputation.
+	 *
+	 * \warning This set of models is still experimental and has not been extenisively tested.  For example, it seems clear that the rest of the model has to be pre-run to convergence before initializing this kind of object.  Furthermore, the initializeing predictor probably has to be a mean of several (\f$ \sim 50 \f$) MCMC samples.
+	 *
+	 * \param[in] Grp& response
+	 * \param[in] SigmaI& data inverse-covariance
+	 * \param[in] srting& predictor file name
+	 * \param[in] size_t& number of predictors
+	 * \param[in] double& fraction of predictors to retain, as a fraction of the number of data points
+	 * \param[in] double& \f$ r^2 \f$ cut-off for among-predictor correlation
+	 * \param[in] double& missing data label
+	 * \param[in] RanIndex& replication index
+	 * \param[in] RanIndex& index to the prior
+	 * \param[in] string& output file name
+	 * \param[in] int& number of threads
+	 *
+	 */
 	BetaGrpFt(const Grp &rsp, const SigmaI &SigI, const string &predFlNam, const size_t &Npred, const double &Nmul, const double &rSqMax, const double &absLab, RanIndex &low, RanIndex &up, const string &outFlNam, const int &nThr);
 	
+	/** \brief Destructor */
 	virtual ~BetaGrpFt();
 	
-	BetaGrpFt(const BetaGrpFt &mG); // copy constructor
+	/** \brief Copy constructor
+	 *
+	 * \param[in] BetaGrpFt& object to be copied
+	 * \return BetaGrpFt object
+	 */
+	BetaGrpFt(const BetaGrpFt &mG);
+	/** \brief Assignment operator
+	 *
+	 * \param[in] BetaGrpFt& object to be copied
+	 * \return BetaGrpFt& target object
+	 */
 	BetaGrpFt & operator=(const BetaGrpFt &mG);
 	
+	/** \brief Access to the fitted value matrix
+	 *
+	 * Pointer to the \f$ \boldsymbol{XB} \f$ matrix, while dMat() accesses the regression coefficient matrix.
+	 *
+	 * \return gsl_matrix* pointer to the matrix of fitted values
+	 *
+	 */
 	virtual const gsl_matrix *fMat() const{return _fittedAll; };
+	/** \brief Store samples
+	 *
+	 * Stores samples of predictor effect scores in a matrix to be dumped at the end of the MCMC run.
+	 *
+	 * \param[in] SigmaI& data inverse-covariance
+	 *
+	 */
 	void save(const SigmaI &SigI);
 	void dump();
 	
@@ -3388,44 +3985,275 @@ public:
 	virtual void update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, const Grp &muPr, const Qgrp &qPr, const SigmaI &SigIp);
 	
 };
-
+/** \brief Multivariate multiple regression with parameter expansion
+ *
+ * Implements multiplicative prameter expansion as in MuGrpPEX, but for regression coefficients. The "raw" value matrix \f$ \boldsymbol{\Xi} \f$ contains regression coefficients on the unadjusted scale (see MuGrpPEX for explanation of these terms).
+ * The adjusted regression coefficient matrix is not calculated, but fMat() point to the adjusted fitted value matrix \f$ \boldsymbol{X \Xi A} \f$.
+ * Regression models with this method must have a prior, typically one with mean zero.
+ *
+ */
 class BetaGrpPEX : virtual public BetaGrpFt {
 protected:
-	gsl_matrix *_tSigIAt;   // t(SigIm%*%t(_A)) that is in common among all individual MVnormMuPEX's
+	/** \brief Scaled inverse-covariance
+	 *
+	 * The matrix \f$ \left( \boldsymbol{\Sigma}^{-1}\boldsymbol{A}^T \right)^T \f$ that is common for sampling each row of the value matrix.
+	 */
+	gsl_matrix *_tSigIAt;
+	/** \brief Multiplicative redundant parameter */
 	Apex _A;
+	/** \brief Fitted values
+	 *
+	 * Vector of vectorized individual fitted matrices \f$ \boldsymbol{\Xi}_{\cdot -m}\boldsymbol{A}_{-m\cdot} \f$.
+	 *
+	 */
 	vector<vector<double> > _ftA;
-	gsl_matrix *_fittedAllAdj;  // this is the X%*%Zeta%*%A, the regular scale matrix.  The _fittedAll is the "raw" matrix, as is the _valueMat (we don't need the adjusted _valueMat)
+	/** \brief Adjusted fitted matrix
+	 *
+	 * The \f$ \boldsymbol{X \Xi A} \f$ matrix.  The inherited _fittedAll matrix is \f$ \boldsymbol{X \Xi} \f$, i.e. the "raw" version.
+	 *
+	 */
+	gsl_matrix *_fittedAllAdj;
 	
+	/** \brief Finish construction
+	 *
+	 * Most of the construction tasks are handled by the parent class.  This function sets up the PEX portion of the class.
+	 *
+	 * \param[in] double& prior inverse variance for \f$ \boldsymbol{A} \f$
+	 *
+	 */
 	void _finishConstruct(const double &Spr);
+	/** \brief Adjusted matrix calculation
+	 *
+	 * Calculates adjusted fitted matrix and all sub-matrices.
+	 *
+	 */
 	void _finishFitted();
+	/** \brief Calculate redundant parameter fitted values
+	 *
+	 * Calculates separate \f$ \left(\boldsymbol{X \Xi A}\right)_{\cdot -p} \f$ for each trait \f$ p \f$.
+	 */
 	void _updateAfitted();
 	
-	BetaGrpPEX(const double &Spr) {_finishConstruct(Spr); }; // only used by BetaGrpPCpex
+	/** \brief Finishing constructor
+	 *
+	 * For use in BetaGrpPCpex.
+	 *
+	 * \param[in] double& prior inverse variance for \f$ \boldsymbol{A} \f$
+	 */
+	BetaGrpPEX(const double &Spr) {_finishConstruct(Spr); };
 public:
+	/** \brief Default constructor */
 	BetaGrpPEX() : BetaGrpFt() {};
-	BetaGrpPEX(const Grp &rsp, const string &predFlNam, const size_t &Npred, const double &Spr, const int &nThr) : BetaGrpFt(rsp, predFlNam, Npred, nThr) {_finishConstruct(Spr); };
+	/** \brief Simple constructor with a prior index
+	 *
+	 * Reads the predictor from a file and initiates regression coefficients using the provided response data.  Number of rows of the predictor is equal to the number of rows in the response (no replication).
+	 *
+	 * \param[in] Grp& response
+	 * \param[in] srting& predictor file name
+	 * \param[in] size_t& number of predictors
+	 * \param[in] double& prior inverse variance for \f$ \boldsymbol{A} \f$
+	 * \param[in] RanIndex& index to the prior
+	 * \param[in] int& number of threads
+	 */
 	BetaGrpPEX(const Grp &rsp, const string &predFlNam, const size_t &Npred, const double &Spr, RanIndex &up, const int &nThr) : BetaGrpFt(rsp, predFlNam, Npred, up, nThr) {_finishConstruct(Spr); };
+	/** \brief Simple constructor with a prior index and replication
+	 *
+	 * Reads the predictor from a file and initiates regression coefficients using the provided response data.  Number of rows of the predictor is equal to the number of groups in the lower (data) index.
+	 * The number of rows in the response is equal to the number of elements in the low index
+	 *
+	 * \param[in] Grp& response
+	 * \param[in] srting& predictor file name
+	 * \param[in] size_t& number of predictors
+	 * \param[in] double& prior inverse variance for \f$ \boldsymbol{A} \f$
+	 * \param[in] RanIndex& replication index
+	 * \param[in] RanIndex& index to the prior
+	 * \param[in] int& number of threads
+	 */
 	BetaGrpPEX(const Grp &rsp, const string &predFlNam, const size_t &Npred, const double &Spr, RanIndex &low, RanIndex &up, const int &nThr) : BetaGrpFt(rsp, predFlNam, Npred, low, up, nThr) {_finishConstruct(Spr); };
-	BetaGrpPEX(const Grp &rsp, const string &predFlNam, const size_t &Npred, const double &Spr, const string &outFlNam, const int &nThr) : BetaGrpFt(rsp, predFlNam, Npred, outFlNam, nThr) {_finishConstruct(Spr); };
+	/** \brief Simple constructor with a prior index and output file name
+	 *
+	 * Reads the predictor from a file and initiates regression coefficients using the provided response data.  Number of rows of the predictor is equal to the number of rows in the response (no replication).
+	 *
+	 * \param[in] Grp& response
+	 * \param[in] srting& predictor file name
+	 * \param[in] size_t& number of predictors
+	 * \param[in] double& prior inverse variance for \f$ \boldsymbol{A} \f$
+	 * \param[in] RanIndex& index to the prior
+	 * \param[in] string& output file name
+	 * \param[in] int& number of threads
+	 */
 	BetaGrpPEX(const Grp &rsp, const string &predFlNam, const size_t &Npred, const double &Spr, RanIndex &up, const string &outFlNam, const int &nThr) : BetaGrpFt(rsp, predFlNam, Npred, up, outFlNam, nThr) {_finishConstruct(Spr); };
+	/** \brief Simple constructor with a prior index, replication and output file name
+	 *
+	 * Reads the predictor from a file and initiates regression coefficients using the provided response data.  Number of rows of the predictor is equal to the number of groups in the lower (data) index.
+	 * The number of rows in the response is equal to the number of elements in the low index
+	 *
+	 * \param[in] Grp& response
+	 * \param[in] srting& predictor file name
+	 * \param[in] size_t& number of predictors
+	 * \param[in] double& prior inverse variance for \f$ \boldsymbol{A} \f$
+	 * \param[in] RanIndex& replication index
+	 * \param[in] RanIndex& index to the prior
+	 * \param[in] string& output file name
+	 * \param[in] int& number of threads
+	 */
 	BetaGrpPEX(const Grp &rsp, const string &predFlNam, const size_t &Npred, const double &Spr, RanIndex &low, RanIndex &up, const string &outFlNam, const int &nThr) : BetaGrpFt(rsp, predFlNam, Npred, low, up, outFlNam, nThr) {_finishConstruct(Spr); };
 	
-	// with missing predictor values (labeled by absLab)
-	BetaGrpPEX(const Grp &rsp, const string &predFlNam, const size_t &Npred, const double &Spr, const double &absLab, const int &nThr) : BetaGrpFt(rsp, predFlNam, Npred, absLab, nThr) {_finishConstruct(Spr); };
+	/** \brief Missing data constructor with a prior index
+	 *
+	 * Reads the predictor from a file and initiates regression coefficients using the provided response data. Predictor has missing data labeled by the provided value.  Number of rows of the predictor is equal to the number of rows in the response (no replication).
+	 *
+	 * \param[in] Grp& response
+	 * \param[in] srting& predictor file name
+	 * \param[in] size_t& number of predictors
+	 * \param[in] double& prior inverse variance for \f$ \boldsymbol{A} \f$
+	 * \param[in] double& missing data label
+	 * \param[in] RanIndex& index to the prior
+	 * \param[in] int& number of threads
+	 */
 	BetaGrpPEX(const Grp &rsp, const string &predFlNam, const size_t &Npred, const double &Spr, const double &absLab, RanIndex &up, const int &nThr) : BetaGrpFt(rsp, predFlNam, Npred, absLab, up, nThr) {_finishConstruct(Spr); };
+	/** \brief Missing data constructor with a prior index and replication
+	 *
+	 * Reads the predictor from a file and initiates regression coefficients using the provided response data. Predictor has missing data labeled by the provided value.  Number of rows of the predictor is equal to the number of groups in the lower (data) index.
+	 * The number of rows in the response is equal to the number of elements in the low index
+	 *
+	 * \param[in] Grp& response
+	 * \param[in] srting& predictor file name
+	 * \param[in] size_t& number of predictors
+	 * \param[in] double& prior inverse variance for \f$ \boldsymbol{A} \f$
+	 * \param[in] double& missing data label
+	 * \param[in] RanIndex& replication index
+	 * \param[in] RanIndex& index to the prior
+	 * \param[in] int& number of threads
+	 */
 	BetaGrpPEX(const Grp &rsp, const string &predFlNam, const size_t &Npred, const double &Spr, const double &absLab, RanIndex &low, RanIndex &up, const int &nThr) : BetaGrpFt(rsp, predFlNam, Npred, absLab, low, up, nThr) {_finishConstruct(Spr); };
-	BetaGrpPEX(const Grp &rsp, const string &predFlNam, const size_t &Npred, const double &Spr, const double &absLab, const string &outFlNam, const int &nThr) : BetaGrpFt(rsp, predFlNam, Npred, absLab, outFlNam, nThr) {_finishConstruct(Spr); };
+	/** \brief Missing data constructor with a prior index and output file name
+	 *
+	 * Reads the predictor from a file and initiates regression coefficients using the provided response data. Predictor has missing data labeled by the provided value.  Number of rows of the predictor is equal to the number of rows in the response (no replication).
+	 *
+	 * \param[in] Grp& response
+	 * \param[in] srting& predictor file name
+	 * \param[in] size_t& number of predictors
+	 * \param[in] double& prior inverse variance for \f$ \boldsymbol{A} \f$
+	 * \param[in] double& missing data label
+	 * \param[in] RanIndex& index to the prior
+	 * \param[in] string& output file name
+	 * \param[in] int& number of threads
+	 */
 	BetaGrpPEX(const Grp &rsp, const string &predFlNam, const size_t &Npred, const double &Spr, const double &absLab, RanIndex &up, const string &outFlNam, const int &nThr) : BetaGrpFt(rsp, predFlNam, Npred, absLab, up, outFlNam, nThr) {_finishConstruct(Spr); };
+	/** \brief Missing data constructor with a prior index, replication and output file name
+	 *
+	 * Reads the predictor from a file and initiates regression coefficients using the provided response data. Predictor has missing data labeled by the provided value.  Number of rows of the predictor is equal to the number of groups in the lower (data) index.
+	 * The number of rows in the response is equal to the number of elements in the low index
+	 *
+	 * \param[in] Grp& response
+	 * \param[in] srting& predictor file name
+	 * \param[in] size_t& number of predictors
+	 * \param[in] double& prior inverse variance for \f$ \boldsymbol{A} \f$
+	 * \param[in] double& missing data label
+	 * \param[in] RanIndex& replication index
+	 * \param[in] RanIndex& index to the prior
+	 * \param[in] string& output file name
+	 * \param[in] int& number of threads
+	 */
 	BetaGrpPEX(const Grp &rsp, const string &predFlNam, const size_t &Npred, const double &Spr, const double &absLab, RanIndex &low, RanIndex &up, const string &outFlNam, const int &nThr) : BetaGrpFt(rsp, predFlNam, Npred, absLab, low, up, outFlNam, nThr) {_finishConstruct(Spr); };
 	
-	// pre-screening of predictors based on initial rank.  Unlike BVSR, there is no update of the selected set
+	/** \brief Selection constructor
+	 *
+	 * Unlike the previous constructors, selection-type constructors pre-screen predictors for association with any of the traits (using Hoteling-like multi-trait statistics), and keeps only the specified proportion in the model.
+	 * The candidate predictors are further screened for between-predictor correlation and only ones with \f$ r^2 \f$ below the provided threshold are kept in the model.  This among-predictor correlation often arises in SNP data, where there is likage disequilbrium (LD) among markers.
+	 * Once the predictors are picked, the updating proceeds like for other BetaGrpFt objects, i.e. the set remains the same (unlike variable selection).
+	 *
+	 * \warning This set of models is still experimental and has not been extenisively tested.  For example, it seems clear that the rest of the model has to be pre-run to convergence before initializing this kind of object.  Furthermore, the initializeing predictor probably has to be a mean of several (\f$ \sim 50 \f$) MCMC samples.
+	 *
+	 * \param[in] Grp& response
+	 * \param[in] SigmaI& data inverse-covariance
+	 * \param[in] srting& predictor file name
+	 * \param[in] size_t& number of predictors
+	 * \param[in] double& prior inverse variance for \f$ \boldsymbol{A} \f$
+	 * \param[in] double& fraction of predictors to retain, as a fraction of the number of data points
+	 * \param[in] double& \f$ r^2 \f$ cut-off for among-predictor correlation
+	 * \param[in] RanIndex& index to the prior
+	 * \param[in] string& output file name
+	 * \param[in] int& number of threads
+	 *
+	 */
 	BetaGrpPEX(const Grp &rsp, const SigmaI &SigI, const string &predFlNam, const size_t &Npred, const double &Spr, const double &Nmul, const double &rSqMax, RanIndex &up, const string &outFlNam, const int &nThr) : BetaGrpFt(rsp, SigI, predFlNam, Npred, Nmul, rSqMax, up, outFlNam, nThr) {_finishConstruct(Spr); };
+	/** \brief Selection constructor with replication
+	 *
+	 * Unlike the previous constructors, selection-type constructors pre-screen predictors for association with any of the traits (using Hoteling-like multi-trait statistics), and keeps only the specified proportion in the model.
+	 * The candidate predictors are further screened for between-predictor correlation and only ones with \f$ r^2 \f$ below the provided threshold are kept in the model.  This among-predictor correlation often arises in SNP data, where there is likage disequilbrium (LD) among markers.
+	 * Once the predictors are picked, the updating proceeds like for other BetaGrpFt objects, i.e. the set remains the same (unlike variable selection).
+	 *
+	 * \warning This set of models is still experimental and has not been extenisively tested.  For example, it seems clear that the rest of the model has to be pre-run to convergence before initializing this kind of object.  Furthermore, the initializeing predictor probably has to be a mean of several (\f$ \sim 50 \f$) MCMC samples.
+	 *
+	 * \param[in] Grp& response
+	 * \param[in] SigmaI& data inverse-covariance
+	 * \param[in] srting& predictor file name
+	 * \param[in] size_t& number of predictors
+	 * \param[in] double& prior inverse variance for \f$ \boldsymbol{A} \f$
+	 * \param[in] double& fraction of predictors to retain, as a fraction of the number of data points
+	 * \param[in] double& \f$ r^2 \f$ cut-off for among-predictor correlation
+	 * \param[in] RanIndex& replication index
+	 * \param[in] RanIndex& index to the prior
+	 * \param[in] string& output file name
+	 * \param[in] int& number of threads
+	 *
+	 */
 	BetaGrpPEX(const Grp &rsp, const SigmaI &SigI, const string &predFlNam, const size_t &Npred, const double &Spr, const double &Nmul, const double &rSqMax, RanIndex &low, RanIndex &up, const string &outFlNam, const int &nThr) : BetaGrpFt(rsp, SigI, predFlNam, Npred, Nmul, rSqMax, low, up, outFlNam, nThr) {_finishConstruct(Spr); };
+	/** \brief Selection constructor with missing predictor data
+	 *
+	 * Unlike the previous constructors, selection-type constructors pre-screen predictors for association with any of the traits (using Hoteling-like multi-trait statistics), and keeps only the specified proportion in the model.
+	 * The candidate predictors are further screened for between-predictor correlation and only ones with \f$ r^2 \f$ below the provided threshold are kept in the model.  This among-predictor correlation often arises in SNP data, where there is likage disequilbrium (LD) among markers.
+	 * Once the predictors are picked, the updating proceeds like for other BetaGrpFt objects, i.e. the set remains the same (unlike variable selection).  Missing predictor data are filled in by mean imputation.
+	 *
+	 * \warning This set of models is still experimental and has not been extenisively tested.  For example, it seems clear that the rest of the model has to be pre-run to convergence before initializing this kind of object.  Furthermore, the initializeing predictor probably has to be a mean of several (\f$ \sim 50 \f$) MCMC samples.
+	 *
+	 * \param[in] Grp& response
+	 * \param[in] SigmaI& data inverse-covariance
+	 * \param[in] srting& predictor file name
+	 * \param[in] size_t& number of predictors
+	 * \param[in] double& prior inverse variance for \f$ \boldsymbol{A} \f$
+	 * \param[in] double& fraction of predictors to retain, as a fraction of the number of data points
+	 * \param[in] double& \f$ r^2 \f$ cut-off for among-predictor correlation
+	 * \param[in] double& missing data label
+	 * \param[in] RanIndex& index to the prior
+	 * \param[in] string& output file name
+	 * \param[in] int& number of threads
+	 *
+	 */
 	BetaGrpPEX(const Grp &rsp, const SigmaI &SigI, const string &predFlNam, const size_t &Npred, const double &Spr, const double &Nmul, const double &rSqMax, const double &absLab, RanIndex &up, const string &outFlNam, const int &nThr) : BetaGrpFt(rsp, SigI, predFlNam, Npred, Nmul, rSqMax, absLab, up, outFlNam, nThr) {_finishConstruct(Spr); };
+	/** \brief Selection constructor with missing predictor data and replication
+	 *
+	 * Unlike the previous constructors, selection-type constructors pre-screen predictors for association with any of the traits (using Hoteling-like multi-trait statistics), and keeps only the specified proportion in the model.
+	 * The candidate predictors are further screened for between-predictor correlation and only ones with \f$ r^2 \f$ below the provided threshold are kept in the model.  This among-predictor correlation often arises in SNP data, where there is likage disequilbrium (LD) among markers.
+	 * Once the predictors are picked, the updating proceeds like for other BetaGrpFt objects, i.e. the set remains the same (unlike variable selection).  Missing predictor data are filled in by mean imputation.
+	 *
+	 * \warning This set of models is still experimental and has not been extenisively tested.  For example, it seems clear that the rest of the model has to be pre-run to convergence before initializing this kind of object.  Furthermore, the initializeing predictor probably has to be a mean of several (\f$ \sim 50 \f$) MCMC samples.
+	 *
+	 * \param[in] Grp& response
+	 * \param[in] SigmaI& data inverse-covariance
+	 * \param[in] srting& predictor file name
+	 * \param[in] size_t& number of predictors
+	 * \param[in] double& prior inverse variance for \f$ \boldsymbol{A} \f$
+	 * \param[in] double& fraction of predictors to retain, as a fraction of the number of data points
+	 * \param[in] double& \f$ r^2 \f$ cut-off for among-predictor correlation
+	 * \param[in] double& missing data label
+	 * \param[in] RanIndex& replication index
+	 * \param[in] RanIndex& index to the prior
+	 * \param[in] string& output file name
+	 * \param[in] int& number of threads
+	 *
+	 */
 	BetaGrpPEX(const Grp &rsp, const SigmaI &SigI, const string &predFlNam, const size_t &Npred, const double &Spr, const double &Nmul, const double &rSqMax, const double &absLab, RanIndex &low, RanIndex &up, const string &outFlNam, const int &nThr) : BetaGrpFt(rsp, SigI, predFlNam, Npred, Nmul, rSqMax, absLab, low, up, outFlNam, nThr) {_finishConstruct(Spr); };
 	
+	/** \brief Destructor */
 	virtual ~BetaGrpPEX();
 	
+	/** \brief Access adjusted fitted value matrix 
+	 *
+	 * \return gsl_matrix* pointer to the adjusted-value fitted matrix
+	 */
 	virtual const gsl_matrix *fMat() const{return _fittedAllAdj; };
 	
 	void save();
@@ -3442,37 +4270,172 @@ public:
 	virtual void update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, const Grp &muPr, const Qgrp &qPr, const SigmaI &SigIp);
 };
 
-
+/** \brief Relationship matrix regression
+ *
+ * Implements regression models with principal components of a relationship matrix as predictors.  Only principal vectors with non-zero eigenvalues are used.  If the likelihood and the prior are Gaussian, and the prior mean is zero, this is equivalent to the "mixed model" in packages like EMMA and TASSEL.
+ * Because the PC vectors are orthonormal there are some speed-ups in initialization.  The updates are handled by the same internal row classes as in BetaGrpFt.
+ *
+ */
 class BetaGrpPC : virtual public BetaGrpFt {
 protected:
 	
 public:
+	/** \brief Default constructor */
 	BetaGrpPC() : BetaGrpFt() {};
+	/** \brief Constructor with a prior index
+	 *
+	 * Reads principal vectors and eigen-values from files. Number of rows of the predictor is equal to the number of rows in the response (no replication).
+	 *
+	 * \param[in] Grp& data for initialization
+	 * \param[in] string& PC vector file name
+	 * \param[in] string& eigen-value file name
+	 * \param[in] size_t& number of predictors
+	 * \param[in] RanIndex& prior index
+	 * \param[in] int& number of threads
+	 */
 	BetaGrpPC(const Grp &rsp, const string &predFlNam, const string &evFlNam, const size_t &Npred, RanIndex &up, const int &nThr);
+	/** \brief Constructor with a prior index and replication
+	 *
+	 * Reads principal vectors and eigen-values from files.   Number of rows of the predictor is equal to the number of groups in the lower (data) index.
+	 * The number of rows in the response is equal to the number of elements in the low index.
+	 *
+	 * \param[in] Grp& data for initialization
+	 * \param[in] string& PC vector file name
+	 * \param[in] string& eigen-value file name
+	 * \param[in] size_t& number of predictors
+	 * \param[in] RanIndex& lower-level (replicate) index
+	 * \param[in] RanIndex& prior index
+	 * \param[in] int& number of threads
+	 */
 	BetaGrpPC(const Grp &rsp, const string &predFlNam, const string &evFlNam, const size_t &Npred, RanIndex &low, RanIndex &up, const int &nThr);
+	/** \brief Constructor with a prior index, replication and output file name
+	 *
+	 * Reads principal vectors and eigen-values from files.   Number of rows of the predictor is equal to the number of groups in the lower (data) index.
+	 * The number of rows in the response is equal to the number of elements in the low index.
+	 *
+	 * \param[in] Grp& data for initialization
+	 * \param[in] string& PC vector file name
+	 * \param[in] string& eigen-value file name
+	 * \param[in] size_t& number of predictors
+	 * \param[in] RanIndex& lower-level (replicate) index
+	 * \param[in] RanIndex& prior index
+	 * \param[in] string& output file name
+	 * \param[in] int& number of threads
+	 */
 	BetaGrpPC(const Grp &rsp, const string &predFlNam, const string &evFlNam, const size_t &Npred, RanIndex &up, const string &outFlNam, const int &nThr);
+	/** \brief Constructor with a prior index and replication
+	 *
+	 * Reads principal vectors and eigen-values from files.   Number of rows of the predictor is equal to the number of groups in the lower (data) index.
+	 * The number of rows in the response is equal to the number of elements in the low index.
+	 *
+	 * \param[in] Grp& data for initialization
+	 * \param[in] string& PC vector file name
+	 * \param[in] string& eigen-value file name
+	 * \param[in] size_t& number of predictors
+	 * \param[in] RanIndex& lower-level (replicate) index
+	 * \param[in] RanIndex& prior index
+	 * \param[in] string& output file name
+	 * \param[in] int& number of threads
+	 */
 	BetaGrpPC(const Grp &rsp, const string &predFlNam, const string &evFlNam, const size_t &Npred, RanIndex &low, RanIndex &up, const string &outFlNam, const int &nThr);
 	
+	/** \brief Destructor */
 	virtual ~BetaGrpPC() {};
 	
-	BetaGrpPC(const BetaGrpPC &mG); // copy constructor
+	/** \brief Copy constructor
+	 *
+	 * \param[in] BetaGrpPC& object to be copied
+	 */
+	BetaGrpPC(const BetaGrpPC &mG);
+	/** \brief Assignment operator
+	 *
+	 * \param[in] BetaGrpPC& object to be copied
+	 * \return BetaGrpPC& target object
+	 */
 	BetaGrpPC & operator=(const BetaGrpPC &mG);
 	
 	//update methods taken care of by BetaGrpFt
 };
 
+/** \brief Multiplicative parameter expansion for PC regression
+ *
+ * Brings together implementations from BetaGrpPC and BetaGrpPEX.
+ *
+ */
 class BetaGrpPCpex : public BetaGrpPC, public BetaGrpPEX {
 protected:
 	
 public:
+	/** \brief Default constructor */
 	BetaGrpPCpex(){};
+	/** \brief Constructor with a prior index
+	 *
+	 * Reads principal vectors and eigen-values from files. Number of rows of the predictor is equal to the number of rows in the response (no replication).
+	 *
+	 * \param[in] Grp& data for initialization
+	 * \param[in] string& PC vector file name
+	 * \param[in] string& eigen-value file name
+	 * \param[in] size_t& number of predictors
+	 * \param[in] double& prior inverse variance for \f$ \boldsymbol{A} \f$
+	 * \param[in] RanIndex& prior index
+	 * \param[in] int& number of threads
+	 */
 	BetaGrpPCpex(const Grp &rsp, const string &predFlNam, const string &evFlNam, const size_t &Npred, const double &Spr, RanIndex &up, const int &nThr) : BetaGrpFt(), BetaGrpPC(rsp, predFlNam, evFlNam, Npred, up, nThr), BetaGrpPEX(Spr) {};
+	/** \brief Constructor with a prior index and replication
+	 *
+	 * Reads principal vectors and eigen-values from files.   Number of rows of the predictor is equal to the number of groups in the lower (data) index.
+	 * The number of rows in the response is equal to the number of elements in the low index.
+	 *
+	 * \param[in] Grp& data for initialization
+	 * \param[in] string& PC vector file name
+	 * \param[in] string& eigen-value file name
+	 * \param[in] size_t& number of predictors
+	 * \param[in] double& prior inverse variance for \f$ \boldsymbol{A} \f$
+	 * \param[in] RanIndex& lower-level (replicate) index
+	 * \param[in] RanIndex& prior index
+	 * \param[in] int& number of threads
+	 */
 	BetaGrpPCpex(const Grp &rsp, const string &predFlNam, const string &evFlNam, const size_t &Npred, const double &Spr, RanIndex &low, RanIndex &up, const int &nThr) : BetaGrpFt(), BetaGrpPC(rsp, predFlNam, evFlNam, Npred, low, up, nThr), BetaGrpPEX(Spr) {};
+	/** \brief Constructor with a prior index, replication and output file name
+	 *
+	 * Reads principal vectors and eigen-values from files.   Number of rows of the predictor is equal to the number of groups in the lower (data) index.
+	 * The number of rows in the response is equal to the number of elements in the low index.
+	 *
+	 * \param[in] Grp& data for initialization
+	 * \param[in] string& PC vector file name
+	 * \param[in] string& eigen-value file name
+	 * \param[in] size_t& number of predictors
+	 * \param[in] double& prior inverse variance for \f$ \boldsymbol{A} \f$
+	 * \param[in] RanIndex& lower-level (replicate) index
+	 * \param[in] RanIndex& prior index
+	 * \param[in] string& output file name
+	 * \param[in] int& number of threads
+	 */
 	BetaGrpPCpex(const Grp &rsp, const string &predFlNam, const string &evFlNam, const size_t &Npred, const double &Spr, RanIndex &up, const string &outFlNam, const int &nThr) : BetaGrpFt(), BetaGrpPC(rsp, predFlNam, evFlNam, Npred, up, outFlNam, nThr), BetaGrpPEX(Spr) {};
+	/** \brief Constructor with a prior index and replication
+	 *
+	 * Reads principal vectors and eigen-values from files.   Number of rows of the predictor is equal to the number of groups in the lower (data) index.
+	 * The number of rows in the response is equal to the number of elements in the low index.
+	 *
+	 * \param[in] Grp& data for initialization
+	 * \param[in] string& PC vector file name
+	 * \param[in] string& eigen-value file name
+	 * \param[in] size_t& number of predictors
+	 * \param[in] double& prior inverse variance for \f$ \boldsymbol{A} \f$
+	 * \param[in] RanIndex& lower-level (replicate) index
+	 * \param[in] RanIndex& prior index
+	 * \param[in] string& output file name
+	 * \param[in] int& number of threads
+	 */
 	BetaGrpPCpex(const Grp &rsp, const string &predFlNam, const string &evFlNam, const size_t &Npred, const double &Spr, RanIndex &low, RanIndex &up, const string &outFlNam, const int &nThr) : BetaGrpFt(), BetaGrpPC(rsp, predFlNam, evFlNam, Npred, low, up, outFlNam, nThr), BetaGrpPEX(Spr) {};
 	
+	/** \brief Destructor */
 	~BetaGrpPCpex() {};
 	
+	/** \brief Access adjusted fitted value matrix
+	 *
+	 * \return gsl_matrix* pointer to the adjusted-value fitted matrix
+	 */
 	const gsl_matrix *fMat() const{return _fittedAllAdj; };
 	
 	void update(const Grp &dat, const SigmaI &SigIm, const SigmaI &SigIp) { BetaGrpPEX::update(dat, SigIm, SigIp); };
