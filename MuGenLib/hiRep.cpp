@@ -22,7 +22,7 @@
 #include <cctype>
 #include <cstdio>
 
-#include "MuGenLib.h"
+#include <MuGen.h>
 
 using std::vector;
 using std::string;

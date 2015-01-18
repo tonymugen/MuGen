@@ -80,8 +80,9 @@ int main(int argc, char *argv[]){
 	char popTok;
 	string cNam;
 	
+	string dataFolder("phenoData/");
 	string dfNam("Y");
-	string sdfNam("SD");
+	string sdfNam("VAR");
 	string eIndFnam("errInd");
 	string cvFlNam("PCecov");
 	string mMatFnam("MatNAind");
@@ -89,12 +90,13 @@ int main(int argc, char *argv[]){
 	string pcEvecFlNam("ionHDRA_EVC");
 	string pcEvalFlNam("ionHDRA_EVL");
 	string expFacVec("ExpInd");
-	string lnFacVec("LnInd");
+	string lnFacVec("LnLInd");
 	string batchFacVec("BatchInd");
 	string bPrFacVec("BprInd");
 	string tubFacVec("TubInd");
 	string tubPrFacVec("TubPrInd");
 	string LNout("LN");
+	string SDout("SD");
 	string BVout("BV");
 	string SgEout("Sig_e");
 	string SgEXout("Sig_exp");
@@ -157,6 +159,10 @@ int main(int argc, char *argv[]){
 						
 					case 'c':
 						cOn = true;
+						break;
+						
+					case 'S':
+						dataFolder = "phenoDataSC/";
 						break;
 						
 					default:
@@ -277,8 +283,8 @@ int main(int argc, char *argv[]){
 		}
 	}
 	if (popID == "all") {
-		dfNam       = "phenoData/" + dfNam + trtSet + ".gbin";
-		sdfNam      = "phenoData/" + sdfNam + trtSet + ".gbin";
+		dfNam       = dataFolder + dfNam + trtSet + ".gbin";
+		sdfNam      = dataFolder + sdfNam + trtSet + ".gbin";
 		cvFlNam     = "phenoData/" + cvFlNam + ".gbin";
 		mMatFnam    = "phenoData/" + trtSet + mMatFnam + ".gbin";
 		mVecFnam    = "phenoData/" + trtSet + mVecFnam + ".gbin";
@@ -290,8 +296,8 @@ int main(int argc, char *argv[]){
 		tubPrFacVec = "phenoData/" + trtSet + tubPrFacVec + ".gbin";
 	}
 	else{
-		dfNam       = "phenoData/" + dfNam + trtSet + "_" + popID + ".gbin";
-		sdfNam      = "phenoData/" + sdfNam + trtSet + "_" + popID + ".gbin";
+		dfNam       = dataFolder + dfNam + trtSet + "_" + popID + ".gbin";
+		sdfNam      = dataFolder + sdfNam + trtSet + "_" + popID + ".gbin";
 		cvFlNam     = "phenoData/" + cvFlNam + "_" + popID + ".gbin";
 		mMatFnam    = "phenoData/" + trtSet + mMatFnam + "_" + popID + ".gbin";
 		mVecFnam    = "phenoData/" + trtSet + mVecFnam + "_" + popID + ".gbin";
@@ -307,6 +313,7 @@ int main(int argc, char *argv[]){
 	snpIn       = snpIn + popID + ".gbin";
 	
 	LNout   = trtSet + LNout;
+	SDout   = trtSet + SDout;
 	BVout   = trtSet + BVout;
 	SgEout  = trtSet + SgEout;
 	SgEXout = trtSet + SgEXout;
@@ -320,6 +327,7 @@ int main(int argc, char *argv[]){
 	addOn.push_back(cNam);
 	
 	finishFlNam(LNout, addOn);
+	finishFlNam(SDout, addOn);
 	finishFlNam(BVout, addOn);
 	finishFlNam(SgEout, addOn);
 	finishFlNam(SgEXout, addOn);
@@ -423,143 +431,125 @@ int main(int argc, char *argv[]){
 	const size_t Npc = Nln - 1;
 	
 	RanIndex e2exp(N, Nxp, expFacVec);
-	RanIndex exp2ln(Nxp, Nln, lnFacVec);
+	RanIndex e2ln(N, Nln, lnFacVec);
 	RanIndex e2e(N, N);
 	RanIndex e2tub(N, Ntub, tubFacVec);
-	//RanIndex tub2pr(Ntub, Nel, tubPrFacVec);
 	RanIndex tub2pr(Ntub);
 	RanIndex el2pr(Nel);
 	RanIndex ln2mu(Nln);
+	RanIndex ln2ln(Nln, Nln);
 	RanIndex exp2mu(Nxp);
 	RanIndex gm2pr(Npc);
 	RanIndex cv2pr(Ncv);
 	RanIndex mu2pr;
 	
 	RanIndex *e2bch;
-	//RanIndex *bch2pr;
 	RanIndex bch2pr(Nbatch);
-	//RanIndex bch2pr(Nbatch, Nel, bPrFacVec);
 	
-	MuGrpEEmiss dataI(dfNam, sdfNam, eIndFnam, mMatFnam, mVecFnam, e2e, d);
+	//MuGrpEEmiss dataI(dfNam, sdfNam, eIndFnam, mMatFnam, mVecFnam, e2e, d);
+	MuGrpMiss dataI(dfNam, mMatFnam, mVecFnam, e2e, d);
 	Grp &data = dataI;
 	
-	MuGrp muExpI(data, e2exp, exp2ln);
-	Grp &muExp = muExpI;
+	//MuGrp sExpI(data, e2exp, exp2mu);
+	MuGrpPEX sExpI(data, e2exp, exp2mu, 1e-6, nThr);
+	Grp &sExp = sExpI;
 	
-	MuGrp cvPredI = data - muExp;
+	MuGrp muEI(sExp, exp2mu, mu2pr);
+	Grp &muE = muEI;
+	
+	MuGrp cvPredI = data - sExp;
 	Grp &cvPred   = cvPredI;
 	
 	BetaGrpFt betaCvI(cvPred, cvFlNam, Ncv, cv2pr, nThr);
 	Grp &betaCv = betaCvI;
 	
-	MuGrp tubI(data, e2tub, tub2pr);
+	MuGrp tubI(cvPred, e2tub, tub2pr);
 	//MuGrpPEX tubI(data, e2tub, tub2pr, 1e-6, nThr);
 	Grp &tub = tubI;
 	
-	MuGrp muTI(tub, tub2pr, mu2pr);
-	Grp &muT = muTI;
+	//MuGrp muTI(tub, tub2pr, mu2pr);
+	//Grp &muT = muTI;
 	
-	/*
-	MuGrp tubPrI(tub, tub2pr, el2pr);
-	Grp &tubPr = tubPrI;
-	
-	MuGrp tubHPI(tubPr, el2pr, mu2pr);
-	Grp &tubHP = tubHPI;
-	*/
 	Grp *batchI;
 	if (trtSet == "all") {
-		batchI = new MuBlk(data, batchFacVec, Nbatch, bch2pr, "phenoData/allBlkInd.gbin");
+		batchI = new MuBlk(cvPred, batchFacVec, Nbatch, bch2pr, "phenoData/allBlkInd.gbin");
 	}
 	else {
 		e2bch = new RanIndex(N, Nbatch, batchFacVec);
-		batchI = new MuGrp(data, *e2bch, bch2pr);
-		//batchI = new MuGrp(data, *e2bch, bch2pr);
+		batchI = new MuGrp(cvPred, *e2bch, bch2pr);
 	}
 	Grp &batch = *batchI;
 	
 	MuGrp muBI(batch, bch2pr, mu2pr);
 	Grp &muB = muBI;
-	/*
-	MuGrp bchPrI(batch, bch2pr, el2pr);
-	Grp &bchPr = bchPrI;
-	
-	MuGrp bchHPI(bchPr, el2pr, mu2pr);
-	Grp &bchHP = bchHPI;
-	*/
-	MuGrp dExpI = data - muExp;
-	Grp &dExp   = dExpI;
 	
 	MuGrp tBchI = tub + batch;
 	Grp &tBch   = tBchI;
 	
-	MuGrp muExpPredI = data - betaCv - tBch;
-	Grp &muExpPred   = muExpPredI;
-	
 	MuGrp beTbchI = betaCv + tBch;
 	Grp &beTbch   = beTbchI;
 	
-	MuGrp dataPrI = muExp + beTbch;
+	MuGrp bbI = betaCv + batch;
+	Grp &bb   = bbI;
+	
+	MuGrp beTI = betaCv + tub;
+	Grp &beT   = beTI;
+	
+	MuGrp muLnPredI = data - beTbch;
+	Grp &muLnPred   = muLnPredI;
+	
+	MuGrp muLnI(muLnPred, e2ln, ln2ln, LNout);
+	Grp &muLn = muLnI;
+	
+	MuGrp dLnI = data - muLn;
+	Grp &dLn   = dLnI;
+	
+	MuGrp dLnExpI = dLn - sExp;
+	Grp &dLnExp   = dLnExpI;
+	
+	MuGrp lnExpI = muLn + sExp;
+	Grp &lnExp   = lnExpI;
+	
+	MuGrp sExpPredI = dLn;
+	Grp &sExpPred   = sExpPredI;
+	
+	MuGrp dataPrI = lnExp + betaCv;
 	Grp &dataPr   = dataPrI;
 	
-	MuGrp tubPredI = data - muExp - betaCv;
+	MuGrp tubPredI = dLn;
 	Grp &tubPred   = tubPredI;
 	
-	MuGrp bchPredI = dExp - betaCv - tub;
+	MuGrp bchPredI = dLn;
 	Grp &bchPred   = bchPredI;
 	
-	MuGrp muI(muExp, exp2mu, mu2pr);
+	MuGrp muI(muLn, ln2mu, mu2pr);
 	Grp &mu = muI;
 	
-	MuGrp scaPredI = muExp - mu;
-	Grp &scaPred   = scaPredI;
-	
-	//MuGrpPEX scaI(scaPred, exp2ln, ln2mu, 1e-6, nThr);
-	MuGrp scaI(scaPred, exp2ln, ln2mu);
-	Grp &sca = scaI;
-	
-	//MuGrp muSI(sca, ln2mu, mu2pr);
-	//Grp &muS = muSI;
-	
-	MuGrp gamPredI = muExp - mu;
+	MuGrp gamPredI = muLn - mu;
 	Grp &gamPred   = gamPredI;
 	
-	//BetaGrpPC gammaI(gamPred, pcEvecFlNam, pcEvalFlNam, Npc, exp2ln, gm2pr, nThr);
-	BetaGrpPCpex gammaI(gamPred, pcEvecFlNam, pcEvalFlNam, Npc, 1e-6, exp2ln, gm2pr, nThr);
+	BetaGrpPC gammaI(gamPred, pcEvecFlNam, pcEvalFlNam, Npc, gm2pr, nThr);
+	//BetaGrpPCpex gammaI(gamPred, pcEvecFlNam, pcEvalFlNam, Npc, 1e-6, gm2pr, nThr);
 	Grp &gamma = gammaI;
+	
+	MuGrp muGmI(gamma, gm2pr, mu2pr);
+	Grp &muGm = muGmI;
 	
 	MuGrp bvI = mu + gamma;
 	Grp &bv   = bvI;
 	
-	MuGrp gsI = gamma + sca;
-	Grp &gs   = gsI;
-	
-	MuGrp msI = mu + sca;
-	Grp &ms   = msI;
-	
-	MuGrp muLnI = bv + sca;
-	Grp &muLn = muLnI;
-	
-	MuGrp muPredI = muExp - sca;
+	MuGrp muPredI = muLn - gamma;
 	Grp &muPred   = muPredI;
 	
 	MuGrp eDevI = data - dataPr;
 	Grp &eDev   = eDevI;
 	
-	printMat(muExp.fMat());
-	cout << "#####" << endl;
+	MuGrp scaDevI = muLn - bv;
+	Grp &scaDev   = scaDevI;
 	
-	printMat(muLn.fMat());
-	cout << "#####" << endl;
-	
-	MuGrp expDevI = muExp - muLn;
-	Grp &expDev   = expDevI;
-	
-	printMat(expDev.fMat());
-	cout << "#####" << endl;
-	
-	SigmaIpex SigIeI(eDev, SgEout, 1.0, 2.0);
-	SigmaI &SigIe = SigIeI;
-	//SigmaI SigIe(eDev, SgEout, 1.0, 2.0);
+	//SigmaIpex SigIeI(eDev, SgEout, 1.0, 2.0);
+	//SigmaI &SigIe = SigIeI;
+	SigmaI SigIe(eDev, SgEout, 1.0, 2.0);
 	//SigmaI SigIe(eDev, SgEout, 1.0, 2000.0);
 	//SigmaI SigItub(tub, 1.0, 2.0);
 	SigmaI SigItub(tub, 1.0, static_cast<double>(d));
@@ -567,183 +557,198 @@ int main(int argc, char *argv[]){
 	//SigmaI SigIbch(batch, 1.0, 2.0);
 	SigmaI SigIbch(batch, 1.0, static_cast<double>(d));
 	//SigmaI SigIbpr(bchPr, 1.0, static_cast<double>(d));
-	SigmaI SigIexp(expDev, SgEXout, 1.0, 2.0);
+	SigmaI SigIexp(sExp, SgEXout, 1.0, 2.0);
 	//SigmaI SigIexp(expDev, SgEXout, 1.0, 2000.0);
-	SigmaI SigIs(sca, SgSout, 1.0, 2.0);
+	SigmaI SigIs(scaDev, SgSout, 1.0, 2.0);
 	SigmaI SigIa(gamma, 1.0, 2.0);
 	SigmaI SigIpr(d, 1e-6);
 	
-	QgrpPEX qEI(N, nuE, mVecFnam);
-	Qgrp &qE = qEI;
-	//Qgrp qE(N, nuE, mVecFnam);
+	//QgrpPEX qEI(N, nuE, mVecFnam);
+	//Qgrp &qE = qEI;
+	Qgrp qE(N, nuE, mVecFnam);
 	Qgrp qG(Npc, nuG);
 	
 	cout << "Burn-in..." << endl;
 	for (int iBnin = 0; iBnin < Nbnin; iBnin++) {
-		data.update(dataPr, qE, SigIe);
-		dExpI = data - muExp;
+		//data.update(dataPr, qE, SigIe);
+		data.update(dataPr, SigIe);
 		
-		cvPredI = dExp - tBch;
+		cvPredI = dLnExp - tBch;
 		betaCv.update(cvPred, qE, SigIe, SigIpr);
 		
-		tubPredI = dExp - betaCv - batch;
+		tubPredI = dLnExp - bb;
 		//tub.update(tubPred, qE, SigIe, tubPr, SigItub);
-		//tub.update(tubPred, qE, SigIe, SigItub);
-		tub.update(tubPred, qE, SigIe, muT, SigItub);
-		muT.update(tub, SigItub, SigIpr);
+		tub.update(tubPred, qE, SigIe, SigItub);
+		//tub.update(tubPred, qE, SigIe, muT, SigItub);
+		//muT.update(tub, SigItub, SigIpr);
 		//tubPr.update(tub, SigItub, tubHP, SigItpr);
 		//SigItub.update(tub, tubPr);
-		//SigItub.update(tub);
-		SigItub.update(tub, muT);
+		SigItub.update(tub);
+		//SigItub.update(tub, muT);
 		//tubHP.update(tubPr, SigItpr, SigIpr);
 		//SigItpr.update(tubPr, tubHP);
 		
-		bchPredI = dExp - betaCv - tub;
+		beTI     = betaCv + tub;
+		bchPredI = dLnExp - beT;
 		//batch.update(bchPred, qE, SigIe, bchPr, SigIbch);
 		//bchPr.update(batch, SigIbch, bchHP, SigIbpr);
 		//batch.update(bchPred, qE, SigIe, SigIbch);
 		batch.update(bchPred, qE, SigIe, muB, SigIbch);
 		muB.update(batch, SigIbch, SigIpr);
+		//SigIbch.update(batch);
 		SigIbch.update(batch, muB);
 		
 		tBchI   = tub + batch;
 		beTbchI = betaCv + tBch;
+		bbI     = betaCv + batch;
 		
-		muExpPredI = data - beTbch;
-		muExp.update(muExpPred, qE, SigIe, muLn, SigIexp);
+		sExpPredI = dLn - beTbch;
+		sExp.update(sExpPred, qE, SigIe, muE, SigIexp);
+		//sExp.update(sExpPred, qE, SigIe, SigIexp);
+		muE.update(sExp, SigIexp, SigIpr);
+		//SigIexp.update(sExp);
+		SigIexp.update(sExp, muE);
 		
-		dataPrI = muExp + beTbch;
+		muLnPredI = data - sExp - beTbch;
+		//sca.update(scaPred, SigIexp, muS, SigIs);
+		muLn.update(muLnPred, qE, SigIe, bv, SigIs);
+		//muS.update(sca, SigIs, SigIpr);
+		//SigIs.update(sca, muS);
+		
+		dLnI    = data - muLn;
+		dLnExpI = dLn - sExp;
+		lnExpI  = muLn + sExp;
+		dataPrI = lnExp + beTbch;
 		eDevI   = data - dataPr;
 		SigIe.update(eDev, qE);
 		qE.update(eDev, SigIe);
 		
-		scaPredI = muExp - bv;
-		//sca.update(scaPred, SigIexp, muS, SigIs);
-		sca.update(scaPred, SigIexp, SigIs);
-		//muS.update(sca, SigIs, SigIpr);
-		//SigIs.update(sca, muS);
-		SigIs.update(sca);
+		gamPredI = muLn - mu;
+		gamma.update(gamPred, SigIs, muGm, qG, SigIa);
+		//gamma.update(gamPred, SigIs, qG, SigIa);
+		muGm.update(gamma, SigIa, SigIpr);
+		SigIa.update(gamma, muGm, qG);
+		//SigIa.update(gamma, qG);
+		qG.update(gamma, muGm, SigIa);
+		//qG.update(gamma, SigIa);
 		
-		msI      = mu + sca;
-		gamPredI = muExp - ms;
-		gamma.update(gamPred, SigIexp, qG, SigIa);
-		SigIa.update(gamma, qG);
-		qG.update(gamma, SigIa);
+		muPredI = muLn - gamma;
+		mu.update(muPred, SigIs, SigIpr);
 		
 		bvI     = mu + gamma;
-		gsI     = gamma + sca;
-		muPredI = muExp - gs;
-		mu.update(muPred, SigIexp, SigIpr);
+		scaDevI = muLn - bv;
 		
-		muLnI   = bv + sca;
-		expDevI = muExp - muLn;
-		SigIexp.update(expDev);
+		SigIs.update(scaDev);
 		
 		cout << "+" << flush;
 	}
 	cout << endl;
 	
+	Grp *snpBetI;
+	if (snpModel == "SMC"){
+		snpBetI = new BetaGrpSnpMissCV(snpIn, betOut, Nln, Nsnp, d, nThr, prABF, -9);
+	}
+	else if (snpModel == "SMP"){
+		snpBetI = new BetaGrpPSRmiss(snpIn, betOut, Nln, Nsnp, d, nThr, prABF, -9);
+	}
+	else {
+		snpBetI = new BetaGrpSnpMiss(snpIn, betOut, Nln, Nsnp, d, nThr, prABF, -9);
+	}
+	Grp &snpBet = *snpBetI;
+		
 	cout << "Sampling..." << endl;
 	for (int iSam = 0; iSam < Nsamp; iSam++) {
-		data.update(dataPr, qE, SigIe);
-		dExpI = data - muExp;
+		//data.update(dataPr, qE, SigIe);
+		data.update(dataPr, SigIe);
 		
-		cvPredI = dExp - tBch;
+		cvPredI = dLnExp - tBch;
 		betaCv.update(cvPred, qE, SigIe, SigIpr);
 		
-		tubPredI = dExp - betaCv - batch;
-		//tub.update(tubPred, qE, SigIe, tubPr, SigItub);
-		//tub.update(tubPred, qE, SigIe, SigItub);
-		tub.update(tubPred, qE, SigIe, muT, SigItub);
-		muT.update(tub, SigItub, SigIpr);
+		tubPredI = dLnExp - bb;
+		tub.update(tubPred, qE, SigIe, SigItub);
+		//tub.update(tubPred, qE, SigIe, muT, SigItub);
+		//muT.update(tub, SigItub, SigIpr);
 		//tubPr.update(tub, SigItub, tubHP, SigItpr);
 		//SigItub.update(tub, tubPr);
-		//SigItub.update(tub);
-		SigItub.update(tub, muT);
+		SigItub.update(tub);
+		//SigItub.update(tub, muT);
 		//tubHP.update(tubPr, SigItpr, SigIpr);
 		//SigItpr.update(tubPr, tubHP);
 		
-		bchPredI = dExp - betaCv - tub;
+		beTI     = betaCv + tub;
+		bchPredI = dLnExp - beT;
 		//batch.update(bchPred, qE, SigIe, bchPr, SigIbch);
 		//bchPr.update(batch, SigIbch, bchHP, SigIbpr);
 		//batch.update(bchPred, qE, SigIe, SigIbch);
 		batch.update(bchPred, qE, SigIe, muB, SigIbch);
 		muB.update(batch, SigIbch, SigIpr);
-		SigIbch.update(batch, muB);
 		//SigIbch.update(batch);
-		//SigIbch.update(batch, bchPr);
-		//bchPr.update(batch, SigIbch, bchHP, SigIbpr);
-		//bchHP.update(bchPr, SigIbpr, SigIpr);
-		//SigIbpr.update(bchPr, bchHP);
+		SigIbch.update(batch, muB);
 		
 		tBchI   = tub + batch;
 		beTbchI = betaCv + tBch;
+		bbI     = betaCv + batch;
 		
-		muExpPredI = data - beTbch;
-		muExp.update(muExpPred, qE, SigIe, muLn, SigIexp);
+		sExpPredI = dLn - beTbch;
+		sExp.update(sExpPred, qE, SigIe, muE, SigIexp);
+		//sExp.update(sExpPred, qE, SigIe, SigIexp);
+		muE.update(sExp, SigIexp, SigIpr);
+		//SigIexp.update(sExp);
+		SigIexp.update(sExp, muE);
 		
-		dataPrI = muExp + beTbch;
+		muLnPredI = data - sExp - beTbch;
+		//sca.update(scaPred, SigIexp, muS, SigIs);
+		muLn.update(muLnPred, qE, SigIe, bv, SigIs);
+		//muS.update(sca, SigIs, SigIpr);
+		//SigIs.update(sca, muS);
+		
+		dLnI    = data - muLn;
+		dLnExpI = dLn - sExp;
+		lnExpI  = muLn + sExp;
+		dataPrI = lnExp + beTbch;
 		eDevI   = data - dataPr;
 		SigIe.update(eDev, qE);
 		qE.update(eDev, SigIe);
 		
-		scaPredI = muExp - bv;
-		//sca.update(scaPred, SigIexp, muS, SigIs);
-		sca.update(scaPred, SigIexp, SigIs);
-		//muS.update(sca, SigIs, SigIpr);
-		//SigIs.update(sca, muS);
-		SigIs.update(sca);
+		gamPredI = muLn - mu;
+		gamma.update(gamPred, SigIs, muGm, qG, SigIa);
+		//gamma.update(gamPred, SigIs, qG, SigIa);
+		muGm.update(gamma, SigIa, SigIpr);
+		SigIa.update(gamma, muGm, qG);
+		//SigIa.update(gamma, qG);
+		qG.update(gamma, muGm, SigIa);
+		//qG.update(gamma, SigIa);
 		
-		msI      = mu + sca;
-		gamPredI = muExp - ms;
-		gamma.update(gamPred, SigIexp, qG, SigIa);
-		SigIa.update(gamma, qG);
-		qG.update(gamma, SigIa);
+		muPredI = muLn - gamma;
+		mu.update(muPred, SigIs, SigIpr);
 		
 		bvI     = mu + gamma;
-		gsI     = gamma + sca;
-		muPredI = muExp - gs;
-		mu.update(muPred, SigIexp, SigIpr);
+		scaDevI = muLn - bv;
 		
-		muLnI   = bv + sca;
-		expDevI = muExp - muLn;
-		SigIexp.update(expDev);
+		SigIs.update(scaDev);
 		
 		if ((iSam + 1) % Nthin) {
 			cout << "." << flush;
 		}
 		else {
 			cout << "|" << flush;
-			muLn.save(LNout);
+			muLn.save();
 			bv.save(BVout);
+			scaDev.save(SDout);
 			SigIe.save();
 			SigIexp.save();
 			SigIs.save();
+			snpBet.update(scaDev, SigIs);
 			
 		}
 	}
 	cout << endl;
-	//cout << "Saving GWA results..." << endl;
+	cout << "Saving GWA results..." << endl;
 	
-	/*
-	 Grp *snpBetI;
-	 if (snpModel == "SMC"){
-		snpBetI = new BetaGrpSnpMissCV(snpIn, betOut, e2ln, Nsnp, d, nThr, prABF, -9);
-	 }
-	 else if (snpModel == "SMP"){
-		snpBetI = new BetaGrpPSRmiss(snpIn, betOut, e2ln, Nsnp, d, nThr, prABF, -9);
-	 }
-	 else {
-		snpBetI = new BetaGrpSnpMiss(snpIn, betOut, e2ln, Nsnp, d, nThr, prABF, -9);
-	 }
-	 Grp &snpBet = *snpBetI;
-	 
-	 MuGrp snpPredI = data - bv - bb;
-	 Grp &snpPred   = snpPredI;
-
-	 */
-	//snpBet.dump();
+	snpBet.dump();
 	
-	//delete snpBetI;
+	delete snpBetI;
+	delete batchI;
+	delete e2bch;
 }
 

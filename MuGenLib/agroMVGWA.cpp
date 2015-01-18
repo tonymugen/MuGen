@@ -21,7 +21,7 @@
 #include <cctype>
 #include <cstdio>
 
-#include "MuGenLib.h"
+#include "libMuGen.h"
 
 using std::vector;
 using std::string;
