@@ -4449,6 +4449,9 @@ public:
 	void update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, const Grp &muPr, const Qgrp &qPr, const SigmaI &SigIp){ BetaGrpPEX::update(dat, q, SigIm, muPr, qPr, SigIp); };
 };
 
+/** \brief Simple single-SNP regression class
+ *
+ */
 class BetaGrpSnp : public MuGrp {
 protected:
 	gsl_matrix *_Xmat;
