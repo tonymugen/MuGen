@@ -98,9 +98,14 @@ int main(int argc, char *argv[]){
 	string LNout("LN");
 	string SDout("SD");
 	string BVout("BV");
+	string TBout("TB");
+	string BTout("BT");
+	string EXout("EX");
 	string SgEout("Sig_e");
 	string SgEXout("Sig_exp");
 	string SgSout("Sig_s");
+	string SgBout("Sig_bt");
+	string SgAout("Sig_a");
 	string betOut("SNP");
 	string snpIn("snpHDRA");
 	
@@ -315,9 +320,14 @@ int main(int argc, char *argv[]){
 	LNout   = trtSet + LNout;
 	SDout   = trtSet + SDout;
 	BVout   = trtSet + BVout;
+	BTout   = trtSet + BTout;
+	TBout   = trtSet + TBout;
+	EXout   = trtSet + EXout;
 	SgEout  = trtSet + SgEout;
 	SgEXout = trtSet + SgEXout;
 	SgSout  = trtSet + SgSout;
+	SgBout  = trtSet + SgBout;
+	SgAout  = trtSet + SgAout;
 	betOut  = trtSet + betOut;
 	
 	vector<string> addOn;
@@ -329,9 +339,14 @@ int main(int argc, char *argv[]){
 	finishFlNam(LNout, addOn);
 	finishFlNam(SDout, addOn);
 	finishFlNam(BVout, addOn);
+	finishFlNam(BTout, addOn);
+	finishFlNam(TBout, addOn);
+	finishFlNam(EXout, addOn);
 	finishFlNam(SgEout, addOn);
 	finishFlNam(SgEXout, addOn);
 	finishFlNam(SgSout, addOn);
+	finishFlNam(SgBout, addOn);
+	finishFlNam(SgAout, addOn);
 	finishFlNam(betOut, addOn);
 	
 	const size_t Nel  = 2;
@@ -450,25 +465,28 @@ int main(int argc, char *argv[]){
 	MuGrpMiss dataI(dfNam, mMatFnam, mVecFnam, e2e, d);
 	Grp &data = dataI;
 	
-	MuGrp sExpI(data, e2exp, exp2mu);
-	//MuGrpPEX sExpI(data, e2exp, exp2mu, 1e-6, nThr);
+	//MuGrp sExpI(data, e2exp, exp2mu);
+	MuGrpPEX sExpI(data, e2exp, exp2mu, EXout, SgEXout, 1e-6, nThr);
 	Grp &sExp = sExpI;
 	
-	MuGrp muEI(sExp, exp2mu, mu2pr);
-	Grp &muE = muEI;
+	//MuGrp muEI(sExp, exp2mu, mu2pr);
+	//Grp &muE = muEI;
 	
 	MuGrp cvPredI = data - sExp;
 	Grp &cvPred   = cvPredI;
 	
-	BetaGrpFt betaCvI(cvPred, cvFlNam, Ncv, cv2pr, nThr);
+	BetaGrpFt betaCvI(cvPred, cvFlNam, Ncv, cv2pr, BTout, nThr);
 	Grp &betaCv = betaCvI;
 	
 	MuGrp tubI(cvPred, e2tub, tub2pr);
 	//MuGrpPEX tubI(data, e2tub, tub2pr, 1e-6, nThr);
 	Grp &tub = tubI;
 	
-	MuGrp muTI(tub, tub2pr, mu2pr);
-	Grp &muT = muTI;
+	//MuGrp muTI(tub, tub2pr, mu2pr);
+	//Grp &muT = muTI;
+	
+	//MuGrp tubSI = tub - muT;
+	//Grp &tubS   = tubSI;
 	
 	Grp *batchI;
 	if (trtSet == "all") {
@@ -528,8 +546,8 @@ int main(int argc, char *argv[]){
 	MuGrp gamPredI = muLn - mu;
 	Grp &gamPred   = gamPredI;
 	
-	BetaGrpPC gammaI(gamPred, pcEvecFlNam, pcEvalFlNam, Npc, gm2pr, nThr);
-	//BetaGrpPCpex gammaI(gamPred, pcEvecFlNam, pcEvalFlNam, Npc, 1e-6, gm2pr, nThr);
+	//BetaGrpPC gammaI(gamPred, pcEvecFlNam, pcEvalFlNam, Npc, gm2pr, nThr);
+	BetaGrpPCpex gammaI(gamPred, pcEvecFlNam, pcEvalFlNam, Npc, 1e-6, gm2pr, nThr);
 	Grp &gamma = gammaI;
 	
 	//MuGrp muGmI(gamma, gm2pr, mu2pr);
@@ -547,6 +565,12 @@ int main(int argc, char *argv[]){
 	MuGrp scaDevI = muLn - bv;
 	Grp &scaDev   = scaDevI;
 	
+	//MuGrp muLnSI = muLn + muT;
+	//Grp &muLnS   = muLnSI;
+	
+	//MuGrp bvSI = bv + muT;
+	//Grp &bvS   = bvSI;
+	
 	//SigmaIpex SigIeI(eDev, SgEout, 1.0, 2.0);
 	//SigmaI &SigIe = SigIeI;
 	SigmaI SigIe(eDev, SgEout, 1.0, 2.0);
@@ -555,21 +579,26 @@ int main(int argc, char *argv[]){
 	SigmaI SigItub(tub, 1.0, static_cast<double>(d));
 	//SigmaI SigItpr(tubPr, 1.0, static_cast<double>(d));
 	//SigmaI SigIbch(batch, 1.0, 2.0);
-	SigmaI SigIbch(batch, 1.0, static_cast<double>(d));
+	SigmaI SigIbch(batch, SgBout, 1.0, static_cast<double>(d));
 	//SigmaI SigIbpr(bchPr, 1.0, static_cast<double>(d));
-	SigmaI SigIexp(sExp, SgEXout, 1.0, 2.0);
+	//SigmaI SigIexp(sExp, SgEXout, 1.0, 2.0);
+	SigmaI SigIexp(sExp, 1.0, 2.0);
 	//SigmaI SigIexp(expDev, SgEXout, 1.0, 2000.0);
 	SigmaI SigIs(scaDev, SgSout, 1.0, 2.0);
-	SigmaI SigIa(gamma, 1.0, 2.0);
+	//SigmaIpex SigIaI(gamma, SgAout, 1.0, 2.0);
+	//SigmaI &SigIa = SigIaI;
+	SigmaI SigIa(gamma, SgAout, 1.0, 2.0);
 	SigmaI SigIpr(d, 1e-6);
 	
 	//QgrpPEX qEI(N, nuE, mVecFnam);
 	//Qgrp &qE = qEI;
 	Qgrp qE(N, nuE, mVecFnam);
 	Qgrp qG(Npc, nuG);
+	//QgrpPEX qGI(Npc, nuG);
+	//Qgrp &qG = qGI;
 	
-	cout << "Pre-burn-in..." << endl;
-	for (int iPnin = 0; iPnin < Nbnin; iPnin++) {
+	cout << "Burn-in..." << endl;
+	for (int iBnin = 0; iBnin < Nbnin; iBnin++) {
 		//data.update(dataPr, qE, SigIe);
 		data.update(dataPr, SigIe);
 		
@@ -578,13 +607,13 @@ int main(int argc, char *argv[]){
 		
 		tubPredI = dLnExp - bb;
 		//tub.update(tubPred, qE, SigIe, tubPr, SigItub);
-		//tub.update(tubPred, qE, SigIe, SigItub);
-		tub.update(tubPred, qE, SigIe, muT, SigItub);
-		muT.update(tub, SigItub, SigIpr);
+		tub.update(tubPred, qE, SigIe, SigItub);
+		//tub.update(tubPred, qE, SigIe, muT, SigItub);
+		//muT.update(tub, SigItub, SigIpr);
 		//tubPr.update(tub, SigItub, tubHP, SigItpr);
 		//SigItub.update(tub, tubPr);
-		//SigItub.update(tub);
-		SigItub.update(tub, muT);
+		SigItub.update(tub);
+		//SigItub.update(tub, muT);
 		//tubHP.update(tubPr, SigItpr, SigIpr);
 		//SigItpr.update(tubPr, tubHP);
 		
@@ -608,70 +637,6 @@ int main(int argc, char *argv[]){
 		//muE.update(sExp, SigIexp, SigIpr);
 		SigIexp.update(sExp);
 		//SigIexp.update(sExp, muE);
-		
-		muLnPredI = data - sExp - beTbch;
-		//sca.update(scaPred, SigIexp, muS, SigIs);
-		muLn.update(muLnPred, qE, SigIe, mu, SigIs);
-		//muS.update(sca, SigIs, SigIpr);
-		//SigIs.update(sca, muS);
-		
-		dLnI    = data - muLn;
-		dLnExpI = dLn - sExp;
-		lnExpI  = muLn + sExp;
-		dataPrI = lnExp + beTbch;
-		eDevI   = data - dataPr;
-		SigIe.update(eDev, qE);
-		qE.update(eDev, SigIe);
-		
-		mu.update(muLn, SigIs, SigIpr);
-		scaDevI = muLn - mu;
-		
-		SigIs.update(scaDev);
-		
-		cout << "+" << flush;
-	}
-	cout << endl;
-	
-	cout << "Burn-in..." << endl;
-	for (int iBnin = 0; iBnin < Nbnin/2; iBnin++) {
-		//data.update(dataPr, qE, SigIe);
-		data.update(dataPr, SigIe);
-		
-		cvPredI = dLnExp - tBch;
-		betaCv.update(cvPred, qE, SigIe, SigIpr);
-		
-		tubPredI = dLnExp - bb;
-		//tub.update(tubPred, qE, SigIe, tubPr, SigItub);
-		//tub.update(tubPred, qE, SigIe, SigItub);
-		tub.update(tubPred, qE, SigIe, muT, SigItub);
-		muT.update(tub, SigItub, SigIpr);
-		//tubPr.update(tub, SigItub, tubHP, SigItpr);
-		//SigItub.update(tub, tubPr);
-		//SigItub.update(tub);
-		SigItub.update(tub, muT);
-		//tubHP.update(tubPr, SigItpr, SigIpr);
-		//SigItpr.update(tubPr, tubHP);
-		
-		beTI     = betaCv + tub;
-		bchPredI = dLnExp - beT;
-		//batch.update(bchPred, qE, SigIe, bchPr, SigIbch);
-		//bchPr.update(batch, SigIbch, bchHP, SigIbpr);
-		batch.update(bchPred, qE, SigIe, SigIbch);
-		//batch.update(bchPred, qE, SigIe, muB, SigIbch);
-		//muB.update(batch, SigIbch, SigIpr);
-		SigIbch.update(batch);
-		//SigIbch.update(batch, muB);
-		
-		tBchI   = tub + batch;
-		beTbchI = betaCv + tBch;
-		bbI     = betaCv + batch;
-		
-		sExpPredI = dLn - beTbch;
-		sExp.update(sExpPred, qE, SigIe, muE, SigIexp);
-		//sExp.update(sExpPred, qE, SigIe, SigIexp);
-		muE.update(sExp, SigIexp, SigIpr);
-		//SigIexp.update(sExp);
-		SigIexp.update(sExp, muE);
 		
 		muLnPredI = data - sExp - beTbch;
 		//sca.update(scaPred, SigIexp, muS, SigIs);
@@ -730,13 +695,13 @@ int main(int argc, char *argv[]){
 		
 		tubPredI = dLnExp - bb;
 		//tub.update(tubPred, qE, SigIe, tubPr, SigItub);
-		//tub.update(tubPred, qE, SigIe, SigItub);
-		tub.update(tubPred, qE, SigIe, muT, SigItub);
-		muT.update(tub, SigItub, SigIpr);
+		tub.update(tubPred, qE, SigIe, SigItub);
+		//tub.update(tubPred, qE, SigIe, muT, SigItub);
+		//muT.update(tub, SigItub, SigIpr);
 		//tubPr.update(tub, SigItub, tubHP, SigItpr);
 		//SigItub.update(tub, tubPr);
-		//SigItub.update(tub);
-		SigItub.update(tub, muT);
+		SigItub.update(tub);
+		//SigItub.update(tub, muT);
 		//tubHP.update(tubPr, SigItpr, SigIpr);
 		//SigItpr.update(tubPr, tubHP);
 		
@@ -755,11 +720,11 @@ int main(int argc, char *argv[]){
 		bbI     = betaCv + batch;
 		
 		sExpPredI = dLn - beTbch;
-		sExp.update(sExpPred, qE, SigIe, muE, SigIexp);
-		//sExp.update(sExpPred, qE, SigIe, SigIexp);
-		muE.update(sExp, SigIexp, SigIpr);
-		//SigIexp.update(sExp);
-		SigIexp.update(sExp, muE);
+		//sExp.update(sExpPred, qE, SigIe, muE, SigIexp);
+		sExp.update(sExpPred, qE, SigIe, SigIexp);
+		//muE.update(sExp, SigIexp, SigIpr);
+		SigIexp.update(sExp);
+		//SigIexp.update(sExp, muE);
 		
 		muLnPredI = data - sExp - beTbch;
 		//sca.update(scaPred, SigIexp, muS, SigIs);
@@ -797,12 +762,21 @@ int main(int argc, char *argv[]){
 		}
 		else {
 			cout << "|" << flush;
+			//tubSI = tub - muT;
+			tub.save(TBout);
+			betaCv.save();
+			SigIbch.save();
 			scaDev.save(SDout);
+			//bvSI = bv + muT;
 			bv.save(BVout);
-			gamPred.save(LNout);
+			//gamPred.save(LNout);
+			//muLnSI = muLn + muT;
+			muLn.save(LNout);
+			sExp.save(SigIexp);
 			SigIe.save();
-			SigIexp.save();
+			//SigIexp.save();
 			SigIs.save();
+			SigIa.save();
 			snpBet.update(scaDev, SigIs);
 			
 		}
