@@ -60,6 +60,7 @@ int main(int argc, char *argv[]){
 	bool pOn = false; // pop data set
 	bool dOn = false; // trait data set
 	bool mOn = false; // SNP model
+	bool SOn = false; // kind of phenotypic data
 	bool TOn = false; // # of threads
 	bool aOn = false; // ABF prior
 	bool cOn = false; // chain ID
@@ -76,6 +77,7 @@ int main(int argc, char *argv[]){
 	string snpModel("SM");
 	string trtSet;
 	char trtTok;
+	char pssTok = 'A';
 	string popID;
 	char popTok;
 	string cNam;
@@ -167,7 +169,7 @@ int main(int argc, char *argv[]){
 						break;
 						
 					case 'S':
-						dataFolder = "phenoDataSC/";
+						SOn = true;
 						break;
 						
 					default:
@@ -199,6 +201,26 @@ int main(int argc, char *argv[]){
 					gOn = false;
 					nuG = atof(pchar);
 				}
+				else if (SOn){
+					SOn = false;
+					switch (pchar[0]) {
+						case 'n':
+							dataFolder = "phenoData/";
+							break;
+						case 's':
+							dataFolder = "phenoDataSC/";
+							break;
+						case 'r':
+							pssTok = 'R'; // "reduced" number of traits
+							dataFolder = "phenoDataSM/";
+							break;
+						default:
+							cerr << "ERROR: unknown phenotype scaling token " << pchar[0] << endl;
+							exit(-1);
+							break;
+					}
+
+				}
 				else if (pOn){
 					pOn = false;
 					switch (pchar[0]) {
@@ -227,25 +249,22 @@ int main(int argc, char *argv[]){
 							trtSet   = "root";
 							trtTok   = 'R';
 							cvFlNam += "Root";
-							eIndFnam = "phenoData/" + eIndFnam + "R.txt";
 							break;
 						case 'S':
 							trtSet   = "shoot";
 							trtTok   = 'S';
 							cvFlNam += "Shoot";
-							eIndFnam = "phenoData/" + eIndFnam + "S.txt";
 							break;
 						case 'B':
 							trtSet   = "all"; // 'B' for 'both' or 'A' for 'all' works
 							trtTok   = 'A';
 							cvFlNam += "All";
-							eIndFnam = "phenoData/" + eIndFnam + "A.txt";
+							
 							break;
 						case 'A':
 							trtSet   = "all";
 							trtTok   = 'A';
 							cvFlNam += "All";
-							eIndFnam = "phenoData/" + eIndFnam + "A.txt";
 							break;
 						default:
 							cerr << "ERROR: unkown trait set token: " << pchar[0] << endl;
@@ -291,8 +310,8 @@ int main(int argc, char *argv[]){
 		dfNam       = dataFolder + dfNam + trtSet + ".gbin";
 		sdfNam      = dataFolder + sdfNam + trtSet + ".gbin";
 		cvFlNam     = "phenoData/" + cvFlNam + ".gbin";
-		mMatFnam    = "phenoData/" + trtSet + mMatFnam + ".gbin";
-		mVecFnam    = "phenoData/" + trtSet + mVecFnam + ".gbin";
+		mMatFnam    = dataFolder + trtSet + mMatFnam + ".gbin";
+		mVecFnam    = dataFolder + trtSet + mVecFnam + ".gbin";
 		expFacVec   = "phenoData/" + trtSet + expFacVec + ".gbin";
 		lnFacVec    = "phenoData/" + trtSet + lnFacVec + ".gbin";
 		batchFacVec = "phenoData/" + trtSet + batchFacVec + ".gbin";
@@ -304,8 +323,8 @@ int main(int argc, char *argv[]){
 		dfNam       = dataFolder + dfNam + trtSet + "_" + popID + ".gbin";
 		sdfNam      = dataFolder + sdfNam + trtSet + "_" + popID + ".gbin";
 		cvFlNam     = "phenoData/" + cvFlNam + "_" + popID + ".gbin";
-		mMatFnam    = "phenoData/" + trtSet + mMatFnam + "_" + popID + ".gbin";
-		mVecFnam    = "phenoData/" + trtSet + mVecFnam + "_" + popID + ".gbin";
+		mMatFnam    = dataFolder + trtSet + mMatFnam + "_" + popID + ".gbin";
+		mVecFnam    = dataFolder + trtSet + mVecFnam + "_" + popID + ".gbin";
 		expFacVec   = "phenoData/" + trtSet + expFacVec + "_" + popID + ".gbin";
 		lnFacVec    = "phenoData/" + trtSet + lnFacVec + "_" + popID + ".gbin";
 		batchFacVec = "phenoData/" + trtSet + batchFacVec + "_" + popID + ".gbin";
@@ -331,6 +350,7 @@ int main(int argc, char *argv[]){
 	betOut  = trtSet + betOut;
 	
 	vector<string> addOn;
+	addOn.push_back(popID);
 	addOn.push_back(snpModel);
 	addOn.push_back(db2str(nuE));
 	addOn.push_back(db2str(nuG));
@@ -358,7 +378,12 @@ int main(int argc, char *argv[]){
 	size_t Nbatch;
 	size_t Ncv;
 	size_t d;
-	trtSet == "all" ? d = 50 : d = 25;
+	if (pssTok == 'R') {
+		trtSet == "all" ? d = 46 : d = 23;
+	}
+	else {
+		trtSet == "all" ? d = 50 : d = 25;
+	}
 	
 	switch (popTok) {
 		case 'I':
@@ -370,6 +395,8 @@ int main(int argc, char *argv[]){
 					Nxp    = 250;
 					Nbatch = 20;
 					Ncv    = 17;
+					
+					eIndFnam = dataFolder + eIndFnam + "R.txt";
 					break;
 					
 				case 'S':
@@ -377,6 +404,8 @@ int main(int argc, char *argv[]){
 					Nxp    = 250;
 					Nbatch = 23;
 					Ncv    = 17;
+					
+					eIndFnam = dataFolder + eIndFnam + "S.txt";
 					break;
 				
 				default: // is all
@@ -384,6 +413,8 @@ int main(int argc, char *argv[]){
 					Nxp    = 250;
 					Nbatch = 23;
 					Ncv    = 17;
+					
+					eIndFnam = dataFolder + eIndFnam + "A.txt";
 					break;
 			}
 			break;
@@ -397,6 +428,8 @@ int main(int argc, char *argv[]){
 					Nxp    = 454;
 					Nbatch = 22;
 					Ncv    = 18;
+					
+					eIndFnam = dataFolder + eIndFnam + "R.txt";
 					break;
 					
 				case 'S':
@@ -404,6 +437,8 @@ int main(int argc, char *argv[]){
 					Nxp    = 455;
 					Nbatch = 23;
 					Ncv    = 18;
+					
+					eIndFnam = dataFolder + eIndFnam + "S.txt";
 					break;
 					
 				default: // is all
@@ -411,6 +446,8 @@ int main(int argc, char *argv[]){
 					Nxp    = 455;
 					Nbatch = 23;
 					Ncv    = 18;
+					
+					eIndFnam = dataFolder + eIndFnam + "A.txt";
 					break;
 			}
 			break;
@@ -423,6 +460,8 @@ int main(int argc, char *argv[]){
 					Nxp    = 724;
 					Nbatch = 22;
 					Ncv    = 18;
+					
+					eIndFnam = dataFolder + eIndFnam + "R.txt";
 					break;
 					
 				case 'S':
@@ -430,6 +469,8 @@ int main(int argc, char *argv[]){
 					Nxp    = 725;
 					Nbatch = 23;
 					Ncv    = 19;
+					
+					eIndFnam = dataFolder + eIndFnam + "S.txt";
 					break;
 					
 				default: // is all
@@ -437,6 +478,8 @@ int main(int argc, char *argv[]){
 					Nxp    = 725;
 					Nbatch = 23;
 					Ncv    = 18;
+					
+					eIndFnam = dataFolder + eIndFnam + "A.txt";
 					break;
 			}
 			
@@ -465,12 +508,8 @@ int main(int argc, char *argv[]){
 	MuGrpMiss dataI(dfNam, mMatFnam, mVecFnam, e2e, d);
 	Grp &data = dataI;
 	
-	//MuGrp sExpI(data, e2exp, exp2mu);
 	MuGrpPEX sExpI(data, e2exp, exp2mu, EXout, SgEXout, 1e-6, nThr);
 	Grp &sExp = sExpI;
-	
-	//MuGrp muEI(sExp, exp2mu, mu2pr);
-	//Grp &muE = muEI;
 	
 	MuGrp cvPredI = data - sExp;
 	Grp &cvPred   = cvPredI;
@@ -479,14 +518,7 @@ int main(int argc, char *argv[]){
 	Grp &betaCv = betaCvI;
 	
 	MuGrp tubI(cvPred, e2tub, tub2pr);
-	//MuGrpPEX tubI(data, e2tub, tub2pr, 1e-6, nThr);
 	Grp &tub = tubI;
-	
-	//MuGrp muTI(tub, tub2pr, mu2pr);
-	//Grp &muT = muTI;
-	
-	//MuGrp tubSI = tub - muT;
-	//Grp &tubS   = tubSI;
 	
 	Grp *batchI;
 	if (trtSet == "all") {
@@ -497,9 +529,6 @@ int main(int argc, char *argv[]){
 		batchI = new MuGrp(cvPred, *e2bch, bch2pr);
 	}
 	Grp &batch = *batchI;
-	
-	//MuGrp muBI(batch, bch2pr, mu2pr);
-	//Grp &muB = muBI;
 	
 	MuGrp tBchI = tub + batch;
 	Grp &tBch   = tBchI;
@@ -546,12 +575,8 @@ int main(int argc, char *argv[]){
 	MuGrp gamPredI = muLn - mu;
 	Grp &gamPred   = gamPredI;
 	
-	//BetaGrpPC gammaI(gamPred, pcEvecFlNam, pcEvalFlNam, Npc, gm2pr, nThr);
 	BetaGrpPCpex gammaI(gamPred, pcEvecFlNam, pcEvalFlNam, Npc, 1e-6, gm2pr, nThr);
 	Grp &gamma = gammaI;
-	
-	//MuGrp muGmI(gamma, gm2pr, mu2pr);
-	//Grp &muGm = muGmI;
 	
 	MuGrp bvI = mu + gamma;
 	Grp &bv   = bvI;
@@ -565,37 +590,16 @@ int main(int argc, char *argv[]){
 	MuGrp scaDevI = muLn - bv;
 	Grp &scaDev   = scaDevI;
 	
-	//MuGrp muLnSI = muLn + muT;
-	//Grp &muLnS   = muLnSI;
-	
-	//MuGrp bvSI = bv + muT;
-	//Grp &bvS   = bvSI;
-	
-	//SigmaIpex SigIeI(eDev, SgEout, 1.0, 2.0);
-	//SigmaI &SigIe = SigIeI;
 	SigmaI SigIe(eDev, SgEout, 1.0, 2.0);
-	//SigmaI SigIe(eDev, SgEout, 1.0, 2000.0);
-	//SigmaI SigItub(tub, 1.0, 2.0);
 	SigmaI SigItub(tub, 1.0, static_cast<double>(d));
-	//SigmaI SigItpr(tubPr, 1.0, static_cast<double>(d));
-	//SigmaI SigIbch(batch, 1.0, 2.0);
 	SigmaI SigIbch(batch, SgBout, 1.0, static_cast<double>(d));
-	//SigmaI SigIbpr(bchPr, 1.0, static_cast<double>(d));
-	//SigmaI SigIexp(sExp, SgEXout, 1.0, 2.0);
 	SigmaI SigIexp(sExp, 1.0, 2.0);
-	//SigmaI SigIexp(expDev, SgEXout, 1.0, 2000.0);
 	SigmaI SigIs(scaDev, SgSout, 1.0, 2.0);
-	//SigmaIpex SigIaI(gamma, SgAout, 1.0, 2.0);
-	//SigmaI &SigIa = SigIaI;
 	SigmaI SigIa(gamma, SgAout, 1.0, 2.0);
 	SigmaI SigIpr(d, 1e-6);
 	
-	//QgrpPEX qEI(N, nuE, mVecFnam);
-	//Qgrp &qE = qEI;
 	Qgrp qE(N, nuE, mVecFnam);
 	Qgrp qG(Npc, nuG);
-	//QgrpPEX qGI(Npc, nuG);
-	//Qgrp &qG = qGI;
 	
 	cout << "Burn-in..." << endl;
 	for (int iBnin = 0; iBnin < Nbnin; iBnin++) {
@@ -606,43 +610,24 @@ int main(int argc, char *argv[]){
 		betaCv.update(cvPred, qE, SigIe, SigIpr);
 		
 		tubPredI = dLnExp - bb;
-		//tub.update(tubPred, qE, SigIe, tubPr, SigItub);
 		tub.update(tubPred, qE, SigIe, SigItub);
-		//tub.update(tubPred, qE, SigIe, muT, SigItub);
-		//muT.update(tub, SigItub, SigIpr);
-		//tubPr.update(tub, SigItub, tubHP, SigItpr);
-		//SigItub.update(tub, tubPr);
 		SigItub.update(tub);
-		//SigItub.update(tub, muT);
-		//tubHP.update(tubPr, SigItpr, SigIpr);
-		//SigItpr.update(tubPr, tubHP);
 		
 		beTI     = betaCv + tub;
 		bchPredI = dLnExp - beT;
-		//batch.update(bchPred, qE, SigIe, bchPr, SigIbch);
-		//bchPr.update(batch, SigIbch, bchHP, SigIbpr);
 		batch.update(bchPred, qE, SigIe, SigIbch);
-		//batch.update(bchPred, qE, SigIe, muB, SigIbch);
-		//muB.update(batch, SigIbch, SigIpr);
 		SigIbch.update(batch);
-		//SigIbch.update(batch, muB);
 		
 		tBchI   = tub + batch;
 		beTbchI = betaCv + tBch;
 		bbI     = betaCv + batch;
 		
 		sExpPredI = dLn - beTbch;
-		//sExp.update(sExpPred, qE, SigIe, muE, SigIexp);
 		sExp.update(sExpPred, qE, SigIe, SigIexp);
-		//muE.update(sExp, SigIexp, SigIpr);
 		SigIexp.update(sExp);
-		//SigIexp.update(sExp, muE);
 		
 		muLnPredI = data - sExp - beTbch;
-		//sca.update(scaPred, SigIexp, muS, SigIs);
 		muLn.update(muLnPred, qE, SigIe, bv, SigIs);
-		//muS.update(sca, SigIs, SigIpr);
-		//SigIs.update(sca, muS);
 		
 		dLnI    = data - muLn;
 		dLnExpI = dLn - sExp;
@@ -653,12 +638,8 @@ int main(int argc, char *argv[]){
 		qE.update(eDev, SigIe);
 		
 		gamPredI = muLn - mu;
-		//gamma.update(gamPred, SigIs, muGm, qG, SigIa);
 		gamma.update(gamPred, SigIs, qG, SigIa);
-		//muGm.update(gamma, SigIa, SigIpr);
-		//SigIa.update(gamma, muGm, qG);
 		SigIa.update(gamma, qG);
-		//qG.update(gamma, muGm, SigIa);
 		qG.update(gamma, SigIa);
 		
 		muPredI = muLn - gamma;
@@ -694,43 +675,24 @@ int main(int argc, char *argv[]){
 		betaCv.update(cvPred, qE, SigIe, SigIpr);
 		
 		tubPredI = dLnExp - bb;
-		//tub.update(tubPred, qE, SigIe, tubPr, SigItub);
 		tub.update(tubPred, qE, SigIe, SigItub);
-		//tub.update(tubPred, qE, SigIe, muT, SigItub);
-		//muT.update(tub, SigItub, SigIpr);
-		//tubPr.update(tub, SigItub, tubHP, SigItpr);
-		//SigItub.update(tub, tubPr);
 		SigItub.update(tub);
-		//SigItub.update(tub, muT);
-		//tubHP.update(tubPr, SigItpr, SigIpr);
-		//SigItpr.update(tubPr, tubHP);
 		
 		beTI     = betaCv + tub;
 		bchPredI = dLnExp - beT;
-		//batch.update(bchPred, qE, SigIe, bchPr, SigIbch);
-		//bchPr.update(batch, SigIbch, bchHP, SigIbpr);
 		batch.update(bchPred, qE, SigIe, SigIbch);
-		//batch.update(bchPred, qE, SigIe, muB, SigIbch);
-		//muB.update(batch, SigIbch, SigIpr);
 		SigIbch.update(batch);
-		//SigIbch.update(batch, muB);
 		
 		tBchI   = tub + batch;
 		beTbchI = betaCv + tBch;
 		bbI     = betaCv + batch;
 		
 		sExpPredI = dLn - beTbch;
-		//sExp.update(sExpPred, qE, SigIe, muE, SigIexp);
 		sExp.update(sExpPred, qE, SigIe, SigIexp);
-		//muE.update(sExp, SigIexp, SigIpr);
 		SigIexp.update(sExp);
-		//SigIexp.update(sExp, muE);
 		
 		muLnPredI = data - sExp - beTbch;
-		//sca.update(scaPred, SigIexp, muS, SigIs);
 		muLn.update(muLnPred, qE, SigIe, bv, SigIs);
-		//muS.update(sca, SigIs, SigIpr);
-		//SigIs.update(sca, muS);
 		
 		dLnI    = data - muLn;
 		dLnExpI = dLn - sExp;
@@ -741,12 +703,8 @@ int main(int argc, char *argv[]){
 		qE.update(eDev, SigIe);
 		
 		gamPredI = muLn - mu;
-		//gamma.update(gamPred, SigIs, muGm, qG, SigIa);
 		gamma.update(gamPred, SigIs, qG, SigIa);
-		//muGm.update(gamma, SigIa, SigIpr);
-		//SigIa.update(gamma, muGm, qG);
 		SigIa.update(gamma, qG);
-		//qG.update(gamma, muGm, SigIa);
 		qG.update(gamma, SigIa);
 		
 		muPredI = muLn - gamma;
@@ -767,14 +725,10 @@ int main(int argc, char *argv[]){
 			betaCv.save();
 			SigIbch.save();
 			scaDev.save(SDout);
-			//bvSI = bv + muT;
 			bv.save(BVout);
-			//gamPred.save(LNout);
-			//muLnSI = muLn + muT;
 			muLn.save(LNout);
 			sExp.save(SigIexp);
 			SigIe.save();
-			//SigIexp.save();
 			SigIs.save();
 			SigIa.save();
 			snpBet.update(scaDev, SigIs);
