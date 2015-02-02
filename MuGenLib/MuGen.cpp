@@ -10081,6 +10081,7 @@ void BetaGrpSnpMiss::dump(){
 			gsl_matrix_free(tmpY);
 		}
 		
+		colCenter(_Ystore); // necessary for predictors with no missing data
 #pragma omp parallel num_threads(_nThr)
 		{
 			double XtX;
@@ -10319,6 +10320,7 @@ void BetaGrpSnpMissCV::dump(){
 			gsl_matrix_free(tmpY);
 		}
 		
+		colCenter(_Ystore); // necessary for predictors with no missing data
 #pragma omp parallel num_threads(_nThr)
 		{
 			double XtX;
@@ -10437,8 +10439,8 @@ void BetaGrpSnpMissCV::dump(){
 					gsl_linalg_cholesky_invert(S);
 					
 					for (int iPh = 0; iPh < _Ystore->size2; iPh++) {
-						double invSeB  = sqrt(gsl_matrix_get(S, iPh, iPh)/static_cast<double>(presInd[iSnp].size() - 1));
-						double tVal = fabs(gsl_vector_get(bTmp, iPh))*invSeB;
+						double invSeB  = sqrt(gsl_matrix_get(S, iPh, iPh) * static_cast<double>(presInd[iSnp].size() - 1));
+						double tVal = fabs(gsl_vector_get(bTmp, iPh)) * invSeB;
 						double pV   = -log10(gsl_cdf_tdist_Q(tVal, _Ystore->size1 - 1)*2.0);
 						gsl_matrix_set(_valueMat, iSnp, iPh, pV);
 						
@@ -10567,6 +10569,7 @@ void BetaGrpPSRmiss::dump(){
 			gsl_matrix_free(tmpY);
 		}
 		
+		colCenter(_Ystore); // necessary for presidictors with no missing data
 #pragma omp parallel num_threads(_nThr)
 		{
 			double sig;
