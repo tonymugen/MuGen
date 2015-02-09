@@ -2142,7 +2142,7 @@ public:
 	RanIndex(const size_t &Ntot, const size_t &Nup);
 	/** \brief Constructor with file input
 	 *
-	 * Reads the index information from a file. Base-0 indexing is generally assumed, checks are ettempted.  Since there are cases when indexes that look non-base-0 are needed (such as when only a subset of lower-level rows are accessed), these generate warnings rather than errors, unless there are upper-level index values outsinde the set range.
+	 * Reads the index information from a file. Base-0 indexing is generally assumed, but checks are attempted.  Since there are cases when indexes that look non-base-0 are needed (such as when only a subset of lower-level rows are accessed), these generate warnings rather than errors, unless there are upper-level index values outside the set range.
 	 *
 	 * \param[in] size_t& number of lower-level elements
 	 * \param[in] size_t& number of upper-level elements
@@ -2152,7 +2152,7 @@ public:
 	RanIndex(const size_t &Ntot, const size_t &Nup, const string &fileNam);
 	/** \brief Constructor with file-stream input
 	 *
-	 * Reads the index information from a file. Base-0 indexing is generally assumed, checks are ettempted.  Since there are cases when indexes that look non-base-0 are needed (such as when only a subset of lower-level rows are accessed), these generate warnings rather than errors, unless there are upper-level index values outsinde the set range.
+	 * Reads the index information from a file. Base-0 indexing is generally assumed, but checks are attempted.  Since there are cases when indexes that look non-base-0 are needed (such as when only a subset of lower-level rows are accessed), these generate warnings rather than errors, unless there are upper-level index values outside the set range.
 	 *
 	 * \param[in] size_t& number of lower-level elements
 	 * \param[in] size_t& number of upper-level elements
@@ -3421,6 +3421,8 @@ public:
 	 * If some data are present, performs standard Gaussian marginal imputation (desribed in, e.g., \cite chatfield80 ) with the provided Grp object as a mean and the SigmaI object as the inverse-covariance.
 	 * If no data for a row are present, simply replaces the row values by a Gaussian sample with mean and inverse-covariance provided.  Rows with no missing data are ignored.
 	 *
+	 * \ingroup updateFun
+	 *
 	 * \param[in] Grp& mean
 	 * \param[in] SigmaI& inverse-covariance
 	 */
@@ -3429,6 +3431,8 @@ public:
 	 *
 	 * If some data are present, performs Gaussian marginal imputation (desribed in, e.g., \cite chatfield80 ) with the provided Grp object as a mean and the SigmaI object as the inverse-covariance, but with a 0-mean prior.
 	 * If no data for a row are present, simply replaces the row values by a Gaussian sample with mean and inverse-covariance provided.  Rows with no missing data are ignored.
+	 *
+	 * \ingroup updateFun
 	 *
 	 * \warning Has not been extensively tested
 	 *
@@ -3509,6 +3513,8 @@ public:
 	 * The Grp object contains the prior means and the SigmaI object -- the prior inverse-covariance for the sampling of data values.  The upper index of the object must have the same number of groups as the number of rows in the prior matrix addressed by fMat().
 	 * While the sampling is independent, the prior inverse variances for each trait are taken from the diagonal of the inverse-covariance matrix (in the SigmaI object), and are thus influenced by any correlated traits.
 	 *
+	 * \ingroup updateFun
+	 *
 	 * \param[in] Grp& prior mean
 	 * \param[in] SigmaI& prior inverse-covariance
 	 */
@@ -3517,6 +3523,8 @@ public:
 	 *
 	 * The Grp object contains the prior means and the SigmaI object -- the prior inverse-covariance for the sampling of data values.  The upper index of the object must have the same number of groups as the number of rows in the prior matrix addressed by fMat().
 	 * While the sampling is independent, the prior inverse variances for each trait are taken from the diagonal of the inverse-covariance matrix (in the SigmaI object), and are thus influenced by any correlated traits.
+	 *
+	 * \ingroup updateFun
 	 *
 	 * \param[in] Grp& prior mean
 	 * \param[in] Qgrp& Student-\f$t\f$ weights
@@ -3632,7 +3640,10 @@ protected:
 	 */
 	double _numSaves;
 	
-	/** \brief Update fitted values */
+	/** \brief Update fitted values 
+	 * 
+	 * \ingroup fitFun
+	 */
 	virtual void _updateFitted();
 	/** \brief Rank predictors
 	 *
@@ -4029,6 +4040,8 @@ protected:
 	 */
 	void _finishFitted();
 	/** \brief Calculate redundant parameter fitted values
+	 *
+	 * \ingroup fitFun
 	 *
 	 * Calculates separate \f$ \left(\boldsymbol{X \Xi A}\right)_{\cdot -p} \f$ for each trait \f$ p \f$.
 	 */
@@ -4451,211 +4464,903 @@ public:
 
 /** \brief Simple single-SNP regression class
  *
+ * Implements single-marker GWAS.  Each trait is treated separately, including the variances (i.e., \f$ \widehat{\sigma}^2_p = \widehat{\boldsymbol{\Sigma}}_{p,p} \f$).  However, in addition to the single-trait tests an extra Hotelling-type mutivariate association test is performed.
+ * This multivariate test reflects the distance of the whole vector of trait effects to zero, potentially increasing the power to detect pleiotropic SNPs with moderate effects on mutiple traits.
+ * The saved value matrix thus has one extra column for this test.  The output is either \f$ -\log_{10}p \f$, (although this statistic is not strictly a frequentist \f$p\f$-value, it performs very similarly in simulations), or Wakefield's \cite wakefield07 approximation of \f$ -ln BF \f$ (log-Bayes factor ratio).  In the latter case, the user can set the prior variance manually.
+ * The SNP regression is performed on the point estimate of a response, as described in documentation of the update() and dump() functions.  The latter can be, say, a residual of a mixed-model type GEBV estimate done to control population structure.
+ *
  */
 class BetaGrpSnp : public MuGrp {
 protected:
+	/** \brief SNP predictor matrix
+	 *
+	 * Read in only at the end of the run in the dump() function.
+	 */
 	gsl_matrix *_Xmat;
-	gsl_matrix *_fakeFmat; // is all 0, in case someone uses this class in an addition/subtraction operator
+	/** \brief Matrix for addition operators
+	 *
+	 * This matrix is addressed by fMat() and set to all zero values, so that if this object is in an addition/subtraction operator things don't break.  Because this object operates outside of the regular Markov chains, on the residuals of the model, it ordinarily makes no sense to add or subtract it from anything.
+	 */
+	gsl_matrix *_fakeFmat;
 	
-	gsl_matrix *_Ystore;   // storing the values for predictor until the end, when the mean is used for the SNP regression
+	/** \brief Response storage
+	 *
+	 * MCMC samples from a response variable (representing a residual of the model) are stored here and divided by the total number of saves at the end before the regression is performed.
+	 */
+	gsl_matrix *_Ystore;
 	
+	/** \brief Number of predictors (SNPs) */
 	size_t _Npred;
+	/** \brief Number of threads */
 	int _nThr;
+	/** \brief Number of saves
+	 * 
+	 * Number of times the response samples have been saved.
+	 */
 	double _numSaves;
+	/** \brief Prior variance
+	 *
+	 * Prior variance for Wakefield's \cite wakefield07 ABF calculation (Wakefield's notation for it is \f$W\f$).  If it zero, \f$ -\log_{10}p \f$ are calculated.
+	 */
 	double _priorVar;  // W in Wakefield's (2007) ABF paper
 	
+	/** \brief Predictor (SNP) file name */
 	string _inPredFl;
 	
 public:
+	/** \brief Default constructor */
 	BetaGrpSnp();
+	/** \brief Constructor with no replication and \f$p\f$-values
+	 *
+	 * Initializes the object with no replication (i.e., the number of rows in the predictor is the same as in the response) and leaves the prior variance for SNP regressions at zero, thereby resulting in a dump of \f$ -\log_{10}p \f$ values.
+	 *
+	 * \param[in] string& predictor file name
+	 * \param[in] string& output file name
+	 * \param[in] size_t& number of rows in the response matrix
+	 * \param[in] size_t& number of predictors
+	 * \param[in] size_t& number of traits
+	 * \param[in] int& number of threads
+	 *
+	 */
 	BetaGrpSnp(const string &predFlNam, const string &outFlNam, const size_t &Ndat, const size_t &Npred, const size_t &d, const int &Nthr);
+	/** \brief Constructor with replication and \f$p\f$-values
+	 *
+	 * Initializes the object with replication, encoded with the given index, and leaves the prior variance for SNP regressions at zero, thereby resulting in a dump of \f$ -\log_{10}p \f$ values.
+	 *
+	 * \param[in] string& predictor file name
+	 * \param[in] string& output file name
+	 * \param[in] RanIndex& replicate index
+	 * \param[in] size_t& number of predictors
+	 * \param[in] size_t& number of traits
+	 * \param[in] int& number of threads
+	 *
+	 */
 	BetaGrpSnp(const string &predFlNam, const string &outFlNam, RanIndex &low, const size_t &Npred, const size_t &d, const int &Nthr);
+	/** \brief Constructor with no replication and ABF
+	 *
+	 * Initializes the object with no replication (i.e., the number of rows in the predictor is the same as in the response) and sets the prior variance for SNP regressions to the given value, therefore dumping Wakefield's log of approximate Bayes factor (ABF) ratios to the output file.
+	 *
+	 * \param[in] string& predictor file name
+	 * \param[in] string& output file name
+	 * \param[in] size_t& number of rows in the response matrix
+	 * \param[in] size_t& number of predictors
+	 * \param[in] size_t& number of traits
+	 * \param[in] int& number of threads
+	 * \param[in] double& prior variance
+	 *
+	 */
 	BetaGrpSnp(const string &predFlNam, const string &outFlNam, const size_t &Ndat, const size_t &Npred, const size_t &d, const int &Nthr, const double &prVar);
+	/** \brief Constructor with replication and ABF
+	 *
+	 * Initializes the object with replication, encoded with the given index, and sets the prior variance for SNP regressions to the given value, therefore dumping Wakefield's log of approximate Bayes factor (ABF) ratios to the output file.
+	 *
+	 * \param[in] string& predictor file name
+	 * \param[in] string& output file name
+	 * \param[in] RanIndex& replicate index
+	 * \param[in] size_t& number of predictors
+	 * \param[in] size_t& number of traits
+	 * \param[in] int& number of threads
+	 * \param[in] double& prior variance
+	 *
+	 */
 	BetaGrpSnp(const string &predFlNam, const string &outFlNam, RanIndex &low, const size_t &Npred, const size_t &d, const int &Nthr, const double &prVar);
 	
+	/** \brief Destructor */
 	~BetaGrpSnp();
 	
+	/** \brief Dump results to the output file
+	 *
+	 * The predictor (SNP) file is read by this function, and the single-predictor regression (i.e., each predictor is tested separately, ignoring all others) is performed.  The results are saved to the pre-specified output file.
+	 */
 	virtual void dump();
 	
-	BetaGrpSnp(const BetaGrpSnp &mG); // copy constructor
+	/** \brief Copy constructor
+	 *
+	 * \param[in] BetaGrpSnp& object to be copied
+	 */
+	BetaGrpSnp(const BetaGrpSnp &mG);
+	/** \brief Assignment operator
+	 *
+	 * \param[in] BetaGrpSnp& object to be copied
+	 * \return BetaGrpSnp& target object
+	 */
 	BetaGrpSnp & operator=(const BetaGrpSnp &mG);
 	
+	/** \brief Access adjusted fitted value matrix
+	 *
+	 * \return gsl_matrix* pointer to a zero-valued matrix
+	 */
 	const gsl_matrix *fMat() const{return _fakeFmat; };
-
+	
+	/** \brief Response update function
+	 *
+	 * Unlike standard update functions, this one only saves MCMC samples of the response.  The covariance provided is ignored.  
+	 * The actual regression is performed on the point estimates of response values calculated as means of the stored MCMC values, and is done at the end by envoking the dump() function.
+	 *
+	 * \ingroup updateFun
+	 *
+	 * \param[in] Grp& response variable to be saved
+	 * \param[in] SigmaI& inverse-covariance (ignored)
+	 */
 	void update(const Grp &dat, const SigmaI &SigIm);
 };
 
-/** \brief Regression with conditional variance
+/** \brief Single-SNP regression with conditional variance
  *
+ * Implements single-marker GWAS.  Each trait is treated separately for coefficient calculation.  In contrast, the variance estimates are taken from the inverse-covariance: \f$ \widehat{\sigma}^2_p = \left[ \widehat{\boldsymbol{\Sigma}}^{-1}_{p,p} \right]^{-1} \le \widehat{\boldsymbol{\Sigma}}_{p,p} \f$.
+ * In addition to the single-trait tests an extra Hotelling-type mutivariate association test is performed.
+ * This multivariate test reflects the distance of the whole vector of trait effects to zero, potentially increasing the power to detect pleiotropic SNPs with moderate effects on mutiple traits.
+ * The saved value matrix thus has one extra column for this test.  The output is either \f$ -\log_{10}p \f$, (although this statistic is not strictly a frequentist \f$p\f$-value, it performs very similarly in simulations), or Wakefield's \cite wakefield07 approximation of \f$ -ln BF \f$ (log-Bayes factor ratio).  In the latter case, the user can set the prior variance manually.
+ * The SNP regression is performed on the point estimate of a response, as described in documentation of the update() and dump() functions.  The latter can be, say, a residual of a mixed-model type GEBV estimate done to control population structure.
  */
 class BetaGrpSnpCV : public BetaGrpSnp {
 protected:
 	
 public:
+	/** \brief Default constructor */
 	BetaGrpSnpCV() : BetaGrpSnp() {};
+	/** \brief Constructor with no replication and \f$p\f$-values
+	 *
+	 * Initializes the object with no replication (i.e., the number of rows in the predictor is the same as in the response) and leaves the prior variance for SNP regressions at zero, thereby resulting in a dump of \f$ -\log_{10}p \f$ values.
+	 *
+	 * \param[in] string& predictor file name
+	 * \param[in] string& output file name
+	 * \param[in] size_t& number of rows in the response matrix
+	 * \param[in] size_t& number of predictors
+	 * \param[in] size_t& number of traits
+	 * \param[in] int& number of threads
+	 *
+	 */
 	BetaGrpSnpCV(const string &predFlNam, const string &outFlNam, const size_t &Ndat, const size_t &Npred, const size_t &d, const int &Nthr) : BetaGrpSnp(predFlNam, outFlNam, Ndat, Npred, d, Nthr) {};
+	/** \brief Constructor with replication and \f$p\f$-values
+	 *
+	 * Initializes the object with replication, encoded with the given index, and leaves the prior variance for SNP regressions at zero, thereby resulting in a dump of \f$ -\log_{10}p \f$ values.
+	 *
+	 * \param[in] string& predictor file name
+	 * \param[in] string& output file name
+	 * \param[in] RanIndex& replicate index
+	 * \param[in] size_t& number of predictors
+	 * \param[in] size_t& number of traits
+	 * \param[in] int& number of threads
+	 *
+	 */
 	BetaGrpSnpCV(const string &predFlNam, const string &outFlNam, RanIndex &low, const size_t &Npred, const size_t &d, const int &Nthr) : BetaGrpSnp(predFlNam, outFlNam, low, Npred, d, Nthr) {};
+	/** \brief Constructor with no replication and ABF
+	 *
+	 * Initializes the object with no replication (i.e., the number of rows in the predictor is the same as in the response) and sets the prior variance for SNP regressions to the given value, therefore dumping Wakefield's log of approximate Bayes factor (ABF) ratios to the output file.
+	 *
+	 * \param[in] string& predictor file name
+	 * \param[in] string& output file name
+	 * \param[in] size_t& number of rows in the response matrix
+	 * \param[in] size_t& number of predictors
+	 * \param[in] size_t& number of traits
+	 * \param[in] int& number of threads
+	 * \param[in] double& prior variance
+	 *
+	 */
 	BetaGrpSnpCV(const string &predFlNam, const string &outFlNam, const size_t &Ndat, const size_t &Npred, const size_t &d, const int &Nthr, const double &prVar) : BetaGrpSnp(predFlNam, outFlNam, Ndat, Npred, d, Nthr, prVar) {};
+	/** \brief Constructor with replication and ABF
+	 *
+	 * Initializes the object with replication, encoded with the given index, and sets the prior variance for SNP regressions to the given value, therefore dumping Wakefield's log of approximate Bayes factor (ABF) ratios to the output file.
+	 *
+	 * \param[in] string& predictor file name
+	 * \param[in] string& output file name
+	 * \param[in] RanIndex& replicate index
+	 * \param[in] size_t& number of predictors
+	 * \param[in] size_t& number of traits
+	 * \param[in] int& number of threads
+	 * \param[in] double& prior variance
+	 *
+	 */
 	BetaGrpSnpCV(const string &predFlNam, const string &outFlNam, RanIndex &low, const size_t &Npred, const size_t &d, const int &Nthr, const double &prVar) : BetaGrpSnp(predFlNam, outFlNam, low, Npred, d, Nthr, prVar) {};
 	
+	/** \brief Destructor */
 	~BetaGrpSnpCV() {};
 	
-	BetaGrpSnpCV(const BetaGrpSnpCV &mG); // copy constructor
+	/** \brief Copy constructor
+	 *
+	 * \param[in] BetaGrpSnpCV& object to be copied
+	 */
+	BetaGrpSnpCV(const BetaGrpSnpCV &mG);
+	/** \brief Assignment operator
+	 *
+	 * \param[in] BetaGrpSnp& object to be copied
+	 * \return BetaGrpSnp& target object
+	 */
 	BetaGrpSnpCV & operator=(const BetaGrpSnpCV &mG);
 	
 	void dump();
 	
 };
 
-/** \brief regressions on a single SNP controlling for other traits
+/** \brief Single-SNP regression with partial effects
  *
+ * Implements single-marker GWAS.  Each trait is treated as a single response, and the other traits are added to the SNP as predictors.  Only the SNP test is reported.
+ * No Hotelling-type mutivariate association test is performed, so the number of columns in the results matrix is the same as the number of traits.
+ * The output is either \f$ -\log_{10}p \f$, (although this statistic is not strictly a frequentist \f$p\f$-value, it performs very similarly in simulations), or Wakefield's \cite wakefield07 approximation of \f$ -ln BF \f$ (log-Bayes factor ratio).  In the latter case, the user can set the prior variance manually.
+ * The SNP regression is performed on the point estimate of a response, as described in documentation of the update() and dump() functions.  The latter can be, say, a residual of a mixed-model type GEBV estimate done to control population structure.
  */
 class BetaGrpPSR : public BetaGrpSnp {
 protected:
 	
 public:
+	/** \brief Default constructor */
 	BetaGrpPSR() : BetaGrpSnp() {};
+	/** \brief Constructor with no replication and \f$p\f$-values
+	 *
+	 * Initializes the object with no replication (i.e., the number of rows in the predictor is the same as in the response) and leaves the prior variance for SNP regressions at zero, thereby resulting in a dump of \f$ -\log_{10}p \f$ values.
+	 *
+	 * \param[in] string& predictor file name
+	 * \param[in] string& output file name
+	 * \param[in] size_t& number of rows in the response matrix
+	 * \param[in] size_t& number of predictors
+	 * \param[in] size_t& number of traits
+	 * \param[in] int& number of threads
+	 *
+	 */
 	BetaGrpPSR(const string &predFlNam, const string &outFlNam, const size_t &Ndat, const size_t &Npred, const size_t &d, const int &Nthr) : BetaGrpSnp(predFlNam, outFlNam, Ndat, Npred, d, Nthr) {};
+	/** \brief Constructor with replication and \f$p\f$-values
+	 *
+	 * Initializes the object with replication, encoded with the given index, and leaves the prior variance for SNP regressions at zero, thereby resulting in a dump of \f$ -\log_{10}p \f$ values.
+	 *
+	 * \param[in] string& predictor file name
+	 * \param[in] string& output file name
+	 * \param[in] RanIndex& replicate index
+	 * \param[in] size_t& number of predictors
+	 * \param[in] size_t& number of traits
+	 * \param[in] int& number of threads
+	 *
+	 */
 	BetaGrpPSR(const string &predFlNam, const string &outFlNam, RanIndex &low, const size_t &Npred, const size_t &d, const int &Nthr) : BetaGrpSnp(predFlNam, outFlNam, low, Npred, d, Nthr) {};
+	/** \brief Constructor with no replication and ABF
+	 *
+	 * Initializes the object with no replication (i.e., the number of rows in the predictor is the same as in the response) and sets the prior variance for SNP regressions to the given value, therefore dumping Wakefield's log of approximate Bayes factor (ABF) ratios to the output file.
+	 *
+	 * \param[in] string& predictor file name
+	 * \param[in] string& output file name
+	 * \param[in] size_t& number of rows in the response matrix
+	 * \param[in] size_t& number of predictors
+	 * \param[in] size_t& number of traits
+	 * \param[in] int& number of threads
+	 * \param[in] double& prior variance
+	 *
+	 */
 	BetaGrpPSR(const string &predFlNam, const string &outFlNam, const size_t &Ndat, const size_t &Npred, const size_t &d, const int &Nthr, const double &prVar) : BetaGrpSnp(predFlNam, outFlNam, Ndat, Npred, d, Nthr, prVar) {};
+	/** \brief Constructor with replication and ABF
+	 *
+	 * Initializes the object with replication, encoded with the given index, and sets the prior variance for SNP regressions to the given value, therefore dumping Wakefield's log of approximate Bayes factor (ABF) ratios to the output file.
+	 *
+	 * \param[in] string& predictor file name
+	 * \param[in] string& output file name
+	 * \param[in] RanIndex& replicate index
+	 * \param[in] size_t& number of predictors
+	 * \param[in] size_t& number of traits
+	 * \param[in] int& number of threads
+	 * \param[in] double& prior variance
+	 *
+	 */
 	BetaGrpPSR(const string &predFlNam, const string &outFlNam, RanIndex &low, const size_t &Npred, const size_t &d, const int &Nthr, const double &prVar) : BetaGrpSnp(predFlNam, outFlNam, low, Npred, d, Nthr, prVar) {};
 	
+	/** \brief Destructor */
 	~BetaGrpPSR() {};
+	
+	/** \brief Copy constructor
+	 *
+	 * \param[in] BetaGrpPSR& object to be copied
+	 */
+	BetaGrpPSR(const BetaGrpPSR &mG);
+	/** \brief Assignment operator
+	 *
+	 * \param[in] BetaGrpPSR& object to be copied
+	 * \return BetaGrpPSR& target object
+	 */
+	BetaGrpPSR & operator=(const BetaGrpPSR &mG);
 	
 	void dump();
 	
-	BetaGrpPSR(const BetaGrpPSR &mG); // copy constructor
-	BetaGrpPSR & operator=(const BetaGrpPSR &mG);
-	
 };
 
+/** \brief Simple single-SNP regression class with missing data
+ *
+ * Implements single-marker GWAS with missing genotypes.  Rows with missing genotypes are dropped.  Each trait is treated separately, including the variances (i.e., \f$ \widehat{\sigma}^2_p = \widehat{\boldsymbol{\Sigma}}_{p,p} \f$).  However, in addition to the single-trait tests an extra Hotelling-type mutivariate association test is performed.
+ * This multivariate test reflects the distance of the whole vector of trait effects to zero, potentially increasing the power to detect pleiotropic SNPs with moderate effects on mutiple traits.
+ * The saved value matrix thus has one extra column for this test.  The output is either \f$ -\log_{10}p \f$, (although this statistic is not strictly a frequentist \f$p\f$-value, it performs very similarly in simulations), or Wakefield's \cite wakefield07 approximation of \f$ -ln BF \f$ (log-Bayes factor ratio).  In the latter case, the user can set the prior variance manually.
+ * The SNP regression is performed on the point estimate of a response, as described in documentation of the update() and dump() functions.  The latter can be, say, a residual of a mixed-model type GEBV estimate done to control population structure.
+ *
+ */
 class BetaGrpSnpMiss : public MuGrp {
 protected:
-	vector<vector<double> > _Xmat; // a rugged array that only stores present genotypes
+	/** \brief Predictor array
+	 *
+	 * The outer vector is the same length as the number of predictors.  Each constituent vector stores only the non-missing genotypes.
+	 */
+	vector< vector<double> > _Xmat;
+	
+	/** \brief Matrix for addition operators
+	 *
+	 * This matrix is addressed by fMat() and set to all zero values, so that if this object is in an addition/subtraction operator things don't break.  Because this object operates outside of the regular Markov chains, on the residuals of the model, it ordinarily makes no sense to add or subtract it from anything.
+	 */
 	gsl_matrix *_fakeFmat;
 	
-	gsl_matrix *_Ystore;   // storing the values for predictor until the end, when the mean is used for the SNP regression
+	/** \brief Response storage
+	 *
+	 * MCMC samples from a response variable (representing a residual of the model) are stored here and divided by the total number of saves at the end before the regression is performed.
+	 */
+	gsl_matrix *_Ystore;
 	
+	/** \brief Number of predictors (SNPs) */
 	size_t _Npred;
+	/** \brief Number of threads to use */
 	int _nThr;
+	/** \brief Number of saves
+	 *
+	 * Number of times the response samples have been saved.
+	 */
 	double _numSaves;
+	/** \brief Missing value label
+	 * 
+	 * Value that labels the missing genotypes (predictors). Provided by the user.
+	 */
 	double _absLab;
-	double _priorVar;  // W in Wakefield's (2007) ABF paper
+	/** \brief Prior variance
+	 *
+	 * Prior variance for Wakefield's \cite wakefield07 ABF calculation (Wakefield's notation for it is \f$W\f$).  If it zero, \f$ -\log_{10}p \f$ are calculated.
+	 */
+	double _priorVar;
 	
+	/** \brief Predictor (SNP) file name */
 	string _inPredFl;
 	
 public:
+	/** \brief Default constructor */
 	BetaGrpSnpMiss();
+	/** \brief Constructor with no replication and \f$p\f$-values
+	 *
+	 * Initializes the object with no replication (i.e., the number of rows in the predictor is the same as in the response) and leaves the prior variance for SNP regressions at zero, thereby resulting in a dump of \f$ -\log_{10}p \f$ values.
+	 *
+	 * \param[in] string& predictor file name
+	 * \param[in] string& output file name
+	 * \param[in] size_t& number of rows in the response matrix
+	 * \param[in] size_t& number of predictors
+	 * \param[in] size_t& number of traits
+	 * \param[in] int& number of threads
+	 * \param[in] double& missing value label
+	 *
+	 */
 	BetaGrpSnpMiss(const string &predFlNam, const string &outFlNam, const size_t &Ndat, const size_t &Npred, const size_t &d, const int &Nthr, const double &absLab);
+	/** \brief Constructor with replication and \f$p\f$-values
+	 *
+	 * Initializes the object with replication, encoded with the given index, and leaves the prior variance for SNP regressions at zero, thereby resulting in a dump of \f$ -\log_{10}p \f$ values.
+	 *
+	 * \param[in] string& predictor file name
+	 * \param[in] string& output file name
+	 * \param[in] RanIndex& replicate index
+	 * \param[in] size_t& number of predictors
+	 * \param[in] size_t& number of traits
+	 * \param[in] int& number of threads
+	 * \param[in] double& missing value label
+	 *
+	 */
 	BetaGrpSnpMiss(const string &predFlNam, const string &outFlNam, RanIndex &low, const size_t &Npred, const size_t &d, const int &Nthr, const double &absLab);
+	/** \brief Constructor with no replication and ABF
+	 *
+	 * Initializes the object with no replication (i.e., the number of rows in the predictor is the same as in the response) and sets the prior variance for SNP regressions to the given value, therefore dumping Wakefield's log of approximate Bayes factor (ABF) ratios to the output file.
+	 *
+	 * \param[in] string& predictor file name
+	 * \param[in] string& output file name
+	 * \param[in] size_t& number of rows in the response matrix
+	 * \param[in] size_t& number of predictors
+	 * \param[in] size_t& number of traits
+	 * \param[in] int& number of threads
+	 * \param[in] double& prior variance
+	 * \param[in] double& missing value label
+	 *
+	 */
 	BetaGrpSnpMiss(const string &predFlNam, const string &outFlNam, const size_t &Ndat, const size_t &Npred, const size_t &d, const int &Nthr, const double &prVar, const double &absLab);
+	/** \brief Constructor with replication and ABF
+	 *
+	 * Initializes the object with replication, encoded with the given index, and sets the prior variance for SNP regressions to the given value, therefore dumping Wakefield's log of approximate Bayes factor (ABF) ratios to the output file.
+	 *
+	 * \param[in] string& predictor file name
+	 * \param[in] string& output file name
+	 * \param[in] RanIndex& replicate index
+	 * \param[in] size_t& number of predictors
+	 * \param[in] size_t& number of traits
+	 * \param[in] int& number of threads
+	 * \param[in] double& prior variance
+	 * \param[in] double& missing value label
+	 *
+	 */
 	BetaGrpSnpMiss(const string &predFlNam, const string &outFlNam, RanIndex &low, const size_t &Npred, const size_t &d, const int &Nthr, const double &prVar, const double &absLab);
 	
+	/** \brief Destructor */
 	~BetaGrpSnpMiss();
 	
+	/** \brief Copy constructor
+	 *
+	 * \param[in] BetaGrpSnpMiss& object to be copied
+	 */
 	BetaGrpSnpMiss(const BetaGrpSnpMiss &mG); // copy constructor
+	/** \brief Assignment operator
+	 *
+	 * \param[in] BetaGrpSnpMiss& object to be copied
+	 * \return BetaGrpSnpMiss& target object
+	 */
 	BetaGrpSnpMiss & operator=(const BetaGrpSnpMiss &mG);
 	
+	/** \brief Dump results to the output file
+	 *
+	 * The predictor (SNP) file is read by this function, and the single-predictor regression (i.e., each predictor is tested separately, ignoring all others) is performed.  The results are saved to the pre-specified output file.
+	 */
 	virtual void dump();
 	
+	/** \brief Access adjusted fitted value matrix
+	 *
+	 * \return gsl_matrix* pointer to a zero-valued matrix
+	 */
 	const gsl_matrix *fMat() const{return _fakeFmat; };
 	
+	/** \brief Response update function
+	 *
+	 * Unlike standard update functions, this one only saves MCMC samples of the response.  The covariance provided is ignored.
+	 * The actual regression is performed on the point estimates of response values calculated as means of the stored MCMC values, and is done at the end by envoking the dump() function.
+	 *
+	 * \ingroup updateFun
+	 *
+	 * \param[in] Grp& response variable to be saved
+	 * \param[in] SigmaI& inverse-covariance (ignored)
+	 */
 	void update(const Grp &dat, const SigmaI &SigIm);
 	
 };
 
-/** \brief Missing-data regression with conditional variance
+/** \brief Single-SNP regression with conditional variance and missing data
  *
+ * Implements single-marker GWAS with missing genotype data.  Rows with missing genotypes are dropped.  Each trait is treated separately for coefficient calculation.  In contrast, the variance estimates are taken from the inverse-covariance: \f$ \widehat{\sigma}^2_p = \left[ \widehat{\boldsymbol{\Sigma}}^{-1}_{p,p} \right]^{-1} \le \widehat{\boldsymbol{\Sigma}}_{p,p} \f$.
+ * In addition to the single-trait tests an extra Hotelling-type mutivariate association test is performed.
+ * This multivariate test reflects the distance of the whole vector of trait effects to zero, potentially increasing the power to detect pleiotropic SNPs with moderate effects on mutiple traits.
+ * The saved value matrix thus has one extra column for this test.  The output is either \f$ -\log_{10}p \f$, (although this statistic is not strictly a frequentist \f$p\f$-value, it performs very similarly in simulations), or Wakefield's \cite wakefield07 approximation of \f$ -ln BF \f$ (log-Bayes factor ratio).  In the latter case, the user can set the prior variance manually.
+ * The SNP regression is performed on the point estimate of a response, as described in documentation of the update() and dump() functions.  The latter can be, say, a residual of a mixed-model type GEBV estimate done to control population structure.
  */
 class BetaGrpSnpMissCV : public BetaGrpSnpMiss {
 protected:
 	
 public:
+	/** \brief Default constructor */
 	BetaGrpSnpMissCV() : BetaGrpSnpMiss() {};
+	/** \brief Constructor with no replication and \f$p\f$-values
+	 *
+	 * Initializes the object with no replication (i.e., the number of rows in the predictor is the same as in the response) and leaves the prior variance for SNP regressions at zero, thereby resulting in a dump of \f$ -\log_{10}p \f$ values.
+	 *
+	 * \param[in] string& predictor file name
+	 * \param[in] string& output file name
+	 * \param[in] size_t& number of rows in the response matrix
+	 * \param[in] size_t& number of predictors
+	 * \param[in] size_t& number of traits
+	 * \param[in] int& number of threads
+	 * \param[in] double& missing value label
+	 *
+	 */
 	BetaGrpSnpMissCV(const string &predFlNam, const string &outFlNam, const size_t &Ndat, const size_t &Npred, const size_t &d, const int &Nthr, const double &absLab) : BetaGrpSnpMiss(predFlNam, outFlNam, Ndat, Npred, d, Nthr, absLab) {};
+	/** \brief Constructor with replication and \f$p\f$-values
+	 *
+	 * Initializes the object with replication, encoded with the given index, and leaves the prior variance for SNP regressions at zero, thereby resulting in a dump of \f$ -\log_{10}p \f$ values.
+	 *
+	 * \param[in] string& predictor file name
+	 * \param[in] string& output file name
+	 * \param[in] RanIndex& replicate index
+	 * \param[in] size_t& number of predictors
+	 * \param[in] size_t& number of traits
+	 * \param[in] int& number of threads
+	 * \param[in] double& missing value label
+	 *
+	 */
 	BetaGrpSnpMissCV(const string &predFlNam, const string &outFlNam, RanIndex &low, const size_t &Npred, const size_t &d, const int &Nthr, const double &absLab) : BetaGrpSnpMiss(predFlNam, outFlNam, low, Npred, d, Nthr, absLab) {};
+	/** \brief Constructor with no replication and ABF
+	 *
+	 * Initializes the object with no replication (i.e., the number of rows in the predictor is the same as in the response) and sets the prior variance for SNP regressions to the given value, therefore dumping Wakefield's log of approximate Bayes factor (ABF) ratios to the output file.
+	 *
+	 * \param[in] string& predictor file name
+	 * \param[in] string& output file name
+	 * \param[in] size_t& number of rows in the response matrix
+	 * \param[in] size_t& number of predictors
+	 * \param[in] size_t& number of traits
+	 * \param[in] int& number of threads
+	 * \param[in] double& prior variance
+	 * \param[in] double& missing value label
+	 *
+	 */
 	BetaGrpSnpMissCV(const string &predFlNam, const string &outFlNam, const size_t &Ndat, const size_t &Npred, const size_t &d, const int &Nthr, const double &prVar, const double &absLab) : BetaGrpSnpMiss(predFlNam, outFlNam, Ndat, Npred, d, Nthr, prVar, absLab) {};
+	/** \brief Constructor with replication and ABF
+	 *
+	 * Initializes the object with replication, encoded with the given index, and sets the prior variance for SNP regressions to the given value, therefore dumping Wakefield's log of approximate Bayes factor (ABF) ratios to the output file.
+	 *
+	 * \param[in] string& predictor file name
+	 * \param[in] string& output file name
+	 * \param[in] RanIndex& replicate index
+	 * \param[in] size_t& number of predictors
+	 * \param[in] size_t& number of traits
+	 * \param[in] int& number of threads
+	 * \param[in] double& prior variance
+	 * \param[in] double& missing value label
+	 *
+	 */
 	BetaGrpSnpMissCV(const string &predFlNam, const string &outFlNam, RanIndex &low, const size_t &Npred, const size_t &d, const int &Nthr, const double &prVar, const double &absLab) : BetaGrpSnpMiss(predFlNam, outFlNam, low, Npred, d, Nthr, prVar, absLab) {};
 	
+	/** \brief Destructor */
 	~BetaGrpSnpMissCV(){};
 	
-	BetaGrpSnpMissCV(const BetaGrpSnpMissCV &mG); // copy constructor
+	/** \brief Copy constructor
+	 *
+	 * \param[in] BetaGrpSnpMissCV& object to be copied
+	 */
+	BetaGrpSnpMissCV(const BetaGrpSnpMissCV &mG);
+	/** \brief Assignment operator
+	 *
+	 * \param[in] BetaGrpSnpMissCV& object to be copied
+	 * \return BetaGrpSnpMissCV& target object
+	 */
 	BetaGrpSnpMissCV & operator=(const BetaGrpSnpMissCV &mG);
 	
 	void dump();
 	
 };
 
+/** \brief Single-SNP regression with partial effects and missing data
+ *
+ * Implements single-marker GWAS with missing genotype data.  Rows with missing genotypes are dropped.  Each trait is treated as a single response, and the other traits are added to the SNP as predictors.  Only the SNP test is reported.
+ * No Hotelling-type mutivariate association test is performed, so the number of columns in the results matrix is the same as the number of traits.
+ * The output is either \f$ -\log_{10}p \f$, (although this statistic is not strictly a frequentist \f$p\f$-value, it performs very similarly in simulations), or Wakefield's \cite wakefield07 approximation of \f$ -ln BF \f$ (log-Bayes factor ratio).  In the latter case, the user can set the prior variance manually.
+ * The SNP regression is performed on the point estimate of a response, as described in documentation of the update() and dump() functions.  The latter can be, say, a residual of a mixed-model type GEBV estimate done to control population structure.
+ */
 class BetaGrpPSRmiss : public BetaGrpSnpMiss {
 protected:
 	
 public:
+	/** \brief Default constructor */
 	BetaGrpPSRmiss() : BetaGrpSnpMiss() {};
+	/** \brief Constructor with no replication and \f$p\f$-values
+	 *
+	 * Initializes the object with no replication (i.e., the number of rows in the predictor is the same as in the response) and leaves the prior variance for SNP regressions at zero, thereby resulting in a dump of \f$ -\log_{10}p \f$ values.
+	 *
+	 * \param[in] string& predictor file name
+	 * \param[in] string& output file name
+	 * \param[in] size_t& number of rows in the response matrix
+	 * \param[in] size_t& number of predictors
+	 * \param[in] size_t& number of traits
+	 * \param[in] int& number of threads
+	 * \param[in] double& missing value label
+	 *
+	 */
 	BetaGrpPSRmiss(const string &predFlNam, const string &outFlNam, const size_t &Ndat, const size_t &Npred, const size_t &d, const int &Nthr, const double &absLab) : BetaGrpSnpMiss(predFlNam, outFlNam, Ndat, Npred, d, Nthr, absLab) {};
+	/** \brief Constructor with replication and \f$p\f$-values
+	 *
+	 * Initializes the object with replication, encoded with the given index, and leaves the prior variance for SNP regressions at zero, thereby resulting in a dump of \f$ -\log_{10}p \f$ values.
+	 *
+	 * \param[in] string& predictor file name
+	 * \param[in] string& output file name
+	 * \param[in] RanIndex& replicate index
+	 * \param[in] size_t& number of predictors
+	 * \param[in] size_t& number of traits
+	 * \param[in] int& number of threads
+	 * \param[in] double& missing value label
+	 *
+	 */
 	BetaGrpPSRmiss(const string &predFlNam, const string &outFlNam, RanIndex &low, const size_t &Npred, const size_t &d, const int &Nthr, const double &absLab) : BetaGrpSnpMiss(predFlNam, outFlNam, low, Npred, d, Nthr, absLab) {};
+	/** \brief Constructor with no replication and ABF
+	 *
+	 * Initializes the object with no replication (i.e., the number of rows in the predictor is the same as in the response) and sets the prior variance for SNP regressions to the given value, therefore dumping Wakefield's log of approximate Bayes factor (ABF) ratios to the output file.
+	 *
+	 * \param[in] string& predictor file name
+	 * \param[in] string& output file name
+	 * \param[in] size_t& number of rows in the response matrix
+	 * \param[in] size_t& number of predictors
+	 * \param[in] size_t& number of traits
+	 * \param[in] int& number of threads
+	 * \param[in] double& prior variance
+	 * \param[in] double& missing value label
+	 *
+	 */
 	BetaGrpPSRmiss(const string &predFlNam, const string &outFlNam, const size_t &Ndat, const size_t &Npred, const size_t &d, const int &Nthr, const double &prVar, const double &absLab) : BetaGrpSnpMiss(predFlNam, outFlNam, Ndat, Npred, d, Nthr, prVar, absLab) {};
+	/** \brief Constructor with replication and ABF
+	 *
+	 * Initializes the object with replication, encoded with the given index, and sets the prior variance for SNP regressions to the given value, therefore dumping Wakefield's log of approximate Bayes factor (ABF) ratios to the output file.
+	 *
+	 * \param[in] string& predictor file name
+	 * \param[in] string& output file name
+	 * \param[in] RanIndex& replicate index
+	 * \param[in] size_t& number of predictors
+	 * \param[in] size_t& number of traits
+	 * \param[in] int& number of threads
+	 * \param[in] double& prior variance
+	 * \param[in] double& missing value label
+	 *
+	 */
 	BetaGrpPSRmiss(const string &predFlNam, const string &outFlNam, RanIndex &low, const size_t &Npred, const size_t &d, const int &Nthr, const double &prVar, const double &absLab) : BetaGrpSnpMiss(predFlNam, outFlNam, low, Npred, d, Nthr, prVar, absLab) {};
 	
+	/** \brief Destructor */
 	~BetaGrpPSRmiss() {};
 	
-	BetaGrpPSRmiss(const BetaGrpPSRmiss &mG); // copy constructor
+	/** \brief Copy constructor
+	 *
+	 * \param[in] BetaGrpPSRmiss& object to be copied
+	 */
+	BetaGrpPSRmiss(const BetaGrpPSRmiss &mG);
+	/** \brief Assignment operator
+	 *
+	 * \param[in] BetaGrpPSRmiss& object to be copied
+	 * \return BetaGrpPSRmiss& target object
+	 */
 	BetaGrpPSRmiss & operator=(const BetaGrpPSRmiss &mG);
 	
 	void dump();
 
 };
 
+/** \brief Bayesian variable selection regression
+ *
+ * A multivariate implementation of Bayesian variable selection regression (BVSR), together with the RanIndexVS class.  The model is similar to that described in \cite guan11 , but unlike their method a pre-selection of predictors based on a first-pass single-predictor regression is made.
+ * The user has control over the number of predictors to choose, and the cut-off for correlation among predictors (which arises as linkage disequilibrium in SNP regressions).  This numebr is expressed as a multiple of genetic sample size. 
+ * Once the pre-selected group of predictors is formed, variable selection is performed within the smaller group.  Predictors discarded for correlation with picked variables are assigned the same probability of retention in the model as their corresponding picked predictors.
+ * Rao-Blackwellised values of regression coefficients are saved by the dump() function.
+ *
+ * \warning This class is experimental and has not been extensively tested
+ */
 class BetaGrpBVSR : public BetaGrpFt {
 	friend void RanIndexVS::update(const Grp &, const SigmaI &, BetaGrpBVSR *, const SigmaI &);
 protected:
-	gsl_matrix *_selB;     // matrix of selected predictors
-	gsl_matrix *_tmpXb;    // Xb matrix for the candidate dropped/added element
+	/** \brief Matrix of selected predictors
+	 *
+	 * Contains only the predictors currently in the model.
+	 */
+	gsl_matrix *_selB;
+	/** \brief \f$ \boldsymbol{\mathrm{x}}_{\cdot l}\boldsymbol{\beta}_{l \cdot}\f$ matrix for the candidate dropped/added element  */
+	gsl_matrix *_tmpXb;
 	
-	// protected functions
-	void _updateFitted();  // local version of the _updateFitted function used in all BetaGrpFt
-	void _ldToss(const gsl_vector *var, const gsl_permutation *prm, const double &rSqMax, const size_t &Nsel, const size_t &Npck, vector< vector<size_t> > &idx, vector< vector<size_t> > &rLd, gsl_matrix *Xpck);  // tossing the predictors in LD with top hits, noting their identity and topping off the selection with "unlinked" SNPs
-	double _MGkernel(const Grp &dat, const SigmaI &SigI) const;   // MV Gaussian kernel calculation for all Xbeta
+	/** \brief Update fitted values 
+	 *
+	 * \ingroup fitFun
+	 */
+	void _updateFitted();
+	/** \brief Testing candidates for correlation
+	 *
+	 * Goes through the list of "top" predictors and eliminates lower-ranked candidates correlated with them.  If any candidates are eliminated, the list of top predictors is augmented with predictors previously discarded.
+	 * The identity of the predictors eliminated for correlation is saved.  The correlation among predictors arises, for example, when estimating SNP effect in genetics (GWAS).
+	 *
+	 * \warning Tested only superficially
+	 *
+	 * \param[in] gsl_vector* \f$ \left( \boldsymbol{x}^T\boldsymbol{x} \right)^{-1} \f$
+	 * \param[in] gsl_permutation* predictor ranks
+	 * \param[in] double& \f$ r^2 \f$ cut-off
+	 * \param[in] size_t& number of predictors to pick
+	 * \param[out] vector< vector<size_t> >& index of picked predictors
+	 * \param[out] vector< vector<size_t> >& index relating dropped correlated predictors to their group-defining predictor
+	 * \param[out] gsl_matrix* matrix of picked predictor values
+	 */
+	void _ldToss(const gsl_vector *var, const gsl_permutation *prm, const double &rSqMax, const size_t &Nsel, const size_t &Npck, vector< vector<size_t> > &idx, vector< vector<size_t> > &rLd, gsl_matrix *Xpck);
+	/** \brief Gaussian kernel
+	 *
+	 * Calculates the multivariate Gaussian kernel value for all regression coefficients in the model.
+	 *
+	 * \param[in] Grp& data
+	 * \param[in] SigmaI& inverse-covariance
+	 *
+	 * \return double kernel value
+	 */
+	double _MGkernel(const Grp &dat, const SigmaI &SigI) const;
+	/** \brief Gaussian kernel dropping one predictor
+	 *
+	 * Calculates the multivariate Gaussian kernel value for all regression coefficients in the model, except for the one indicated.
+	 *
+	 * \param[in] Grp& data
+	 * \param[in] SigmaI& inverse-covariance
+	 * \param[in] size_t& index of the dropped predictor
+	 *
+	 * \return double kernel value
+	 */
 	double _MGkernel(const Grp &dat, const SigmaI &SigI, const size_t &prInd) const;  // MV Gaussian kernel, dropping predictor prInd
-	double _MGkernel(const Grp &dat, const SigmaI &SigIe, const SigmaI &SigIpr, const size_t &prInd);  // MV Gaussian kernel, adding predictor prInd with the prior covariance matrix SigIpr
+	/** \brief Gaussian kernel adding one predictor
+	 *
+	 * Calculates the multivariate Gaussian kernel value for all regression coefficients in the model, plus the indicated extra predictor with a Gaussian zero-mean prior.
+	 *
+	 * \param[in] Grp& data
+	 * \param[in] SigmaI& data inverse-covariance
+	 * \param[in] SigmaI& prior inverse-covariance
+	 * \param[in] size_t& index of the dropped predictor
+	 *
+	 * \return double kernel value
+	 */
+	double _MGkernel(const Grp &dat, const SigmaI &SigIe, const SigmaI &SigIpr, const size_t &prInd);
 public:
+	/** \brief Default constructor */
 	BetaGrpBVSR() : BetaGrpFt() {};
+	/** \brief Basic constructor
+	 *
+	 * Constructor with no missing data in predictors and no replication.  Performs the initial pre-selection of predictors.
+	 *
+	 * \param[in] Grp& data
+	 * \param[in] SigmaI& data inverse-covariance
+	 * \param[in] string& preddictor file name
+	 * \param[in] double& number of predictors to keep, in multiples of sample size
+	 * \param[in] double& \f$ r^2 \f$ cut-off for predictor correlation
+	 * \param[in] RanIndex& prior index
+	 * \param[in] string& output file name
+	 * \param[in] int& number of threads
+	 *
+	 */
 	BetaGrpBVSR(const Grp &y, const SigmaI &SigI, const string &predFlNam, const double &Nmul, const double &rSqMax, RanIndex &up, const string &outFlNam, const int &nThr);
+	/** \brief Basic constructor with replication
+	 *
+	 * Constructor with no missing data in predictors and replication.  A RanIndex index is used instead of a design matrix.  Performs the initial pre-selection of predictors.
+	 *
+	 * \param[in] Grp& data
+	 * \param[in] SigmaI& data inverse-covariance
+	 * \param[in] string& preddictor file name
+	 * \param[in] double& number of predictors to keep, in multiples of sample size
+	 * \param[in] double& \f$ r^2 \f$ cut-off for predictor correlation
+	 * \param[in] RanIndex& replicate (data) index
+	 * \param[in] RanIndex& prior index
+	 * \param[in] string& output file name
+	 * \param[in] int& number of threads
+	 *
+	 */
 	BetaGrpBVSR(const Grp &y, const SigmaI &SigI, const string &predFlNam, const double &Nmul, const double &rSqMax, RanIndex &low, RanIndex &up, const string &outFlNam, const int &nThr);
+	/** \brief Basic constructor with missing data
+	 *
+	 * Constructor with missing data in predictors and no replication. Missing data in the selected predictors are filled in using mean imputation. Performs the initial pre-selection of predictors.
+	 *
+	 * \param[in] Grp& data
+	 * \param[in] SigmaI& data inverse-covariance
+	 * \param[in] string& preddictor file name
+	 * \param[in] double& number of predictors to keep, in multiples of sample size
+	 * \param[in] double& \f$ r^2 \f$ cut-off for predictor correlation
+	 * \param[in] double& missing data label
+	 * \param[in] RanIndex& prior index
+	 * \param[in] string& output file name
+	 * \param[in] int& number of threads
+	 *
+	 */
 	BetaGrpBVSR(const Grp &y, const SigmaI &SigI, const string &predFlNam, const double &Nmul, const double &rSqMax, const double &absLab, RanIndex &up, const string &outFlNam, const int &nThr); // absLab is the token that signifies missing data
+	/** \brief Basic constructor with replication and missing data
+	 *
+	 * Constructor with missing data in predictors and replication.  Missing data in the selected predictors are filled in using mean imputation. A RanIndex index is used instead of a design matrix.  Performs the initial pre-selection of predictors.
+	 *
+	 * \param[in] Grp& data
+	 * \param[in] SigmaI& data inverse-covariance
+	 * \param[in] string& preddictor file name
+	 * \param[in] double& number of predictors to keep, in multiples of sample size
+	 * \param[in] double& \f$ r^2 \f$ cut-off for predictor correlation
+	 * \param[in] double& missing data label
+	 * \param[in] RanIndex& replicate (data) index
+	 * \param[in] RanIndex& prior index
+	 * \param[in] string& output file name
+	 * \param[in] int& number of threads
+	 *
+	 */
 	BetaGrpBVSR(const Grp &y, const SigmaI &SigI, const string &predFlNam, const double &Nmul, const double &rSqMax, const double &absLab, RanIndex &low, RanIndex &up, const string &outFlNam, const int &nThr);
 	
+	/** \brief Destructor */
 	~BetaGrpBVSR();
 	
+	/** \brief Regression value store
+	 *
+	 * Stores \f$t\f$-statistic values for each trait and pre-selected (i.e. whether or not currently in the model) regression coefficient in a variable to subsequently save to a file by dump().
+	 *
+	 * \param[in] SigmaI& data inverse-covariance
+	 */
 	void save(const SigmaI &SigI);
+	/** \brief Regression value and probability store
+	 *
+	 * Stores \f$t\f$-statistic values for each trait and pre-selected (i.e. whether or not currently in the model) regression coefficient in a variable to subsequently save to a file by dump().
+	 * Additionally, (\f$ -\log_{10}) Rao-Blackwellised probabilities that each pre-selected predictor is not in the model (PEP of RanIndexVS) is also stored.
+	 *
+	 * \param[in] Grp& data
+	 * \param[in] SigmaI& data inverse-covariance
+	 */
 	void save(const Grp &y, const SigmaI &SigI);
 	void dump();
+	/** \brief Access to the values currently in the model */
 	const gsl_matrix *dMat() const{return _selB; };
 	
 	void update(const Grp &dat, const SigmaI &SigIm, const SigmaI &SigIp);
 };
 
-/** \brief Independent blocks of traits
+/** \brief Hierarchical mean with independent blocks of traits
  *
+ * Blocks of inter-correlated traits with correlations among blocks set to exactly zero.  These models arise, for example, when traits measured in different environments are modeled together as different traits.
+ * Replication structure and the number of replicates and levels (rows in the would-be _valueMat) can be different among blocks.  The only limitation is that the traits belonging to the same block have to be in adjacent columns.
  */
 class MuBlk : public MuGrp {
 protected:
-	vector< size_t > _blkStart;                  // vector of indexes into beginnings of each block
-	vector< vector< vector<size_t> > > _blkLow;  // lowLevel indexes, separate for each block, not necessarily the same number of levels
-	gsl_matrix *_expandedVM;                     // the _valuMat expanded according to _blkLow
-	vector<size_t> _shortLevels;                 // for cases where the number of levels of low differ among blocks, store here index of the first element past the available one
+	/** \brief Block start indexes
+	 *
+	 * Vector of indexes that indicate the column that starts each block.
+	 */
+	vector< size_t > _blkStart;
+	/** \brief Vector of low level indexes
+	 *
+	 * Indexes to data, similar to _lowLevel.  These are separate for each block, not necessarily the same number of levels or replicates in each.
+	 */
+	vector< vector< vector<size_t> > > _blkLow;
+	/** \brief Expanded _valueMat
+	 *
+	 * Expanded value matrix, with the rows repeated according to _blkLow, separately for each block.  To be used for arithmetic operators.
+	 */
+	gsl_matrix *_expandedVM;
+	/** \brief Blocks with few levels
+	 *
+	 * For cases where the number of levels of _blkLow differ among blocks, this vector stores the index of the first element past the available one.  
+	 * For bloocks that have the same number of levels as the largest among blocks, the value is zero.  Each object has to have at least one zero in this vector, which is for the block with the largest number of levels.
+	 */
+	vector<size_t> _shortLevels;
 	
+	/** \brief Update the _expandedVM matrix */
 	void _updateExp();
+	
+	/** \brief Fill in blocks with few levels
+	 *
+	 * For blocks with the number of levels smaller than the maximum, fill in the value matrix with the overall mean among levels.  This insures that the overall mean is equal to what it would be if only the available rows were used.
+	 */
 	void _fillIn();
+	/** \brief Fill in blocks with few levels and a prior grouping
+	 *
+	 * The same as _fillIn(), but the means are calculated according to the grouping in the prior (upper) level in the hierarchy.
+	 */
 	void _fillInUp();
 	
 public:
+	/** \brief Default constructor */
 	MuBlk() : MuGrp() {};
-	// Nval is the number of rows in _valueMat; if there are diffent numbers of levels of the low factor in each block, it's the maximum number
+	/** \brief Basic constructor
+	 *
+	 * The provided number of values is the number of rows in the value matrix, i.e. the maximum number of levels of the lower level (data) index.
+	 * The file that has the block start indexes should be a white-space delimited text file.  The file that has the lower level index information should have a matrix of _int_ with the number of rows the same as the number of rows in the data, and the number of columns equal to the number of blocks.
+	 *
+	 * \param[in] Grp& data for initialization
+	 * \param[in] string& name of the file with the low-level index
+	 * \param[in] size_t& maximum number of levels
+	 * \param[in] RanIndex& prior index
+	 * \param[in] string& name of the file with the block indexes
+	 */
 	MuBlk(const Grp &dat, const string &lowIndFlName, const size_t &Nval, RanIndex &up, const string &blkIndFileNam);
+	/** \brief Constructor with output file name
+	 *
+	 * The provided number of values is the number of rows in the value matrix, i.e. the maximum number of levels of the lower level (data) index.
+	 * The file that has the block start indexes should be a white-space delimited text file.  The file that has the lower level index information should have a matrix of _int_ with the number of rows the same as the number of rows in the data, and the number of columns equal to the number of blocks.
+	 *
+	 * \param[in] Grp& data for initialization
+	 * \param[in] string& name of the file with the low-level index
+	 * \param[in] size_t& maximum number of levels
+	 * \param[in] RanIndex& prior index
+	 * \param[in] string& output file name
+	 * \param[in] string& name of the file with the block indexes
+	 */
 	MuBlk(const Grp &dat, const string &lowIndFlName, const size_t &Nval, RanIndex &up, const string &outFlNam, const string &blkIndFileNam);
 	
+	/** \brief Destructor */
 	~MuBlk() {gsl_matrix_free(_expandedVM); };
 	
+	/** \brief Access to the expanded value matrix */
 	const gsl_matrix *fMat() const{ return _expandedVM; };
 	
 	// improper prior
@@ -4674,27 +5379,149 @@ public:
 };
 
 
+/** \brief Regression with independent blocks of traits
+ *
+ * Blocks of inter-correlated traits with correlations among blocks set to exactly zero.  These models arise, for example, when traits measured in different environments are modeled together as different traits.
+ * The traits belonging to the same block have to be in adjacent columns.  The number of predictors per block must be the same (future devolpment will drop this requirement), and the predictor columns corresponding to the same trait block have to be adjacent in the _Xmat matrix.
+ */
 class BetaBlk : public BetaGrpFt {
 
 protected:
-	vector< size_t > _blkStart;        // vector of indexes into beginnings of each block
-	vector< gsl_matrix_view > _eachX;  // matrix-view submatrices of the predictors
-	vector< gsl_matrix_view > _eachB;  // matrix-view submatrices of coefficients
+	/** \brief Block start indexes
+	 *
+	 * Vector of indexes that indicate the column that starts each block.
+	 */
+	vector< size_t > _blkStart;
+	/** \brief Predictor submatrices
+	 *
+	 * A vector of GSL matrix views of the submatrices of the overall predictor matrix that correspond to each trait block.
+	 */
+	vector< gsl_matrix_view > _eachX;
+	/** \brief Regression coefficient submatrices
+	 *
+	 * A vector of GSL matrix views of the overall value matrix.
+	 */
+	vector< gsl_matrix_view > _eachB;
 	
+	/** \brief Update fitted values
+	 *
+	 * \ingroup fitFun
+	 */
 	void _updateFitted();
 public:
+	/** \brief Default constructor */
 	BetaBlk() : BetaGrpFt() {};
-	// total Ncol of the predictor matrix is Npred*Nblocks
+	/** \brief Basic constructor
+	 *
+	 * The total number of predictors (columns in _Xmat) is the provided number of predictors times the number of blocks.
+	 * The file that has the block start indexes should be a white-space delimited text file.  The file that has the lower level index information should have a matrix of _int_ with the number of rows the same as the number of rows in the data, and the number of columns equal to the number of blocks.
+	 *
+	 * \param[in] Grp& data for initialization
+	 * \param[in] string& name of the predictor file
+	 * \param[in] size_t& number of predictors per block
+	 * \param[in] string& name of the file with the block indexes
+	 * \param[in] int& number of threads
+	 */
 	BetaBlk(const Grp &dat, const string &predFlName, const size_t &Npred, const string &blkIndFileNam, const int &nThr);
+	/** \brief Constructor with output file name
+	 *
+	 * The total number of predictors (columns in _Xmat) is the provided number of predictors times the number of blocks.
+	 * The file that has the block start indexes should be a white-space delimited text file.  The file that has the lower level index information should have a matrix of _int_ with the number of rows the same as the number of rows in the data, and the number of columns equal to the number of blocks.
+	 *
+	 * \param[in] Grp& data for initialization
+	 * \param[in] string& name of the predictor file
+	 * \param[in] size_t& number of predictors per block
+	 * \param[in] string& output file name
+	 * \param[in] string& name of the file with the block indexes
+	 * \param[in] int& number of threads
+	 */
 	BetaBlk(const Grp &dat, const string &predFlName, const size_t &Npred, const string &outFlNam, const string &blkIndFileNam, const int &nThr);
+	/** \brief Constructor with a prior index
+	 *
+	 * The total number of predictors (columns in _Xmat) is the provided number of predictors times the number of blocks.
+	 * The file that has the block start indexes should be a white-space delimited text file.  The file that has the lower level index information should have a matrix of _int_ with the number of rows the same as the number of rows in the data, and the number of columns equal to the number of blocks.
+	 *
+	 * \param[in] Grp& data for initialization
+	 * \param[in] string& name of the predictor file
+	 * \param[in] size_t& number of predictors per block
+	 * \param[in] RanIndex& prior (upper-level) index
+	 * \param[in] string& name of the file with the block indexes
+	 * \param[in] int& number of threads
+	 */
 	BetaBlk(const Grp &dat, const string &predFlName, const size_t &Npred, RanIndex &up, const string &blkIndFileNam, const int &nThr);
+	/** \brief Constructor with a prior index and output file
+	 *
+	 * The total number of predictors (columns in _Xmat) is the provided number of predictors times the number of blocks.
+	 * The file that has the block start indexes should be a white-space delimited text file.  The file that has the lower level index information should have a matrix of _int_ with the number of rows the same as the number of rows in the data, and the number of columns equal to the number of blocks.
+	 *
+	 * \param[in] Grp& data for initialization
+	 * \param[in] string& name of the predictor file
+	 * \param[in] size_t& number of predictors per block
+	 * \param[in] RanIndex& prior (upper-level) index
+	 * \param[in] string& output file name
+	 * \param[in] string& name of the file with the block indexes
+	 * \param[in] int& number of threads
+	 */
 	BetaBlk(const Grp &dat, const string &predFlName, const size_t &Npred, RanIndex &up, const string &outFlNam, const string &blkIndFileNam, const int &nThr);
 	
+	/** \brief Constructor with missing predictor data
+	 *
+	 * The total number of predictors (columns in _Xmat) is the provided number of predictors times the number of blocks.
+	 * The file that has the block start indexes should be a white-space delimited text file.  The file that has the lower level index information should have a matrix of _int_ with the number of rows the same as the number of rows in the data, and the number of columns equal to the number of blocks.
+	 *
+	 * \param[in] Grp& data for initialization
+	 * \param[in] string& name of the predictor file
+	 * \param[in] size_t& number of predictors per block
+	 * \param[in] double& missing value label
+	 * \param[in] string& name of the file with the block indexes
+	 * \param[in] int& number of threads
+	 */
 	BetaBlk(const Grp &dat, const string &predFlName, const size_t &Npred, const double &absLab, const string &blkIndFileNam, const int &nThr);
+	/** \brief Constructor with missing predictor values and output file name
+	 *
+	 * The total number of predictors (columns in _Xmat) is the provided number of predictors times the number of blocks.
+	 * The file that has the block start indexes should be a white-space delimited text file.  The file that has the lower level index information should have a matrix of _int_ with the number of rows the same as the number of rows in the data, and the number of columns equal to the number of blocks.
+	 *
+	 * \param[in] Grp& data for initialization
+	 * \param[in] string& name of the predictor file
+	 * \param[in] size_t& number of predictors per block
+	 * \param[in] double& missing value label
+	 * \param[in] string& output file name
+	 * \param[in] string& name of the file with the block indexes
+	 * \param[in] int& number of threads
+	 */
 	BetaBlk(const Grp &dat, const string &predFlName, const size_t &Npred, const double &absLab, const string &outFlNam, const string &blkIndFileNam, const int &nThr);
+	/** \brief Constructor with a prior index and missing predictor data
+	 *
+	 * The total number of predictors (columns in _Xmat) is the provided number of predictors times the number of blocks.
+	 * The file that has the block start indexes should be a white-space delimited text file.  The file that has the lower level index information should have a matrix of _int_ with the number of rows the same as the number of rows in the data, and the number of columns equal to the number of blocks.
+	 *
+	 * \param[in] Grp& data for initialization
+	 * \param[in] string& name of the predictor file
+	 * \param[in] size_t& number of predictors per block
+	 * \param[in] double& missing data label
+	 * \param[in] RanIndex& prior (upper-level) index
+	 * \param[in] string& name of the file with the block indexes
+	 * \param[in] int& number of threads
+	 */
 	BetaBlk(const Grp &dat, const string &predFlName, const size_t &Npred, const double &absLab, RanIndex &up, const string &blkIndFileNam, const int &nThr);
+	/** \brief Constructor with a prior index, missing predictor data, and output file
+	 *
+	 * The total number of predictors (columns in _Xmat) is the provided number of predictors times the number of blocks.
+	 * The file that has the block start indexes should be a white-space delimited text file.  The file that has the lower level index information should have a matrix of _int_ with the number of rows the same as the number of rows in the data, and the number of columns equal to the number of blocks.
+	 *
+	 * \param[in] Grp& data for initialization
+	 * \param[in] string& name of the predictor file
+	 * \param[in] size_t& number of predictors per block
+	 * \param[in] double& missing data label
+	 * \param[in] RanIndex& prior (upper-level) index
+	 * \param[in] string& output file name
+	 * \param[in] string& name of the file with the block indexes
+	 * \param[in] int& number of threads
+	 */
 	BetaBlk(const Grp &dat, const string &predFlName, const size_t &Npred, const double &absLab, RanIndex &up, const string &outFlNam, const string &blkIndFileNam, const int &nThr);
 	
+	/** \brief Destructor */
 	~BetaBlk() {};
 	
 	// updates handled by BetaGrpFt
@@ -4703,105 +5530,391 @@ public:
 // end of the locGrp group
 /** @} */
 
+/** \defgroup sigInv Inverse covariance matrices
+ *
+ * Group of classes that implement inverse-covariance matrix updating.  We are dealing with inverse-covarince (a.k.a. concentration) matrices because most algorithms in hierarchical models use these rather than covariance matrices. 
+ * Thus, we save on matrix inversion operations by keeping track only of inverse-covariances.  The save functions, however, output covariance matrices.  All the internal algorithms for all the classes use the lower triangles of the underlying symmetric matrix.  On saving, the matrices are symmetric and it does not matter for downstream applications.
+ * However, if a user wants to manipulate or interact with these in a sampler, addressing the lower triangle ensures stability of the algorithm.
+ * @{
+ */
+/** \brief Basic inverse-covariance
+ *
+ * Standard model for inverse-covariance matrices with a diagonal Wishart prior (i.e., pre-supposing no correlations among traits).  The values on the diagonal of the prior matrix and the prior degrees of freedom can be varied to reflect the vagueness of prior information.
+ * These conjugate priors allow for Gibbs sampling even when the number of traits exceeds the number of data points.  However, in the latter case the estimation of correlations will likely be inaccurate.  Algorithms involving direct penalties on correlations should perform better and are inder development.
+ */
 class SigmaI {
 protected:
+	/** \brief Inverse-covariance matrix 
+	 *
+	 * Square symmetric matrix.
+	 */
 	gsl_matrix *_mat;
+	/** \brief Dimension of the matrix 
+	 *
+	 * The number of rows and columns of _mat.
+	 */
 	size_t _d;
-	double _srDet;      // square root of the determinant; only calculate if necessary (e.g., for MV normal density calculation)
+	/** \brief Square root of the determinant
+	 *
+	 * Square root of the determinant of the corrent value of the inverse-covariance matrix.  Is calculated only if necessary, otherwise is set to -1.0 to provide an easy way to find out if it had been calculated at least once.
+	 */
+	double _srDet;
 	
-	gsl_matrix *_LamSc; // prior covariance matrix scaled by prior df
-	double _n0;         // prior degrees of freedom
+	/** \brief Prior inverse-covariance
+	 *
+	 * Diagonal matrix with zeros on the off-diagonal and inverse variance scaled by degrees of freedom on the diagonal.
+	 */
+	gsl_matrix *_LamSc;
+	/** \brief Prior degrees of freedom */
+	double _n0;
 	
-	string _outFlNam;   // file to save output
+	/** \brief Output file name */
+	string _outFlNam;
 	
+	/** \brief Pseudo-random number generator
+	 *
+	 * Initialized the same way as Grp type PNGs, with a sum of time and RTDSC.
+	 */
 	gsl_rng *_r;
 	
 public:
-	// overloaded constructors
-	SigmaI(); // necessary default constructor
-	SigmaI(const size_t &d, const double &invVar);  // constructor to give a vague high-variance prior to a mean
-	SigmaI(const size_t &d, const double &invVar, const double &df);  // constructor to give a diagonal prior with a set df
+	/** \brief Default constructor 
+	 *
+	 * Creates a \f$ 2\times2 \f$ identity matrix.
+	 */
+	SigmaI();
+	/** \brief Deterministic diagonal matrix constructor
+	 *
+	 * Creates a diagonal matrix with the provided inverse-variance and the degrees of freedom parameter equal to one.  Principally used to create vague large-variance Gaussian priors for location parameters.
+	 *
+	 * \param[in] size_t& number of rows and columns
+	 * \param[in] double& inverse variance
+	 */
+	SigmaI(const size_t &d, const double &invVar);
+	/** \brief Deterministic diagonal matrix constructor
+	 *
+	 * Creates a diagonal matrix with the provided inverse-variance and degrees of freedom parameter.
+	 *
+	 * \param[in] size_t& number of rows and columns
+	 * \param[in] double& inverse variance
+	 * \param[in] double& degrees of freedom
+	 */
+	SigmaI(const size_t &d, const double &invVar, const double &df);
+	/** \brief Deterministic diagonal matrix constructor with output file name
+	 *
+	 * Creates a diagonal matrix with the provided inverse-variance and degrees of freedom parameter.
+	 *
+	 * \param[in] size_t& number of rows and columns
+	 * \param[in] double& inverse variance
+	 * \param[in] double& degrees of freedom
+	 * \param[in] string& output file name
+	 */
 	SigmaI(const size_t &d, const double &invVar, const double &df, const string &outFlNam);
-	SigmaI(const gsl_matrix *mat);                  // deterministic constructor (use for the SNP regression, for example)
-	// legacy C-based constructors
-	SigmaI(const gsl_matrix *S, const size_t d, const size_t &df, const gsl_matrix *LamPr, const double &nu0);
-	SigmaI(const gsl_matrix *S, const size_t d, const size_t &df, const double &diagPr, const double &nu0);
+	/** \brief Deterministic matrix constructor
+	 *
+	 * Used to initialize the inverse-covariance with a given matrix deterministically, i.e. the initial values are not sampled. Only the lower-triangular part of the matrix is used, so if it is not symmetric no error is produced.
+	 *
+	 * \param[in] gsl_matrix* value matrix
+	 */
+	SigmaI(const gsl_matrix *mat);
 	
-	// C++ abstract class-based constructor
+	/** \brief Constructor with a matrix prior
+	 *
+	 * Initializes the matrix with a Wishart sample with the provided matrix as data and another matrix as a prior.  
+	 *
+	 * \param[in] gsl_matrix* data matrix
+	 * \param[in] size_t& dimension parameter
+	 * \param[in] size_t& Wishart sample degrees of freedom
+	 * \param[in] gsl_matrix* prior matrix
+	 * \param[in] double& prior degrees of freedom
+	 */
+	SigmaI(const gsl_matrix *S, const size_t &d, const size_t &df, const gsl_matrix *LamPr, const double &nu0);
+	/** \brief Constructor with a diagonal prior
+	 *
+	 * Initializes the matrix with a Wishart sample with the provided matrix as data and a diagonal prior with all elements set to the provided value.
+	 *
+	 * \param[in] gsl_matrix* data matrix
+	 * \param[in] size_t& dimension parameter
+	 * \param[in] size_t& Wishart sample degrees of freedom
+	 * \param[in] double* prior inverse-variance
+	 * \param[in] double& prior degrees of freedom
+	 */
+	SigmaI(const gsl_matrix *S, const size_t &d, const size_t &df, const double &diagPr, const double &nu0);
+	
+	/** \brief Location data-based constructor
+	 *
+	 * Initializes the object with an inverse-covariance of the provided location data.  The dimension of the object os equal to the number of columns in the data.
+	 *
+	 * \param[in] Grp& data
+	 * \param[in] double& prior inverse-variance
+	 * \param[in] double& prior degrees of freedom
+	 */
 	SigmaI(const Grp &dat, const double &prDiag, const double &nu0);
+	/** \brief Location data-based constructor with output file name
+	 *
+	 * Initializes the object with an inverse-covariance of the provided location data.  The dimension of the object os equal to the number of columns in the data.
+	 *
+	 * \param[in] Grp& data
+	 * \param[in] string& output file name
+	 * \param[in] double& prior inverse-variance
+	 * \param[in] double& prior degrees of freedom
+	 */
 	SigmaI(const Grp &dat, const string &outFlNam, const double &prDiag, const double &nu0);
 	
-	SigmaI(const SigmaI &); // copy constructor
+	/** \brief Copy constructor
+	 *
+	 * \param[in] SigmaI& oject to be copied
+	 */
+	SigmaI(const SigmaI &);
+	/** \brief Assignment operator
+	 *
+	 * \param[in] SigmaI& object to be copied
+	 * \return SigmaI& target object
+	 */
 	SigmaI & operator=(const SigmaI &);
 	
-	virtual ~SigmaI(); // destructor
+	/** \brief Destructor */
+	virtual ~SigmaI();
 	
-	// C++ abstract class-based updates
-	// Gaussian
+	/** \brief Basic Gaussian update
+	 *
+	 * \ingroup updateFun
+	 *
+	 * The data are assumed already centered, so the update is based on the simple cross-product of the data.
+	 *
+	 * \param[in] Grp& data
+	 */
 	virtual void update(const Grp &dat);
+	/** \brief Gaussian update with a mean
+	 *
+	 * \ingroup updateFun
+	 *
+	 * The mean value is subtracted from the data according to the up-pointing RanIndex in the data object.
+	 *
+	 * \param[in] Grp& data
+	 * \param[in] Grp& mean
+	 */
 	virtual void update(const Grp &dat, const Grp &mu);
-	// Student-t
+	/** \brief Basic Student-\f$t\f$ update
+	 *
+	 * \ingroup updateFun
+	 *
+	 * The data are assumed already centered, so the update is based on the simple cross-product of the data and the current value of the scale parameter.
+	 *
+	 * \param[in] Grp& data
+	 * \param[in] Qgrp& scale parameter
+	 */
 	virtual void update(const Grp &dat, const Qgrp &q);
+	/** \brief Student-\f$t\f$ update with a mean
+	 *
+	 * \ingroup updateFun
+	 *
+	 * The mean value is subtracted from the data according to the up-pointing RanIndex in the data object.
+	 *
+	 * \param[in] Grp& data
+	 * \param[in] Grp& mean
+	 * \param[in] Qgrp& scale parameter
+	 */
 	virtual void update(const Grp &dat, const Grp &mu, const Qgrp &q);
 	
-	// save function for the stored file name
+	/** \brief Save to a stored file name
+	 *
+	 * \param[in] char* saving mode, appending by default
+	 */
 	virtual void save(const char *how = "a");
-	// save function, taking file name, appending by default
+	/** \brief Save to a given file name
+	 *
+	 * \param[in] string& output file name
+	 * \param[in] char* saving mode, appending by default
+	 */
 	virtual void save(const string &fileNam, const char *how = "a");
-	// PEX save
+	
+	/** \brief Save adjusted matrix
+	 *
+	 * Saving the adjusted matrix for the multiplicative parameter expansion models.
+	 *
+	 * \param[in] string& output file name
+	 * \param[in] Apex& redundant parameter matrix
+	 * \param[in] char* saving mode, appending by default
+	 */
 	void save(const string &fileNam, const Apex &A, const char *how = "a");
-	// save function, taking file stream name
+	/** \brief Save to file stream
+	 *
+	 * \param[in] FILE* file stream name
+	 */
 	void save(FILE *fileStr) {gsl_matrix_fwrite(fileStr, _mat); };
 	
+	/** \brief Access to the inverse-covariance matrix
+	 *
+	 * \return gsl_matrix* pointer to the inverse-covariance matrix
+	 */
 	const gsl_matrix *getMat() const{return _mat; };
 	
-	//dealing with the determinant
-	
+	/** \brief Update square-root of the determinant */
 	void   srDetUpdate();
+	/** \brief Access the square-root of the determinant
+	 *
+	 * \return double square root of the determinant of the inverse-covariance
+	 */
 	double getSrDet() const {return _srDet; };
 	
 };
 
-class SigmaIblk : public SigmaI {  // block-diagonal inverse-covariance matrix; tests show that it pays to do block-wise inversions
+/** \brief Block-diagonal inverse-covariance
+ *
+ * Implements block-diagonal inverse-covariance, to go with MuBlk and BetaBlk classes. All covariances among blocks are set to exactly zero and are never modified. All sampling is done block by block.
+ */
+class SigmaIblk : public SigmaI {
 protected:
-	vector< size_t > _blkStart;          // vector of indexes into beginnings of each block
-	vector< gsl_matrix_view > _eachBlk;  // matrix-view submatrices of the whole thing
+	/** \brief Block start indexes
+	 *
+	 * Vector of indexes that indicate the column that starts each block.
+	 */
+	vector< size_t > _blkStart;
+	/** \brief Inverse-covariance matrix submatrices
+	 *
+	 * Vector of submatrices of the current sample of the inverse-covariance matrix (_mat).  Is the same length as the number of blocks.
+	 */
+	vector< gsl_matrix_view > _eachBlk;
+	/** \brief Prior matrix submatrices
+	 *
+	 * Vector of submatrices of the prior inverse-covariance matrix (_LamSc).  Is the same length as the number of blocks.
+	 */
 	vector< gsl_matrix_view > _eachLS;   // matrix-view submatrices of the prior
 	
 public:
+	/** \brief Default constructor */
 	SigmaIblk();
+	/** \brief Deterministic diagonal matrix constructor
+	 *
+	 * Creates a diagonal matrix with the provided inverse-variance and degrees of freedom parameter.
+	 *
+	 * \param[in] size_t& number of rows and columns
+	 * \param[in] double& inverse variance
+	 * \param[in] double& degrees of freedom
+	 * \param[in] string& name of the file storing block indexes
+	 */
 	SigmaIblk(const size_t &d, const double &invVar, const double &df, const string &blkIndFileNam);
+	/** \brief Deterministic diagonal matrix constructor with output file
+	 *
+	 * Creates a diagonal matrix with the provided inverse-variance and degrees of freedom parameter.
+	 *
+	 * \param[in] size_t& number of rows and columns
+	 * \param[in] double& inverse variance
+	 * \param[in] double& degrees of freedom
+	 * \param[in] string& name of the file storing block indexes
+	 * \param[in] string& output file name
+	 */
 	SigmaIblk(const size_t &d, const double &invVar, const double &df, const string &blkIndFileNam, const string &outFlNam);
+	/** \brief Location data-based constructor
+	 *
+	 * Initializes the object with an inverse-covariance of the provided location data.  The dimension of the object os equal to the number of columns in the data.
+	 *
+	 * \param[in] Grp& data
+	 * \param[in] string& name of the file storing block indexes
+	 * \param[in] double& prior inverse-variance
+	 * \param[in] double& prior degrees of freedom
+	 */
 	SigmaIblk(const Grp &dat, const string &blkIndFileNam, const double &prDiag, const double &nu0);
+	/** \brief Location data-based constructor with output file
+	 *
+	 * Initializes the object with an inverse-covariance of the provided location data.  The dimension of the object os equal to the number of columns in the data.
+	 *
+	 * \param[in] Grp& data
+	 * \param[in] string& name of the file storing block indexes
+	 * \param[in] string& output file name
+	 * \param[in] double& prior inverse-variance
+	 * \param[in] double& prior degrees of freedom
+	 */
 	SigmaIblk(const Grp &dat, const string &blkIndFileNam, const string &outFlNam, const double &prDiag, const double &nu0);
-
+	
+	/** \brief Destructor */
 	~SigmaIblk() {};
 	
-	// Gaussian
+	// Gaussian only
 	void update(const Grp &dat);
 	void update(const Grp &dat, const Grp &mu);
 	
 };
 
-class SigmaIpex : public SigmaI {  // class for van Dyk and Meng's PEX for MV Student-t
+/** \brief PEX inverse-covariance
+ *
+ * Implementation of the van Dyk and Meng's \cite dyk01 parameter expansion scheme from multivariate Student-\f$t\f$ sampling.  Note that it only works when all the scale values in Qgrp are sampled.  So, for example, when we have missing data with a Student-\f$t\f$ model for the rest (see Qgrp documentation for details), this class should not be used, it will cause divergence and crashing.
+ * 
+ * \note Not to be confused with location parameter PEX such as MuGrpPEX
+ */
+class SigmaIpex : public SigmaI {
+	
 protected:
-	double _alpha;  // the PEX parameter
+	/** \brief The PEX \f$ \alpha \f$ parameter */
+	double _alpha;
 	
 public:
+	/** \brief Default constructor */
 	SigmaIpex() : _alpha(1.0), SigmaI() {};
+	/** \brief Deterministic diagonal matrix constructor
+	 *
+	 * Creates a diagonal matrix with the provided inverse-variance and degrees of freedom parameter.
+	 *
+	 * \param[in] size_t& number of rows and columns
+	 * \param[in] double& inverse variance
+	 * \param[in] double& degrees of freedom
+	 */
 	SigmaIpex(const size_t &d, const double &invVar, const double &df) : _alpha(1.0), SigmaI(d, invVar, df) {};
+	/** \brief Deterministic diagonal matrix constructor with output file name
+	 *
+	 * Creates a diagonal matrix with the provided inverse-variance and degrees of freedom parameter.
+	 *
+	 * \param[in] size_t& number of rows and columns
+	 * \param[in] double& inverse variance
+	 * \param[in] double& degrees of freedom
+	 * \param[in] string& output file name
+	 */
 	SigmaIpex(const size_t &d, const double &invVar, const double &df, const string &outFlNam) : _alpha(1.0), SigmaI(d, invVar, df, outFlNam) {};
+	/** \brief Location data-based constructor
+	 *
+	 * Initializes the object with an inverse-covariance of the provided location data.  The dimension of the object os equal to the number of columns in the data.
+	 *
+	 * \param[in] Grp& data
+	 * \param[in] double& prior inverse-variance
+	 * \param[in] double& prior degrees of freedom
+	 */
 	SigmaIpex(const Grp &dat, const double &prDiag, const double &nu0) : _alpha(1.0), SigmaI(dat, prDiag, nu0) {};
+	/** \brief Location data-based constructor with output file name
+	 *
+	 * Initializes the object with an inverse-covariance of the provided location data.  The dimension of the object os equal to the number of columns in the data.
+	 *
+	 * \param[in] Grp& data
+	 * \param[in] string& output file name
+	 * \param[in] double& prior inverse-variance
+	 * \param[in] double& prior degrees of freedom
+	 */
 	SigmaIpex(const Grp &dat, const string &outFlNam, const double &prDiag, const double &nu0) : _alpha(1.0), SigmaI(dat, outFlNam, prDiag, nu0) {};
 	
+	/** \brief Destructor */
 	~SigmaIpex() {};
+	
+	/** \brief Save to a stored file name
+	 *
+	 * Saves the "adjusted" value, i.e. scaled by the multiplicative parameter.
+	 *
+	 * \param[in] char* saving mode, appending by default
+	 */
+	void save(const char *how = "a");
+	/** \brief Save to a given file name
+	 *
+	 * Saves the "adjusted" value, i.e. scaled by the multiplicative parameter.
+	 *
+	 * \param[in] string& output file name
+	 * \param[in] char* saving mode, appending by default
+	 */
+	void save(const string &fileNam, const char *how = "a");
 	
 	void update(const Grp &dat, const Qgrp &q);
 	void update(const Grp &dat, const Grp &mu, const Qgrp &q);
-	
-	void save(const char *how = "a");
-	void save(const string &fileNam, const char *how = "a");
 };
+// end of the sigInv group
+/** @} */
 
 class StTq {	// the weigting parameter for Student-t sampling
 private:

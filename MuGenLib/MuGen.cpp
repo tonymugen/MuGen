@@ -11187,7 +11187,7 @@ BetaGrpBVSR::BetaGrpBVSR(const Grp &y, const SigmaI &SigI, const string &predFlN
 }
 
 /*
-	Destructor
+ *	Destructor
  */
 
 BetaGrpBVSR::~BetaGrpBVSR(){
@@ -11511,6 +11511,7 @@ MuBlk::MuBlk(const Grp &dat, const string &lowIndFlName, const size_t &Nval, Ran
 	
 	int minVal = gsl_vector_int_min(blkInd);
 	if (minVal == 1) {
+		cerr << "WARNING: block index for MuBlk seems to be base-1. Making it base-0, but check for errors." << endl;
 		gsl_vector_int_add_constant(blkInd, -1); // if the saved array is base-1 (as in R)
 	}
 	else if (minVal != 0) {
@@ -11549,6 +11550,7 @@ MuBlk::MuBlk(const Grp &dat, const string &lowIndFlName, const size_t &Nval, Ran
 	
 	minVal = gsl_matrix_int_min(tmpLow);
 	if (minVal == 1) {
+		cerr << "WARNING: block index for MuBlk seems to be base-1. Making it base-0, but check for errors." << endl;
 		gsl_matrix_int_add_constant(tmpLow, -1); // if the saved array is base-1 (as in R)
 	}
 	else if (minVal != 0) {
@@ -11630,6 +11632,7 @@ MuBlk::MuBlk(const Grp &dat, const string &lowIndFlName, const size_t &Nval, Ran
 	
 	int minVal = gsl_vector_int_min(blkInd);
 	if (minVal == 1) {
+		cerr << "WARNING: block index for MuBlk seems to be base-1. Making it base-0, but check for errors." << endl;
 		gsl_vector_int_add_constant(blkInd, -1); // if the saved array is base-1 (as in R)
 	}
 	else if (minVal != 0) {
@@ -11668,6 +11671,7 @@ MuBlk::MuBlk(const Grp &dat, const string &lowIndFlName, const size_t &Nval, Ran
 	
 	minVal = gsl_matrix_int_min(tmpLow);
 	if (minVal == 1) {
+		cerr << "WARNING: block index for MuBlk seems to be base-1. Making it base-0, but check for errors." << endl;
 		gsl_matrix_int_add_constant(tmpLow, -1); // if the saved array is base-1 (as in R)
 	}
 	else if (minVal != 0) {
@@ -11896,6 +11900,7 @@ BetaBlk::BetaBlk(const Grp &dat, const string &predFlName, const size_t &Npred, 
 	
 	int minVal = gsl_vector_int_min(blkInd);
 	if (minVal == 1) {
+		cerr << "WARNING: block index for BetaBlk seems to be base-1. Making it base-0, but check for errors." << endl;
 		gsl_vector_int_add_constant(blkInd, -1); // if the saved array is base-1 (as in R)
 	}
 	else if (minVal != 0) {
@@ -12004,6 +12009,7 @@ BetaBlk::BetaBlk(const Grp &dat, const string &predFlName, const size_t &Npred, 
 	
 	int minVal = gsl_vector_int_min(blkInd);
 	if (minVal == 1) {
+		cerr << "WARNING: block index for BetaBlk seems to be base-1. Making it base-0, but check for errors." << endl;
 		gsl_vector_int_add_constant(blkInd, -1); // if the saved array is base-1 (as in R)
 	}
 	else if (minVal != 0) {
@@ -12113,6 +12119,7 @@ BetaBlk::BetaBlk(const Grp &dat, const string &predFlName, const size_t &Npred, 
 	
 	int minVal = gsl_vector_int_min(blkInd);
 	if (minVal == 1) {
+		cerr << "WARNING: block index for BetaBlk seems to be base-1. Making it base-0, but check for errors." << endl;
 		gsl_vector_int_add_constant(blkInd, -1); // if the saved array is base-1 (as in R)
 	}
 	else if (minVal != 0) {
@@ -12221,6 +12228,7 @@ BetaBlk::BetaBlk(const Grp &dat, const string &predFlName, const size_t &Npred, 
 	
 	int minVal = gsl_vector_int_min(blkInd);
 	if (minVal == 1) {
+		cerr << "WARNING: block index for BetaBlk seems to be base-1. Making it base-0, but check for errors." << endl;
 		gsl_vector_int_add_constant(blkInd, -1); // if the saved array is base-1 (as in R)
 	}
 	else if (minVal != 0) {
@@ -12332,6 +12340,7 @@ BetaBlk::BetaBlk(const Grp &dat, const string &predFlName, const size_t &Npred, 
 	
 	int minVal = gsl_vector_int_min(blkInd);
 	if (minVal == 1) {
+		cerr << "WARNING: block index for BetaBlk seems to be base-1. Making it base-0, but check for errors." << endl;
 		gsl_vector_int_add_constant(blkInd, -1); // if the saved array is base-1 (as in R)
 	}
 	else if (minVal != 0) {
@@ -12439,6 +12448,7 @@ BetaBlk::BetaBlk(const Grp &dat, const string &predFlName, const size_t &Npred, 
 	
 	int minVal = gsl_vector_int_min(blkInd);
 	if (minVal == 1) {
+		cerr << "WARNING: block index for BetaBlk seems to be base-1. Making it base-0, but check for errors." << endl;
 		gsl_vector_int_add_constant(blkInd, -1); // if the saved array is base-1 (as in R)
 	}
 	else if (minVal != 0) {
@@ -12548,6 +12558,7 @@ BetaBlk::BetaBlk(const Grp &dat, const string &predFlName, const size_t &Npred, 
 	
 	int minVal = gsl_vector_int_min(blkInd);
 	if (minVal == 1) {
+		cerr << "WARNING: block index for BetaBlk seems to be base-1. Making it base-0, but check for errors." << endl;
 		gsl_vector_int_add_constant(blkInd, -1); // if the saved array is base-1 (as in R)
 	}
 	else if (minVal != 0) {
@@ -12656,6 +12667,7 @@ BetaBlk::BetaBlk(const Grp &dat, const string &predFlName, const size_t &Npred, 
 	
 	int minVal = gsl_vector_int_min(blkInd);
 	if (minVal == 1) {
+		cerr << "WARNING: block index for BetaBlk seems to be base-1. Making it base-0, but check for errors." << endl;
 		gsl_vector_int_add_constant(blkInd, -1); // if the saved array is base-1 (as in R)
 	}
 	else if (minVal != 0) {
@@ -12789,8 +12801,8 @@ void BetaBlk::_updateFitted(){
 }
 
 /*
-*	SigmaI methods
-*/
+ *	SigmaI methods
+ */
 
 SigmaI::SigmaI() : _d(2), _srDet(-1.0), _n0(1.0), _outFlNam("SigIout.gbin") {	// default constructor, produces a 2x2 I matrix; _srDet = -1.0 is clear nonsense to make sure I know if it hasn't been updated
 	remove(_outFlNam.c_str());
@@ -12869,9 +12881,17 @@ SigmaI::SigmaI(const gsl_matrix *mat) : _d(mat->size1), _n0(1.0), _srDet(-1.0), 
 
 }
 
-SigmaI::SigmaI(const gsl_matrix *S, const size_t d, const size_t &df, const double &diagPr, const double &nu0) : _d(d), _n0(nu0), _srDet(-1.0), _outFlNam("SigIout.gbin") {
+SigmaI::SigmaI(const gsl_matrix *S, const size_t &d, const size_t &df, const double &diagPr, const double &nu0) : _d(d), _n0(nu0), _srDet(-1.0), _outFlNam("SigIout.gbin") {
 	remove(_outFlNam.c_str());
 	
+	if (_d != S->size1) {
+		cerr << "ERROR: provided dimension (" << _d << ") not equal to data matrix dimension (" << S->size1 << ") in SigmaI initialization" << endl;
+		exit(-1);
+	}
+	else if (S->size1 != S->size2){
+		cerr << "ERROR: data matrix is " << S->size1 << "X" << S->size2 << " and not square in SigmaI initialization" <<endl;
+		exit(-1);
+	}
 	const gsl_rng_type *T = gsl_rng_mt19937;
 	_r = gsl_rng_alloc(T);
 	gsl_rng_set(_r, time(NULL)+rdtsc());
@@ -12892,9 +12912,17 @@ SigmaI::SigmaI(const gsl_matrix *S, const size_t d, const size_t &df, const doub
 	gsl_matrix_free(tmp);
 }
 
-SigmaI::SigmaI(const gsl_matrix *S, const size_t d, const size_t &df, const gsl_matrix *LamPr, const double &nu0) : _d(d), _n0(nu0), _srDet(-1.0), _outFlNam("SigIout.gbin") {	//	the constructor for initialization
+SigmaI::SigmaI(const gsl_matrix *S, const size_t &d, const size_t &df, const gsl_matrix *LamPr, const double &nu0) : _d(d), _n0(nu0), _srDet(-1.0), _outFlNam("SigIout.gbin") {	//	the constructor for initialization
 	remove(_outFlNam.c_str());
 	
+	if (_d != S->size1) {
+		cerr << "ERROR: provided dimension (" << _d << ") not equal to data matrix dimension (" << S->size1 << ") in SigmaI initialization" << endl;
+		exit(-1);
+	}
+	else if (S->size1 != S->size2){
+		cerr << "ERROR: data matrix is " << S->size1 << "X" << S->size2 << " and not square in SigmaI initialization" <<endl;
+		exit(-1);
+	}
 	const gsl_rng_type *T = gsl_rng_mt19937;
 	_r = gsl_rng_alloc(T);
 	gsl_rng_set(_r, time(NULL)+rdtsc());
@@ -13106,7 +13134,7 @@ void SigmaI::update(const Grp &dat, const Grp &mu, const Qgrp &q){
 
 
 /*
-	Dealing with the square root of the determinant
+ *	Dealing with the square root of the determinant
  */
 
 void SigmaI::srDetUpdate(){
@@ -13452,6 +13480,7 @@ SigmaIblk::SigmaIblk(const Grp &dat, const string &blkIndFileNam, const string &
 }
 
 void SigmaIblk::update(const Grp &dat){
+	// tests show that it pays to do block-wise inversions
 	
 	for (size_t iBlk = 0; iBlk < _blkStart.size(); iBlk++) {
 		gsl_matrix *S = gsl_matrix_alloc((_eachBlk[iBlk].matrix).size1, (_eachBlk[iBlk].matrix).size2);
