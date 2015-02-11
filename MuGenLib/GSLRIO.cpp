@@ -20,139 +20,170 @@
  *  along with MuGen.  If not, see <http://www.gnu.org/licenses/>.
  *
  *  A set of functions to read and save GSL matrices in binary from R
- *  to compile: R CMD SHLIB GSLRIO.cpp -lgsl -O3 -DHAVE_INLINE -DGSL_RANGE_CHECK_OFF
+ *
+ */
+
+/// R interface for GSL binary file format
+/** \file
+ * \author Anthony J. Greenberg
+ * \copyright Copyright (c) 2015 Anthony J. Greenberg
+ * \version 0.9.0
+ *
+ * Functions to read and write binary files saved in GSL binary format from R. 
+ * 
+ * To compile, run on command line:
+ * 
+ * R CMD SHLIB GSLRIO.cpp -lgsl -O3 -DHAVE_INLINE -DGSL_RANGE_CHECK_OFF
+ *
+ * and put the resulting GSLRIO.o where it can be found by dyn.load() in R.  The functions are then ready to use with the .C() command.
+ *
+ * \note To pass double-quoted strings from .C(), the corresponding arguments (here they are file names) must be in the form **fileNam.
+ *
  */
 
 #include <R.h>
 #include <string>
+#include <iostream>
+#include <algorithm>
 #include <gsl/gsl_matrix.h>
 #include <gsl/gsl_vector.h>
 
-using namespace std;
+using std::string;
+using std::remove;
+using std::cerr;
+using std::endl;
 
-/*
-	note that to pass a double-quoted chracter to .C(), the **fileNam syntax is essential
-*/
-
+/** \brief Save a double-precision matrix
+ *
+ * The fact that R matrices are column-major, while in C/C++ they are row-major is dealt with internally.  The R user does not have to worry about that.
+ *
+ * \param[in] char** output file name
+ * \param[in] double* vectorized matrix to be saved
+ * \param[in] int* pointer to the number of rows
+ * \param[in] int* pointer to the number of columns
+ */
 extern "C"{
 	void GSLmatSave(const char **fileNam, const double *vec, const int *nRows, const int *nCols){
-		gsl_matrix *mat = gsl_matrix_alloc(*nRows, *nCols);
+		gsl_matrix_const_view mat = gsl_matrix_const_view_array(vec, *nCols, *nRows); // because the R matrix is vectorized row by row
+		remove(*fileNam);
 		
-		for (int iRow = 0; iRow < *nRows; iRow++){  // because R matrices are column-major
-			for (int jCl = 0; jCl < *nCols; jCl++){
-				gsl_matrix_set(mat, iRow, jCl, vec[iRow + (*nRows)*jCl]);
-			}
+		for (size_t iRw = 0; iRw < *nRows; iRw++) { // the rows of the saved matrix are the columns of the passed matrix
+			gsl_vector_const_view rw = gsl_matrix_const_column(&mat.matrix, iRw);
+			FILE *fl = fopen(*fileNam, "a");
+			gsl_vector_fwrite(fl, &rw.vector);
+			fclose(fl);
 		}
 		
-		FILE *fl = fopen(*fileNam, "w");
-		gsl_matrix_fwrite(fl, mat);
-		fclose(fl);
-		
-		gsl_matrix_free(mat);
 	}
 	
 }
-/*
-	for saving vectors used as indeces
-*/
 
+/** \brief Save a vector of integers
+ *
+ * Typically used to save index (factor) vectors to read into RanIndex objects.
+ *
+ * \param[in] char** output file name
+ * \param[in] int* array of integers
+ * \param[in] int* pointer to the array length
+ */
 extern "C"{
 	void GSLvecSaveInt(const char **fileNam, const int *vec, const int *len){
-		gsl_vector_int *svVec = gsl_vector_int_alloc(*len);
-		
-		for (int i = 0; i < *len; i++){
-			gsl_vector_int_set(svVec, i, vec[i]);
-		}
+		gsl_vector_int_const_view svVec = gsl_vector_int_const_view_array(vec, *len);
 		
 		FILE *fl = fopen(*fileNam, "w");
-		gsl_vector_int_fwrite(fl, svVec);
+		gsl_vector_int_fwrite(fl, &svVec.vector);
 		fclose(fl);
 		
-		gsl_vector_int_free(svVec);
 	}
 	
 }
  
-/*
-	for saving double vectors
-*/
+/** \brief Save a double-precision vector
+ *
+ * \param[in] char** output file name
+ * \param[in] double* double-precision array
+ * \param[in] int* pinter to the array size
+ */
 extern "C"{
 	void GSLvecSave(const char **fileNam, const double *vec, const int *len){
-		gsl_vector *svVec = gsl_vector_alloc(*len);
-		
-		for (int i = 0; i < *len; i++){
-			gsl_vector_set(svVec, i, vec[i]);
-		}
+		gsl_vector_const_view svVec = gsl_vector_const_view_array(vec, *len);
 		
 		FILE *fl = fopen(*fileNam, "w");
-		gsl_vector_fwrite(fl, svVec);
+		gsl_vector_fwrite(fl, &svVec.vector);
 		fclose(fl);
 		
-		gsl_vector_free(svVec);
 	}
 	
 }
 
-/*
-	for saving double vectors by appending to an existing file
-*/
+/** \brief Appending a double-precision vector to an existing file
+ *
+ * \param[in] char** output file name
+ * \param[in] double* double-precision array
+ * \param[in] int* pinter to the array size
+ */
 extern "C"{
 	void GSLvecAppend(const char **fileNam, const double *vec, const int *len){
-		gsl_vector *svVec = gsl_vector_alloc(*len);
-		
-		for (int i = 0; i < *len; i++){
-			gsl_vector_set(svVec, i, vec[i]);
-		}
+		gsl_vector_const_view svVec = gsl_vector_const_view_array(vec, *len);
 		
 		FILE *fl = fopen(*fileNam, "a");
-		gsl_vector_fwrite(fl, svVec);
+		gsl_vector_fwrite(fl, &svVec.vector);
 		fclose(fl);
 		
-		gsl_vector_free(svVec);
 	}
 	
 }
-/*
-	loading int vectors
+/** \brief Read a vector of integers
+ *
+ * Reading a file into an array of integers.
+ *
+ * \warning While file existence is checked, there currently is no way to check file size.  If the file is too small to hold an array of integers of the required length, the function will crash and likely take the R session with it.
+ *
+ * \param[in] char** output file name
+ * \param[in] int* pointer to array length
+ * \param[out] int* array of integers to be passed to R
  */
 extern "C" {
 	void GSLiVecLoad(const char **fileNam, const int *len, int *arr){
-		
-		gsl_vector_int *vec = gsl_vector_int_alloc(*len);
+		gsl_vector_int_view vec = gsl_vector_int_view_array(arr, *len);
 		
 		FILE *fl = fopen(*fileNam, "r");
-		gsl_vector_int_fread(fl, vec);
+		if (fl == NULL) {
+			cerr << "ERROR: cannot open file" << endl;
+			exit(-1);
+		}
+		gsl_vector_int_fread(fl, &vec.vector);
 		fclose(fl);
 		
-		for (int el = 0; el < *len; el++){
-			arr[el] = gsl_vector_int_get(vec, el);
-		}
-		
-		gsl_vector_int_free(vec);
 	}
 	
 }
 
-/*
-	the matrix will be passed to R as a vector anyway, so I am reading the matrix in as a vector
-	the matrix is stored by row, so make sure to use matrix(..., byrow = T) in the R code
-*/
+/** \brief Read a double-precision array or matrix
+ *
+ * Reads a double-precision array (vector) or matrix.  If a vector is desired, one of the dimensions should be set to one. The matrix is stored by row, so make sure to use matrix(..., byrow = T) in the R code.
+ *
+ * \warning While file existence is checked, there currently is no way to check file size.  If the file is too small to hold an array of doubles of the required length, the function will crash and likely take the R session with it.
+ *
+ * \param[in] char** output file name
+ * \param[in] int* pointer to the number of rows
+ * \param[in] int* pointer to the number of columns
+ * \param[out] double* array to be passed to R and converted to a matrix if necessary
+ */
 
 extern "C" {
 	void GSLmatLoad(const char **fileNam, const int *nRows, const int *nCols, double *arr){
 		int len = (*nRows)*(*nCols);
-		
-		gsl_vector *vec = gsl_vector_alloc(len);
+		gsl_vector_view vec = gsl_vector_view_array(arr, len);
 		
 		FILE *fl = fopen(*fileNam, "r");
-		gsl_vector_fread(fl, vec);
+		if (fl == NULL) {
+			cerr << "ERROR: cannot open file" << endl;
+			exit(-1);
+		}
+		gsl_vector_fread(fl, &vec.vector);
 		fclose(fl);
 		
-		for (int el = 0; el < len; el++){
-			arr[el] = gsl_vector_get(vec, el);
-		}
-		
-		gsl_vector_free(vec);
 	}
 	
 }
