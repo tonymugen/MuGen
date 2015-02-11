@@ -24,7 +24,7 @@
 /// C++ classes for Hierarchical Bayesian Multi-trait quantitative-genetic models.
 /** \file
  * \author Anthony J. Greenberg
- * \copyright Released under the GNU public license
+ * \copyright Copyright (c) 2015 Anthony J. Greenberg
  * \version 0.9.0
  * 
  * MuGen is a library that implements a comprehensive approach to Bayesian inference of multi-trait models for quantitative genetics.  It enables genome-wide association 
@@ -86,7 +86,6 @@ class BetaBlk;
 class SigmaI;
 class SigmaIblk;
 class SigmaIpex;
-class StTq;
 class Qgrp;
 class QgrpPEX;
 class MixP;
@@ -5916,108 +5915,386 @@ public:
 // end of the sigInv group
 /** @} */
 
-class StTq {	// the weigting parameter for Student-t sampling
-private:
-	double _q;
-	const double *_nu; // Student-t degrees of freedom; pointer to a value kept in Qgrp, since all members of the group should have the same
-	size_t _locInd;
-public:
-	// constructors
-	StTq() : _nu(0), _q(1.0), _locInd(0) {};
-	StTq(const double &nu) : _q(1.0), _locInd(0) { _nu = &nu; };
-	StTq(const double &nu, const int &d, gsl_rng *r);
-	StTq(const double &q, const double &nu, const int &d, gsl_rng *r);
-	StTq(const double &nu, const size_t &ind) : _q(1.0), _locInd(ind) { _nu = &nu; };
-	StTq(const double &q, const double &nu, const size_t &ind, const int &d, gsl_rng *r);
-	
-	~StTq() {};
-	
-	double getVal() const {return _q; };
-	double getNu() const {return *_nu; };
-	
-	void update(const Grp &dat, const Grp &mu, const SigmaI &SigI, const gsl_rng *r);
-	void update(const Grp &dat, const SigmaI &SigI, const gsl_rng *r);
-	// for the PEX scheme
-	void update(const Grp &dat, const Grp &mu, const SigmaI &SigI, const double &alpha, const gsl_rng *r);
-	void update(const Grp &dat, const SigmaI &SigI, const double &alpha, const gsl_rng *r);
-	
-	// save function, taking file name, appending by default
-	void save(const string &fileNam, const char *how = "a");
-	// save function, taking file stream name
-	void save(FILE *fileStr);
-};
-
-class Qgrp { // group of StTq
+/** \defgroup qGrp Student-t weight parameters
+ *
+ * A popular way to build a Gibbs sampler for a Student-\f$t\f$ model \cite dyk01 \cite gelman04  is to treat it like mixture of Gaussians, with the covariance of each data point weighted proportionally to its distabce from the mean.
+ * The weights are modeled as \f$\chi^2_{\nu}\f$ scalars, with the degrees of freedom \f$\nu\f$ equal to the Student-\f$t\f$ degrees of freedom.  It is possible to further construct Metropolis updating steps for the degrees of freedom, but in our experience it complicates computation without adding much to inference.
+ * We therefore leave degrees of freedom as constant, to be varied manually by the user.  We encourage trying a few degree of freedom values to see how the values affect inference.
+ * All constructors for these classes intitialize all weights deterministically to 1.0.  Empirically, this seems the most numerically stable approach, and still results in reasonably well-spread starting points as long the location parameters and inverse-covariances are initiated stochastically.
+ *
+ * @{
+ */
+/** \brief Standard Student-\f$t\f$ weights
+ *
+ * Mostly a standard implementation of the weight parameter sampling for Student-\f$t\f$ modeling.  The only deviation of the standard approach concerns the situation where some values in the data are missing.
+ * If we impute values for these elements, the weights become confounded with means.  So the weights are kept strictly equal to 1.0 and not updated.
+ *
+ * \note The weights are relatively small for values far from the mean, i.e. outliers have small \f$q\f$.
+ */
+class Qgrp {
 protected:
-	vector<StTq> _qVec;
-	vector<size_t> _presInd; // vector of indexes of samples with no missing phenotypes.  These are the ones we can update q for
-	double _nu;  // degrees of freedom
+	/** \brief Vector of weights */
+	vector<double> _qVec;
+	/** \brief Vector of indexes of present data
+	 *
+	 * Only _qVec elements corresponding to rows of data with no missing values are updated.
+	 */
+	vector<size_t> _presInd;
+	/** \brief Student-\f$t\f$ degrees of freedom */
+	double _nu;
+	/** \brief Output file name */
+	string _outFile;
 	
+	/** \brief Pseudo-random number generator
+	 *
+	 * Initialized the same way as Grp type PNGs, with a sum of time and RTDSC.
+	 */
 	gsl_rng *_r;
 	
 public:
-	Qgrp() : _nu(3.0) {};
+	/** \brief Default constructor 
+	 *
+	 * Results in an empty vector of weights.
+	 */
+	Qgrp() : _nu(3.0), _outFile("notSet") {};
+	/** \brief Deterministic size-only constructor
+	 *
+	 * Creates a vector of weights that all equal to 1.0, and three degrees of freedom (the smallest possible that still gives a destribution with defined mean and variance).
+	 *
+	 * \param[in] size_t& number of weights
+	 */
 	Qgrp(const size_t &N);
+	/** \brief Deterministic constructor with degrees of freedom
+	 *
+	 * Creates a vector of weights that all equal to 1.0, and degrees of freedom set to the given value.
+	 *
+	 * \param[in] size_t& number of weights
+	 * \param[in] double& degrees of freedom
+	 */
 	Qgrp(const size_t &N, const double &nu);
+	/** \brief Deterministic constructor with degrees of freedom and missing values
+	 *
+	 * Creates a vector of weights that all equal to 1.0, and degrees of freedom set to the given value.  The given file is read to determine which rows of data have missing values.
+	 *
+	 * \param[in] size_t& number of weights
+	 * \param[in] double& degrees of freedom
+	 * \param[in] string& missing value file name
+	 */
 	Qgrp(const size_t &N, const double &nu, const string &misVecFlNam);
+	/** \brief Deterministic size-only constructor with output file name
+	 *
+	 * Creates a vector of weights that all equal to 1.0, and three degrees of freedom (the smallest possible that still gives a destribution with defined mean and variance).
+	 *
+	 * \param[in] size_t& number of weights
+	 * \param[in] string& output file name
+	 */
+	Qgrp(const size_t &N, const string &outFileNam);
+	/** \brief Deterministic constructor with degrees of freedom and output file name
+	 *
+	 * Creates a vector of weights that all equal to 1.0, and degrees of freedom set to the given value.
+	 *
+	 * \param[in] size_t& number of weights
+	 * \param[in] string& output file name
+	 * \param[in] double& degrees of freedom
+	 */
+	Qgrp(const size_t &N, const string &outFileNam, const double &nu);
+	/** \brief Deterministic constructor with degrees of freedom, missing values and output file name
+	 *
+	 * Creates a vector of weights that all equal to 1.0, and degrees of freedom set to the given value.  The given file is read to determine which rows of data have missing values.
+	 *
+	 * \param[in] size_t& number of weights
+	 * \param[in] string& output file name
+	 * \param[in] double& degrees of freedom
+	 * \param[in] string& missing value file name
+	 */
+	Qgrp(const size_t &N, const string &outFileNam, const double &nu, const string &misVecFlNam);
 	
+	/** \brief Destructor */
 	virtual ~Qgrp() {};
 	
-	double operator[](const size_t i) const{return _qVec[i].getVal(); };
-	double operator[](const size_t i) {return _qVec[i].getVal(); };
+	/** \brief Const subscript operator
+	 *
+	 * \param[in] size_t& index
+	 * \return double weight value
+	 */
+	double operator[](const size_t i) const{return _qVec[i]; };
+	/** \brief Subscript operator
+	 *
+	 * \param[in] size_t& index
+	 * \return double weight value
+	 */
+	double operator[](const size_t i) {return _qVec[i]; };
 	
+	/** \brief Const access to \f$\alpha\f$
+	 *
+	 * Access to the van Dyk and Meng \f$\alpha\f$ multiplicative redundant parameter.  Is equal to 1.0 in this class.
+	 *
+	 * \return double 1.0
+	 */
 	virtual double alpha() const {return 1.0; };
+	/** \brief Access to \f$\alpha\f$
+	 *
+	 * Access to the van Dyk and Meng \f$\alpha\f$ multiplicative redundant parameter.  Is equal to 1.0 in this class.
+	 *
+	 * \return double 1.0
+	 */
 	virtual double alpha() {return 1.0; };
 	
+	/** \brief Const length of the weight vector
+	 *
+	 * \return size_t& vector length
+	 */
 	size_t size() const {return _qVec.size(); };
+	/** \brief Length of the weight vector
+	 *
+	 * \return size_t& vector length
+	 */
 	size_t size() {return _qVec.size(); };
 	
+	/** \brief Save to a stored file name
+	 *
+	 * \param[in] char* saving mode, appending by default
+	 */
+	void save(const char *how = "a");
+	/** \brief Save to a given file name
+	 *
+	 * \param[in] string& output file name
+	 * \param[in] char* saving mode, appending by default
+	 */
+	void save(const string &fileNam, const char *how = "a");
+	
+	/** \brief Update with a mean
+	 *
+	 * \ingroup updateFun
+	 *
+	 * The mean value is subtracted from the data according to the up-pointing RanIndex in the data object.
+	 *
+	 * \param[in] Grp& data
+	 * \param[in] Grp& mean
+	 * \param[in] SigmaI& inverse-covariance
+	 */
 	virtual void update(const Grp &dat, const Grp &mu, const SigmaI &SigI);
+	/** \brief Basic update
+	 *
+	 * \ingroup updateFun
+	 *
+	 * The data are assumed already centered, so the update is based on the simple cross-product of the data and the current value of the inverse-covariance.
+	 *
+	 * \param[in] Grp& data
+	 * \param[in] SigmaI& inverse-covariance
+	 */
 	virtual void update(const Grp &dat, const SigmaI &SigI);
 	
 };
 
-class QgrpPEX : public Qgrp {  // group of StTq for van Dyk and Meng's PEX
+/** \brief Student-\f$t\f$ weights for PEX
+ *
+ * Implements the weight updating for van Dyk and Meng's \cite dyk01 PEX scheme.  The multiplicative redundant parameter \f$\alpha\f$ is a member of this class and is updated internally.
+ * \f$\alpha\f$ is initialized deterministically to 1.0.
+ */
+class QgrpPEX : public Qgrp {
 protected:
-	double _alpha;  // the extra parameter
+	/** \brief Redundant parameter \f$\alpha\f$ */
+	double _alpha;
 	
 public:
+	/** \brief Default constructor */
 	QgrpPEX() : _alpha(1.0), Qgrp() {};
+	/** \brief Deterministic size-only constructor
+	 *
+	 * Creates a vector of weights that all equal to 1.0, and three degrees of freedom (the smallest possible that still gives a destribution with defined mean and variance).
+	 *
+	 * \param[in] size_t& number of weights
+	 */
 	QgrpPEX(const size_t &N) : _alpha(1.0), Qgrp(N) {};
+	/** \brief Deterministic constructor with degrees of freedom
+	 *
+	 * Creates a vector of weights that all equal to 1.0, and degrees of freedom set to the given value.
+	 *
+	 * \param[in] size_t& number of weights
+	 * \param[in] double& degrees of freedom
+	 */
 	QgrpPEX(const size_t &N, const double &nu) : _alpha(1.0), Qgrp(N, nu) {};
+	/** \brief Deterministic constructor with degrees of freedom and missing values
+	 *
+	 * Creates a vector of weights that all equal to 1.0, and degrees of freedom set to the given value.  The given file is read to determine which rows of data have missing values.
+	 *
+	 * \param[in] size_t& number of weights
+	 * \param[in] double& degrees of freedom
+	 * \param[in] string& missing value file name
+	 */
 	QgrpPEX(const size_t &N, const double &nu, const string &misVecFlNam) : _alpha(1.0), Qgrp(N, nu, misVecFlNam) {};
+	/** \brief Deterministic size-only constructor with output file name
+	 *
+	 * Creates a vector of weights that all equal to 1.0, and three degrees of freedom (the smallest possible that still gives a destribution with defined mean and variance).
+	 *
+	 * \param[in] size_t& number of weights
+	 * \param[in] string& output file name
+	 */
+	QgrpPEX(const size_t &N, const string &outFileNam) : _alpha(1.0), Qgrp(N, outFileNam) {};
+	/** \brief Deterministic constructor with degrees of freedom and output file name
+	 *
+	 * Creates a vector of weights that all equal to 1.0, and degrees of freedom set to the given value.
+	 *
+	 * \param[in] size_t& number of weights
+	 * \param[in] string& output file name
+	 * \param[in] double& degrees of freedom
+	 */
+	QgrpPEX(const size_t &N, const string &outFileNam, const double &nu) : _alpha(1.0), Qgrp(N, outFileNam, nu) {};
+	/** \brief Deterministic constructor with degrees of freedom, missing values and output file name
+	 *
+	 * Creates a vector of weights that all equal to 1.0, and degrees of freedom set to the given value.  The given file is read to determine which rows of data have missing values.
+	 *
+	 * \param[in] size_t& number of weights
+	 * \param[in] string& output file name
+	 * \param[in] double& degrees of freedom
+	 * \param[in] string& missing value file name
+	 */
+	QgrpPEX(const size_t &N, const string &outFileNam, const double &nu, const string &misVecFlNam) : _alpha(1.0), Qgrp(N, outFileNam, nu, misVecFlNam) {};
 	
+	/** \brief Const access to \f$\alpha\f$
+	 *
+	 * Access to the van Dyk and Meng \f$\alpha\f$ multiplicative redundant parameter.  Is equal to 1.0 in this class.
+	 *
+	 * \return double \f$\alpha\f$
+	 */
 	double alpha() const {return _alpha; };
+	/** \brief Access to \f$\alpha\f$
+	 *
+	 * Access to the van Dyk and Meng \f$\alpha\f$ multiplicative redundant parameter.  Is equal to 1.0 in this class.
+	 *
+	 * \return double \f$\alpha\f$
+	 */
 	double alpha() {return _alpha; };
 	
 	void update(const Grp &dat, const Grp &mu, const SigmaI &SigI);
 	void update(const Grp &dat, const SigmaI &SigI);
 };
+// end of qGrp
+/** @} */
 
+/** \brief Dirichlet-multinomial mixture prior
+ *
+ * Implements the Dirichlet-multinomial prior on proportions in a mixture of Gaussians.
+ *
+ * \warning This has not been extenisively tested
+ */
 class MixP {
 private:
+	/** \brief Vector of mixture proportions */
 	vector<double> _p;
-	vector<double> _alpha; // prior
+	/** \brief Vector of prior sample sizes */
+	vector<double> _alpha;
+	/** \brief Pseudo-random number generator
+	 *
+	 * Initialized the same way as Grp type PNGs, with a sum of time and RTDSC.
+	 */
 	gsl_rng *_r;
 	
 public:
+	/** \brief Default constructor */
 	MixP();
-	MixP(const vector<double> initP) : _p(initP), _alpha(initP.size(), 1.0) {};
-	MixP(const gsl_vector *initP, const size_t &len);
-	MixP(const vector<double> initP, const double &a);
-	MixP(const gsl_vector *initP, const size_t &len, const double &a);
-	MixP(const vector<double> initP, const double *a, const size_t &len);
-	MixP(const gsl_vector *initP, const size_t &len, const double *a);
-	MixP(const vector<double> initP, const vector<double> &a);
-	MixP(const gsl_vector *initP, const size_t &len, const vector<double> &a);
+	/** \brief Constructor with a vector of proportions
+	 *
+	 * The prior is set to all ones, i.e. the vaguest possible.
+	 *
+	 * \param[in] vector<double>& vector of initial proportions
+	 */
+	MixP(const vector<double> &initP) : _p(initP), _alpha(initP.size(), 1.0) {};
+	/** \brief Constructor with a GSL vector of proportions
+	 *
+	 * The prior is set to all ones, i.e. the vaguest possible.
+	 *
+	 * \param[in] gsl_vector* vector of initial proportions
+	 */
+	MixP(const gsl_vector *initP);
+	/** \brief Constructor with a vector of proportions and a single prior class size
+	 *
+	 * The prior for each mixture category is set to the same provided value.
+	 *
+	 * \param[in] vector<double>& vector of initial proportions
+	 * \param[in] double& prior category size
+	 */
+	MixP(const vector<double> &initP, const double &a);
+	/** \brief Constructor with a GSL vector of proportions and a single prior class size
+	 *
+	 * The prior for each mixture category is set to the same provided value.
+	 *
+	 * \param[in] gsl_vector* vector of initial proportions
+	 * \param[in] double& prior category size
+	 */
+	MixP(const gsl_vector *initP, const double &a);
+	/** \brief Constructor with a vector of proportions and an array of prior class sizes
+	 *
+	 * The prior for each mixture category is set to the corresponding value in the array.
+	 *
+	 * \param[in] vector<double>& vector of initial proportions
+	 * \param[in] double* prior category size
+	 * \param[in] size_t& prior array length
+	 */
+	MixP(const vector<double> &initP, const double *a, const size_t &len);
+	/** \brief Constructor with a GSL vector of proportions and an array of prior class sizes
+	 *
+	 * The prior for each mixture category is set to the corresponding value in the array.
+	 *
+	 * \param[in] gsl_vector* vector of initial proportions
+	 * \param[in] double* prior category size
+	 */
+	MixP(const gsl_vector *initP, const double *a);
+	/** \brief Constructor with a vector of proportions and a vector of prior class sizes
+	 *
+	 * The prior for each mixture category is set to the corresponding value in the vector.
+	 *
+	 * \param[in] vector<double>& vector of initial proportions
+	 * \param[in] vector<double>& prior category size
+	 */
+	MixP(const vector<double> &initP, const vector<double> &a);
+	/** \brief Constructor with a GSL vector of proportions and a vector of prior class sizes
+	 *
+	 * The prior for each mixture category is set to the corresponding value in the vector.
+	 *
+	 * \param[in] gsl_vector* vector of initial proportions
+	 * \param[in] vector<double> prior category size
+	 */
+	MixP(const gsl_vector *initP, const vector<double> &a);
+	/** \brief Constructor with a RanIndex of group IDs and a vector of prior class sizes
+	 *
+	 * The prior for each mixture category is set to the same provided value.  The proportions are calculated using the data in the RanIndex object.
+	 *
+	 * \param[in] gsl_vector* vector of initial proportions
+	 * \param[in] double& prior category size
+	 */
 	MixP(const RanIndex &ind, const double &a);
 	
+	/** \brief Destructor */
 	~MixP() {};
 	
+	/** \brief Copy constructor
+	 *
+	 * \param[in] MixP& object to be copied
+	 */
 	MixP(const MixP &);
+	/** \brief Assignement operator
+	 *
+	 * \param[in] Mixp& object to be copied
+	 * \return MixP target object
+	 */
 	MixP & operator=(const MixP &);
+	/** \brief Subscript operator
+	 *
+	 * \param[in] size_t& index of the category
+	 * \return double& proprtion of the elements in the given category
+	 */
 	const double &operator[](const size_t i) const{return _p[i]; };
 	
+	/** \brief Gibbs update function
+	 *
+	 * \ingroup updateFun
+	 *
+	 * Performs standard Gibbs mixture updating (e.g., \cite gelman04 ) with samples from a Dirichlet distribution.
+	 *
+	 * \param[in] RanIndex& data index of which elements belong to which category
+	 */
 	void update(const RanIndex &Nvec);
 	
 };

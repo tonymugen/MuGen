@@ -19,6 +19,18 @@
  *  You should have received a copy of the GNU General Public License
  *  along with MuGen.  If not, see <http://www.gnu.org/licenses/>.
  */
+
+/// Implementation of C++ classes for Hierarchical Bayesian Multi-trait quantitative-genetic models.
+/** \file
+ * \author Anthony J. Greenberg
+ * \copyright Copyright (c) 2015 Anthony J. Greenberg
+ * \version 0.9.0
+ *
+ * This file contains the implementation of the methods documented in the MuGen.h file.
+ *
+ */
+
+
 #include <gsl/gsl_errno.h>
 #include <gsl/gsl_matrix.h>
 #include <gsl/gsl_vector.h>
@@ -6736,7 +6748,7 @@ void MuGrpEE::update(const Grp &muPr, const SigmaI &SigIm){
 	for (size_t iRw = 0; iRw < _valueMat->size1; iRw++) {
 		for (size_t jECl = 0; jECl < _errInd.size(); jECl++) {
 			double var = 1.0/(1.0/gsl_matrix_get(_errorVar, iRw, jECl) + gsl_matrix_get(SigIm.getMat(), _errInd[jECl], _errInd[jECl]));
-			double mn     = var * (gsl_matrix_get(_valueMat, iRw, _errInd[jECl])/gsl_matrix_get(_errorVar, iRw, jECl) +  gsl_matrix_get(SigIm.getMat(), _errInd[jECl], _errInd[jECl]) * gsl_matrix_get(muPr.fMat(), _upLevel->priorInd(iRw), _errInd[jECl]) );
+			double mn  = var * (gsl_matrix_get(_valueMat, iRw, _errInd[jECl])/gsl_matrix_get(_errorVar, iRw, jECl) +  gsl_matrix_get(SigIm.getMat(), _errInd[jECl], _errInd[jECl]) * gsl_matrix_get(muPr.fMat(), _upLevel->priorInd(iRw), _errInd[jECl]) );
 			gsl_matrix_set(_valueMat, iRw, _errInd[jECl], mn + gsl_ran_gaussian_ziggurat(_rV[0], sqrt(var)));
 		}
 	}
@@ -6745,7 +6757,7 @@ void MuGrpEE::update(const Grp &muPr, const Qgrp &q, const SigmaI &SigIm){
 	for (size_t iRw = 0; iRw < _valueMat->size1; iRw++) {
 		for (size_t jECl = 0; jECl < _errInd.size(); jECl++) {
 			double var = 1.0/(1.0/gsl_matrix_get(_errorVar, iRw, jECl) + q[iRw] * gsl_matrix_get(SigIm.getMat(), _errInd[jECl], _errInd[jECl]));
-			double mn     = var * (gsl_matrix_get(_valueMat, iRw, _errInd[jECl])/gsl_matrix_get(_errorVar, iRw, jECl) +  q[iRw] * gsl_matrix_get(SigIm.getMat(), _errInd[jECl], _errInd[jECl]) * gsl_matrix_get(muPr.fMat(), _upLevel->priorInd(iRw), _errInd[jECl]) );
+			double mn  = var * (gsl_matrix_get(_valueMat, iRw, _errInd[jECl])/gsl_matrix_get(_errorVar, iRw, jECl) +  q[iRw] * gsl_matrix_get(SigIm.getMat(), _errInd[jECl], _errInd[jECl]) * gsl_matrix_get(muPr.fMat(), _upLevel->priorInd(iRw), _errInd[jECl]) );
 			gsl_matrix_set(_valueMat, iRw, _errInd[jECl], mn + gsl_ran_gaussian_ziggurat(_rV[0], sqrt(var)));
 		}
 	}
@@ -13581,105 +13593,11 @@ void SigmaIpex::save(const string &fileNam, const char *how){
 	gsl_matrix_free(inv);
 }
 
-
 /*
-	StTq methods
-*/
-
-//constructors
-
-StTq::StTq(const double &nu, const int &d, gsl_rng *r){
-	_nu     = &nu;
-	_q      = gsl_ran_chisq(r, d + (*_nu))/(1.0 + (*_nu));
-	_locInd = 0;
-}
-StTq::StTq(const double &q, const double &nu, const int &d, gsl_rng *r){
-	_nu     = &nu;
-	_q      = gsl_ran_chisq(r, d + (*_nu))/(q + (*_nu));
-	_locInd = 0;
-}
-StTq::StTq(const double &q, const double &nu, const size_t &ind, const int &d, gsl_rng *r){
-	_nu     = &nu;
-	_q      = gsl_ran_chisq(r, d + (*_nu))/(q + (*_nu));
-	_locInd = ind;
-}
-
-// update methods
-void StTq::update(const Grp &dat, const Grp &mu, const SigmaI &SigI, const gsl_rng *r){
-	gsl_vector *resid = gsl_vector_alloc(dat.phenD());
-	gsl_vector *tmpV  = gsl_vector_alloc(dat.phenD());
-	
-	gsl_vector_memcpy(resid, dat[_locInd]->getVec());
-	gsl_vector_sub(resid, (mu[*(dat[_locInd]->up())])->getVec());
-	
-	gsl_blas_dsymv(CblasLower, 1.0, SigI.getMat(), resid, 0.0, tmpV);
-	gsl_blas_ddot(resid, tmpV, &_q);
-	_q = gsl_ran_chisq(r, dat.phenD() + (*_nu))/(_q + (*_nu));
-	
-	gsl_vector_free(resid);
-	gsl_vector_free(tmpV);
-}
-void StTq::update(const Grp &dat, const SigmaI &SigI, const gsl_rng *r){
-	gsl_vector *tmpV  = gsl_vector_alloc(dat.phenD());
-	
-	gsl_blas_dsymv(CblasLower, 1.0, SigI.getMat(), dat[_locInd]->getVec(), 0.0, tmpV);
-	gsl_blas_ddot(dat[_locInd]->getVec(), tmpV, &_q);
-	_q = gsl_ran_chisq(r, dat.phenD() + (*_nu))/(_q + (*_nu));
-	
-	gsl_vector_free(tmpV);
-}
-
-// for the PEX scheme
-void StTq::update(const Grp &dat, const Grp &mu, const SigmaI &SigI, const double &alpha, const gsl_rng *r){
-	gsl_vector *resid = gsl_vector_alloc(dat.phenD());
-	gsl_vector *tmpV  = gsl_vector_alloc(dat.phenD());
-	
-	gsl_vector_memcpy(resid, dat[_locInd]->getVec());
-	gsl_vector_sub(resid, (mu[*(dat[_locInd]->up())])->getVec());
-	
-	gsl_blas_dsymv(CblasLower, 1.0, SigI.getMat(), resid, 0.0, tmpV);
-	gsl_blas_ddot(resid, tmpV, &_q);
-	_q = gsl_ran_chisq(r, dat.phenD() + (*_nu))/(_q + (*_nu)/alpha);
-	
-	gsl_vector_free(resid);
-	gsl_vector_free(tmpV);
-}
-void StTq::update(const Grp &dat, const SigmaI &SigI, const double &alpha, const gsl_rng *r){
-	gsl_vector *tmpV  = gsl_vector_alloc(dat.phenD());
-	
-	gsl_blas_dsymv(CblasLower, 1.0, SigI.getMat(), dat[_locInd]->getVec(), 0.0, tmpV);
-	gsl_blas_ddot(dat[_locInd]->getVec(), tmpV, &_q);
-	_q = gsl_ran_chisq(r, dat.phenD() + (*_nu))/(_q + (*_nu)/alpha);
-	
-	gsl_vector_free(tmpV);
-}
-
-// save function, taking file name, appending by default
-void StTq::save(const string &fileNam, const char *how){
-	gsl_vector *tmp = gsl_vector_alloc(1);
-	gsl_vector_set(tmp, 1, _q);
-	FILE *outFl = fopen(fileNam.c_str(), how);
-	gsl_vector_fwrite(outFl, tmp);
-	fclose(outFl);
-	
-	gsl_vector_free(tmp);
-}
-// save function, taking file stream name
-void StTq::save(FILE *fileNam){
-	gsl_vector *tmp = gsl_vector_alloc(1);
-	gsl_vector_set(tmp, 1, _q);
-	
-	gsl_vector_fwrite(fileNam, tmp);
-	
-	gsl_vector_free(tmp);
-}
-
-
-/*
-	Qgrp methods
+ *	Qgrp methods
  */
 
-Qgrp::Qgrp(const size_t &N) : _nu(3.0), _qVec(N), _presInd(N) {
+Qgrp::Qgrp(const size_t &N) : _nu(3.0), _qVec(N, 1.0), _presInd(N), _outFile("notSet") {
 	for (size_t i = 0; i < N; i++) {
 		_presInd[i] = i;
 	}
@@ -13688,17 +13606,16 @@ Qgrp::Qgrp(const size_t &N) : _nu(3.0), _qVec(N), _presInd(N) {
 	gsl_rng_set(_r, time(NULL)+rdtsc());
 
 }
-Qgrp::Qgrp(const size_t &N, const double &nu) : _nu(nu), _qVec(N), _presInd(N) {
+Qgrp::Qgrp(const size_t &N, const double &nu) : _nu(nu), _qVec(N, 1.0), _presInd(N), _outFile("notSet") {
 	for (size_t i = 0; i < N; i++) {
 		_presInd[i] = i;
-		_qVec[i] = StTq(_nu, i);
 	}
 	const gsl_rng_type *T = gsl_rng_mt19937;
 	_r = gsl_rng_alloc(T);
 	gsl_rng_set(_r, time(NULL)+rdtsc());
 
 }
-Qgrp::Qgrp(const size_t &N, const double &nu, const string &misVecFlNam) : _nu(nu), _qVec(N) {
+Qgrp::Qgrp(const size_t &N, const double &nu, const string &misVecFlNam) : _nu(nu), _qVec(N, 1.0), _outFile("notSet") {
 	gsl_vector_int *missInd = gsl_vector_int_alloc(N);
 	
 	FILE *indIn = fopen(misVecFlNam.c_str(), "r");
@@ -13713,7 +13630,6 @@ Qgrp::Qgrp(const size_t &N, const double &nu, const string &misVecFlNam) : _nu(n
 		if (gsl_vector_int_get(missInd, i) == 0) {
 			_presInd.push_back(i);
 		}
-		_qVec[i] = StTq(_nu, i);
 	}
 	
 	const gsl_rng_type *T = gsl_rng_mt19937;
@@ -13722,16 +13638,112 @@ Qgrp::Qgrp(const size_t &N, const double &nu, const string &misVecFlNam) : _nu(n
 
 	gsl_vector_int_free(missInd);
 }
+Qgrp::Qgrp(const size_t &N, const string &outFileName) : _nu(3.0), _qVec(N, 1.0), _presInd(N), _outFile(outFileName) {
+	remove(_outFile.c_str());
+	for (size_t i = 0; i < N; i++) {
+		_presInd[i] = i;
+	}
+	const gsl_rng_type *T = gsl_rng_mt19937;
+	_r = gsl_rng_alloc(T);
+	gsl_rng_set(_r, time(NULL)+rdtsc());
+	
+}
+Qgrp::Qgrp(const size_t &N, const string &outFileName, const double &nu) : _nu(nu), _qVec(N, 1.0), _presInd(N), _outFile(outFileName) {
+	remove(_outFile.c_str());
+	for (size_t i = 0; i < N; i++) {
+		_presInd[i] = i;
+	}
+	const gsl_rng_type *T = gsl_rng_mt19937;
+	_r = gsl_rng_alloc(T);
+	gsl_rng_set(_r, time(NULL)+rdtsc());
+	
+}
+Qgrp::Qgrp(const size_t &N, const string &outFileName, const double &nu, const string &misVecFlNam) : _nu(nu), _qVec(N, 1.0), _outFile(outFileName) {
+	gsl_vector_int *missInd = gsl_vector_int_alloc(N);
+	remove(_outFile.c_str());
+	
+	FILE *indIn = fopen(misVecFlNam.c_str(), "r");
+	if (indIn == NULL) {
+		cerr << "ERROR: cannot open missing value index file " << misVecFlNam << " in Qgrp" << endl;
+		exit(-1);
+	}
+	gsl_vector_int_fread(indIn, missInd);
+	fclose(indIn);
+	
+	for (size_t i = 0; i < N; i++) {
+		if (gsl_vector_int_get(missInd, i) == 0) {
+			_presInd.push_back(i);
+		}
+	}
+	
+	const gsl_rng_type *T = gsl_rng_mt19937;
+	_r = gsl_rng_alloc(T);
+	gsl_rng_set(_r, time(NULL)+rdtsc());
+	
+	gsl_vector_int_free(missInd);
+}
 
-void Qgrp::update(const Grp &dat, const Grp &mu, const SigmaI &SigI){
-	for (vector<size_t>::iterator elIt = _presInd.begin(); elIt != _presInd.end(); ++elIt) {
-		_qVec[*elIt].update(dat, mu, SigI, _r);
+void Qgrp::save(const char *how){
+	gsl_vector_view vec = gsl_vector_view_array(_qVec.data(), _qVec.size());
+	
+	if (_outFile == "notSet") {
+		cerr << "WARNING: Qgrp save file name not set! Ignoring the save request." << endl;
+		_outFile = "tested";
+	}
+	else if (_outFile == "tested") {
+		// do nothing
+	}
+	else {
+		FILE *outFl = fopen(_outFile.c_str(), how);
+		gsl_vector_fwrite(outFl, &vec.vector);
+		fclose(outFl);
 	}
 }
-void Qgrp::update(const Grp &dat, const SigmaI &SigI){
-	for (vector<size_t>::iterator elIt = _presInd.begin(); elIt != _presInd.end(); ++elIt) {
-		_qVec[*elIt].update(dat, SigI, _r);
+void Qgrp::save(const string &fileNam, const char *how){
+	gsl_vector_view vec = gsl_vector_view_array(_qVec.data(), _qVec.size());
+	
+	if (_outFile == fileNam) {
+		FILE *outFl = fopen(_outFile.c_str(), how);
+		gsl_vector_fwrite(outFl, &vec.vector);
+		fclose(outFl);
 	}
+	else {
+		_outFile = fileNam;
+		remove(_outFile.c_str());
+		FILE *outFl = fopen(_outFile.c_str(), how);
+		gsl_vector_fwrite(outFl, &vec.vector);
+		fclose(outFl);
+	}
+	
+}
+
+void Qgrp::update(const Grp &dat, const Grp &mu, const SigmaI &SigI){
+	gsl_vector *resid = gsl_vector_alloc(dat.phenD());
+	gsl_vector *tmpV  = gsl_vector_alloc(dat.phenD());
+	
+	for (vector<size_t>::iterator elIt = _presInd.begin(); elIt != _presInd.end(); ++elIt) {
+		gsl_vector_memcpy(resid, dat[*elIt]->getVec());
+		gsl_vector_sub(resid, (mu[*(dat[*elIt]->up())])->getVec());
+		
+		gsl_blas_dsymv(CblasLower, 1.0, SigI.getMat(), resid, 0.0, tmpV);
+		gsl_blas_ddot(resid, tmpV, &_qVec[*elIt]);
+		_qVec[*elIt] = gsl_ran_chisq(_r, dat.phenD() + (_nu))/(_qVec[*elIt] + (_nu));
+
+	}
+	gsl_vector_free(resid);
+	gsl_vector_free(tmpV);
+	
+}
+void Qgrp::update(const Grp &dat, const SigmaI &SigI){
+	gsl_vector *tmpV  = gsl_vector_alloc(dat.phenD());
+	
+	for (vector<size_t>::iterator elIt = _presInd.begin(); elIt != _presInd.end(); ++elIt) {
+		gsl_blas_dsymv(CblasLower, 1.0, SigI.getMat(), dat[*elIt]->getVec(), 0.0, tmpV);
+		gsl_blas_ddot(dat[*elIt]->getVec(), tmpV, &_qVec[*elIt]);
+		_qVec[*elIt] = gsl_ran_chisq(_r, dat.phenD() + (_nu))/(_qVec[*elIt] + (_nu));
+		
+	}
+	gsl_vector_free(tmpV);
 }
 
 /*
@@ -13740,20 +13752,37 @@ void Qgrp::update(const Grp &dat, const SigmaI &SigI){
 
 void QgrpPEX::update(const Grp &dat, const Grp &mu, const SigmaI &SigI){
 	double qSum = 0.0;
+	gsl_vector *resid = gsl_vector_alloc(dat.phenD());
+	gsl_vector *tmpV  = gsl_vector_alloc(dat.phenD());
+	
 	for (vector<size_t>::iterator elIt = _presInd.begin(); elIt != _presInd.end(); ++elIt) {
-		_qVec[*elIt].update(dat, mu, SigI, _alpha, _r);
-		qSum += _qVec[*elIt].getVal();
+		gsl_vector_memcpy(resid, dat[*elIt]->getVec());
+		gsl_vector_sub(resid, (mu[*(dat[*elIt]->up())])->getVec());
+		
+		gsl_blas_dsymv(CblasLower, 1.0, SigI.getMat(), resid, 0.0, tmpV);
+		gsl_blas_ddot(resid, tmpV, &_qVec[*elIt]);
+		_qVec[*elIt] = gsl_ran_chisq(_r, dat.phenD() + (_nu))/(_qVec[*elIt] + (_nu)/_alpha);
+		
+		qSum += _qVec[*elIt];
 	}
+	gsl_vector_free(resid);
+	gsl_vector_free(tmpV);
 	
 	_alpha = _nu * qSum/gsl_ran_chisq(_r,  _nu * static_cast<double>(_qVec.size()));
 	
 }
 void QgrpPEX::update(const Grp &dat, const SigmaI &SigI){
 	double qSum = 0.0;
+	gsl_vector *tmpV  = gsl_vector_alloc(dat.phenD());
+	
 	for (vector<size_t>::iterator elIt = _presInd.begin(); elIt != _presInd.end(); ++elIt) {
-		_qVec[*elIt].update(dat, SigI, _alpha, _r);
-		qSum += _qVec[*elIt].getVal();
+		gsl_blas_dsymv(CblasLower, 1.0, SigI.getMat(), dat[*elIt]->getVec(), 0.0, tmpV);
+		gsl_blas_ddot(dat[*elIt]->getVec(), tmpV, &_qVec[*elIt]);
+		_qVec[*elIt] = gsl_ran_chisq(_r, dat.phenD() + (_nu))/(_qVec[*elIt] + (_nu)/_alpha);
+		
+		qSum += _qVec[*elIt];
 	}
+	gsl_vector_free(tmpV);
 	
 	_alpha = _nu * qSum/gsl_ran_chisq(_r,  _nu * static_cast<double>(_qVec.size()));
 	
@@ -13765,19 +13794,18 @@ void QgrpPEX::update(const Grp &dat, const SigmaI &SigI){
  */
 
 // Constructors
-MixP::MixP(const gsl_vector *initP, const size_t &len){
-	for (size_t elem = 0; elem < len; elem++) {
+MixP::MixP(const gsl_vector *initP){
+	for (size_t elem = 0; elem < initP->size; elem++) {
 		_p.push_back(gsl_vector_get(initP, elem));
 	}
-	_alpha.assign(len, 1.0);
+	_alpha.assign(initP->size, 1.0);
 	
 	const gsl_rng_type *T = gsl_rng_mt19937;
 	_r = gsl_rng_alloc(T);
 	gsl_rng_set(_r, time(NULL)+rdtsc());
 
 }
-MixP::MixP(const vector<double> initP, const double &a){
-	_p = initP;
+MixP::MixP(const vector<double> &initP, const double &a) : _p(initP){
 	_alpha.assign(initP.size(), a);
 	
 	const gsl_rng_type *T = gsl_rng_mt19937;
@@ -13785,19 +13813,22 @@ MixP::MixP(const vector<double> initP, const double &a){
 	gsl_rng_set(_r, time(NULL)+rdtsc());
 
 }
-MixP::MixP(const gsl_vector *initP, const size_t &len, const double &a){
-	for (size_t elem = 0; elem < len; elem++) {
+MixP::MixP(const gsl_vector *initP, const double &a){
+	for (size_t elem = 0; elem < initP->size; elem++) {
 		_p.push_back(gsl_vector_get(initP, elem));
 	}
-	_alpha.assign(len, a);
+	_alpha.assign(initP->size, a);
 	
 	const gsl_rng_type *T = gsl_rng_mt19937;
 	_r = gsl_rng_alloc(T);
 	gsl_rng_set(_r, time(NULL)+rdtsc());
 
 }
-MixP::MixP(const vector<double> initP, const double *a, const size_t &len){
-	_p = initP;
+MixP::MixP(const vector<double> &initP, const double *a, const size_t &len) : _p(initP){
+	if (len != initP.size()) {
+		cerr << "ERROR: length of prior vector not equal to the length of proportion vector in MixP initialization." << endl;
+		exit(-1);
+	}
 	for (size_t elem = 0; elem < len; elem++) {
 		_alpha.push_back(a[elem]);
 	}
@@ -13807,8 +13838,8 @@ MixP::MixP(const vector<double> initP, const double *a, const size_t &len){
 	gsl_rng_set(_r, time(NULL)+rdtsc());
 
 }
-MixP::MixP(const gsl_vector *initP, const size_t &len, const double *a){
-	for (size_t elem = 0; elem < len; elem++) {
+MixP::MixP(const gsl_vector *initP, const double *a){
+	for (size_t elem = 0; elem < initP->size; elem++) {
 		_p.push_back(gsl_vector_get(initP, elem));
 		_alpha.push_back(a[elem]);
 	}
@@ -13818,20 +13849,17 @@ MixP::MixP(const gsl_vector *initP, const size_t &len, const double *a){
 	gsl_rng_set(_r, time(NULL)+rdtsc());
 
 }
-MixP::MixP(const vector<double> initP, const vector<double> &a){
-	_p     = initP;
-	_alpha = a;
+MixP::MixP(const vector<double> &initP, const vector<double> &a) : _p(initP), _alpha(a) {
 	
 	const gsl_rng_type *T = gsl_rng_mt19937;
 	_r = gsl_rng_alloc(T);
 	gsl_rng_set(_r, time(NULL)+rdtsc());
 
 }
-MixP::MixP(const gsl_vector *initP, const size_t &len, const vector<double> &a){
-	for (size_t elem = 0; elem < len; elem++) {
+MixP::MixP(const gsl_vector *initP, const vector<double> &a) : _alpha(a) {
+	for (size_t elem = 0; elem < initP->size; elem++) {
 		_p.push_back(gsl_vector_get(initP, elem));
 	}
-	_alpha = a;
 	
 	const gsl_rng_type *T = gsl_rng_mt19937;
 	_r = gsl_rng_alloc(T);
@@ -13864,15 +13892,14 @@ MixP & MixP::operator=(const MixP &mp){
 // update functions
 
 void MixP::update(const RanIndex &Nvec){
-	double *a = new double[_p.size()];
+	vector<double> a(_p.size());
 	
 	for (size_t elm = 0; elm < _p.size(); elm++) {
 		a[elm] = Nvec[elm].size() + _alpha[elm];
 	}
 	
-	gsl_ran_dirichlet(_r, _p.size(), a, _p.data());
+	gsl_ran_dirichlet(_r, _p.size(), a.data(), _p.data());
 	
-	delete [] a;
 }
 
 
