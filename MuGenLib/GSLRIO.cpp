@@ -27,17 +27,17 @@
 /** \file
  * \author Anthony J. Greenberg
  * \copyright Copyright (c) 2015 Anthony J. Greenberg
- * \version 0.9.0
+ * \version 0.9.1
  *
  * Functions to read and write binary files saved in GSL binary format from R. 
  * 
  * To compile, run on command line:
  * 
- * R CMD SHLIB GSLRIO.cpp -lgsl -O3 -DHAVE_INLINE -DGSL_RANGE_CHECK_OFF
+ *    R CMD SHLIB GSLRIO.cpp -lgsl -O3 -DHAVE_INLINE -DGSL_RANGE_CHECK_OFF
  *
- * and put the resulting GSLRIO.o where it can be found by dyn.load() in R.  The functions are then ready to use with the .C() command.
+ * and put the resulting GSLRIO.o where it can be found by `dyn.load()` in R.  The functions are then ready to use with the `.C()` command.
  *
- * \note To pass double-quoted strings from .C(), the corresponding arguments (here they are file names) must be in the form **fileNam.
+ * \note To pass double-quoted strings from `.C()`, the corresponding arguments (here they are file names) must be in the form **fileNam.
  *
  */
 
@@ -102,7 +102,7 @@ extern "C"{
  *
  * \param[in] char** output file name
  * \param[in] double* double-precision array
- * \param[in] int* pinter to the array size
+ * \param[in] int* pointer to the array size
  */
 extern "C"{
 	void GSLvecSave(const char **fileNam, const double *vec, const int *len){
@@ -120,7 +120,7 @@ extern "C"{
  *
  * \param[in] char** output file name
  * \param[in] double* double-precision array
- * \param[in] int* pinter to the array size
+ * \param[in] int* pointer to the array size
  */
 extern "C"{
 	void GSLvecAppend(const char **fileNam, const double *vec, const int *len){

@@ -24,7 +24,7 @@
 /** \file
  * \author Anthony J. Greenberg
  * \copyright Copyright (c) 2015 Anthony J. Greenberg
- * \version 0.9.0
+ * \version 0.9.1
  *
  * This file contains the implementation of the methods documented in the MuGen.h file.
  *
@@ -43,6 +43,7 @@
 #include <gsl/gsl_linalg.h>
 #include <gsl/gsl_statistics.h>
 #include <gsl/gsl_math.h>
+#include <gsl/gsl_machine.h>
 #include <cmath>
 #include <algorithm>
 #include <vector>
@@ -6650,6 +6651,10 @@ void MuGrpMiss::update(const Grp &mu, const SigmaI &SigIm, const SigmaI &SigIp){
 /*
  * MuGrpEE methods
  */
+MuGrpEE::MuGrpEE() : MuGrp() {
+	_errorInvVar = gsl_matrix_calloc(1, 1);
+	_meanVal = gsl_matrix_calloc(1, 1);
+}
 MuGrpEE::MuGrpEE(const string &datFlNam, const string &varFlNam, const string &indFlNam, RanIndex &up, const size_t &d) : MuGrp(datFlNam, up, d){
 	
 	ifstream varIn(indFlNam.c_str());
@@ -6675,14 +6680,32 @@ MuGrpEE::MuGrpEE(const string &datFlNam, const string &varFlNam, const string &i
 	}
 	
 	varIn.close();
-	_errorVar = gsl_matrix_alloc(_valueMat->size1, _errInd.size());
+	_errorInvVar = gsl_matrix_alloc(_valueMat->size1, _errInd.size());
 	FILE *errIn = fopen(varFlNam.c_str(), "r");
 	if (errIn == NULL) {
 		cerr << "ERROR: Failed to open file " << varFlNam << " when inititializing MuGrpEE" << endl;
 		exit(-1);
 	}
-	gsl_matrix_fread(errIn, _errorVar);
+	gsl_matrix_fread(errIn, _errorInvVar);
 	fclose(errIn);
+	for (size_t iRw = 0; iRw < _errorInvVar->size1; iRw++) {
+		for (size_t jCl = 0; jCl < _errorInvVar->size2; jCl++) {
+			double var = gsl_matrix_get(_errorInvVar, iRw, jCl);
+			if ( var >= GSL_MACH_EPS) {
+				gsl_matrix_set(_errorInvVar, iRw, jCl, 1.0/var);
+			}
+			else {
+				cerr << "ERROR: experimental error variance " << var << " in row " << iRw << " and column " << jCl << " is too small in MuGrpEE initialization." << endl;
+				exit(-1);
+			}
+		}
+	}
+	
+	_meanVal = gsl_matrix_alloc(_errorInvVar->size1, _errorInvVar->size2);
+	for (size_t jCl = 0; jCl < _meanVal->size2; jCl++) {
+		gsl_vector_view col = gsl_matrix_column(_valueMat, _errInd[jCl]);
+		gsl_matrix_set_col(_meanVal, jCl, &col.vector);
+	}
 	
 }
 
@@ -6695,7 +6718,7 @@ MuGrpEE::MuGrpEE(const string &datFlNam, const string &varFlNam, const vector<si
 		cerr << "ERROR: largest element in the experimenatl error index (" << varInd.size() << ") is larger than the number of overall variables (" << d << ") in MuGrpEE initialization" << endl;
 		exit(-1);
 	}
-	_errorVar = gsl_matrix_alloc(_valueMat->size1, varInd.size());
+	_errorInvVar = gsl_matrix_alloc(_valueMat->size1, varInd.size());
 	_errInd   = varInd;
 	
 	
@@ -6704,19 +6727,44 @@ MuGrpEE::MuGrpEE(const string &datFlNam, const string &varFlNam, const vector<si
 		cerr << "ERROR: Failed to open file " << varFlNam << " when inititializing MuGrpEE" << endl;
 		exit(-1);
 	}
-	gsl_matrix_fread(errIn, _errorVar);
+	gsl_matrix_fread(errIn, _errorInvVar);
 	fclose(errIn);
 	
+	for (size_t iRw = 0; iRw < _errorInvVar->size1; iRw++) {
+		for (size_t jCl = 0; jCl < _errorInvVar->size2; jCl++) {
+			double var = gsl_matrix_get(_errorInvVar, iRw, jCl);
+			if ( var >= GSL_MACH_EPS) {
+				gsl_matrix_set(_errorInvVar, iRw, jCl, 1.0/var);
+			}
+			else {
+				cerr << "ERROR: experimental error variance " << var << " in row " << iRw << " and column " << jCl << " is too small in MuGrpEE initialization." << endl;
+				exit(-1);
+			}
+		}
+	}
 	
+	_meanVal = gsl_matrix_alloc(_errorInvVar->size1, _errorInvVar->size2);
+	for (size_t jCl = 0; jCl < _meanVal->size2; jCl++) {
+		gsl_vector_view col = gsl_matrix_column(_valueMat, _errInd[jCl]);
+		gsl_matrix_set_col(_meanVal, jCl, &col.vector);
+	}
+}
+
+MuGrpEE::~MuGrpEE() {
+	gsl_matrix_free(_errorInvVar);
+	gsl_matrix_free(_meanVal);
 }
 
 MuGrpEE::MuGrpEE(const MuGrpEE &mG){
 	gsl_matrix_free(_valueMat);
-	gsl_matrix_free(_errorVar);
+	gsl_matrix_free(_errorInvVar);
+	gsl_matrix_free(_meanVal);
 	_valueMat = gsl_matrix_alloc((mG._valueMat)->size1, (mG._valueMat)->size2);
 	gsl_matrix_memcpy(_valueMat, mG._valueMat);
-	_errorVar = gsl_matrix_alloc((mG._errorVar)->size1, (mG._errorVar)->size2);
-	gsl_matrix_memcpy(_errorVar, mG._errorVar);
+	_errorInvVar = gsl_matrix_alloc((mG._errorInvVar)->size1, (mG._errorInvVar)->size2);
+	gsl_matrix_memcpy(_errorInvVar, mG._errorInvVar);
+	_meanVal = gsl_matrix_alloc((mG._meanVal)->size1, (mG._meanVal)->size2);
+	gsl_matrix_memcpy(_meanVal, mG._meanVal);
 	_upLevel  = mG._upLevel;
 	
 	_theta.resize(_valueMat->size1);
@@ -6727,11 +6775,14 @@ MuGrpEE::MuGrpEE(const MuGrpEE &mG){
 }
 MuGrpEE & MuGrpEE::operator=(const MuGrpEE &mG){
 	gsl_matrix_free(_valueMat);
-	gsl_matrix_free(_errorVar);
+	gsl_matrix_free(_errorInvVar);
+	gsl_matrix_free(_meanVal);
 	_valueMat = gsl_matrix_alloc((mG._valueMat)->size1, (mG._valueMat)->size2);
 	gsl_matrix_memcpy(_valueMat, mG._valueMat);
-	_errorVar = gsl_matrix_alloc((mG._errorVar)->size1, (mG._errorVar)->size2);
-	gsl_matrix_memcpy(_errorVar, mG._errorVar);
+	_errorInvVar = gsl_matrix_alloc((mG._errorInvVar)->size1, (mG._errorInvVar)->size2);
+	gsl_matrix_memcpy(_errorInvVar, mG._errorInvVar);
+	_meanVal = gsl_matrix_alloc((mG._meanVal)->size1, (mG._meanVal)->size2);
+	gsl_matrix_memcpy(_meanVal, mG._meanVal);
 	_upLevel  = mG._upLevel;
 	
 	_theta.resize(_valueMat->size1);
@@ -6747,8 +6798,8 @@ MuGrpEE & MuGrpEE::operator=(const MuGrpEE &mG){
 void MuGrpEE::update(const Grp &muPr, const SigmaI &SigIm){
 	for (size_t iRw = 0; iRw < _valueMat->size1; iRw++) {
 		for (size_t jECl = 0; jECl < _errInd.size(); jECl++) {
-			double var = 1.0/(1.0/gsl_matrix_get(_errorVar, iRw, jECl) + gsl_matrix_get(SigIm.getMat(), _errInd[jECl], _errInd[jECl]));
-			double mn  = var * (gsl_matrix_get(_valueMat, iRw, _errInd[jECl])/gsl_matrix_get(_errorVar, iRw, jECl) +  gsl_matrix_get(SigIm.getMat(), _errInd[jECl], _errInd[jECl]) * gsl_matrix_get(muPr.fMat(), _upLevel->priorInd(iRw), _errInd[jECl]) );
+			double var = 1.0/(gsl_matrix_get(_errorInvVar, iRw, jECl) + gsl_matrix_get(SigIm.getMat(), _errInd[jECl], _errInd[jECl]));
+			double mn  = var * ( gsl_matrix_get(_meanVal, iRw, jECl) * gsl_matrix_get(_errorInvVar, iRw, jECl) +  gsl_matrix_get(SigIm.getMat(), _errInd[jECl], _errInd[jECl]) * gsl_matrix_get(muPr.fMat(), _upLevel->priorInd(iRw), _errInd[jECl]) );
 			gsl_matrix_set(_valueMat, iRw, _errInd[jECl], mn + gsl_ran_gaussian_ziggurat(_rV[0], sqrt(var)));
 		}
 	}
@@ -6756,8 +6807,8 @@ void MuGrpEE::update(const Grp &muPr, const SigmaI &SigIm){
 void MuGrpEE::update(const Grp &muPr, const Qgrp &q, const SigmaI &SigIm){
 	for (size_t iRw = 0; iRw < _valueMat->size1; iRw++) {
 		for (size_t jECl = 0; jECl < _errInd.size(); jECl++) {
-			double var = 1.0/(1.0/gsl_matrix_get(_errorVar, iRw, jECl) + q[iRw] * gsl_matrix_get(SigIm.getMat(), _errInd[jECl], _errInd[jECl]));
-			double mn  = var * (gsl_matrix_get(_valueMat, iRw, _errInd[jECl])/gsl_matrix_get(_errorVar, iRw, jECl) +  q[iRw] * gsl_matrix_get(SigIm.getMat(), _errInd[jECl], _errInd[jECl]) * gsl_matrix_get(muPr.fMat(), _upLevel->priorInd(iRw), _errInd[jECl]) );
+			double var = 1.0/(gsl_matrix_get(_errorInvVar, iRw, jECl) + q[iRw] * gsl_matrix_get(SigIm.getMat(), _errInd[jECl], _errInd[jECl]));
+			double mn  = var * ( gsl_matrix_get(_meanVal, iRw, jECl) * gsl_matrix_get(_errorInvVar, iRw, jECl) +  q[iRw] * gsl_matrix_get(SigIm.getMat(), _errInd[jECl], _errInd[jECl]) * gsl_matrix_get(muPr.fMat(), _upLevel->priorInd(iRw), _errInd[jECl]) );
 			gsl_matrix_set(_valueMat, iRw, _errInd[jECl], mn + gsl_ran_gaussian_ziggurat(_rV[0], sqrt(var)));
 		}
 	}
@@ -6815,11 +6866,15 @@ MuGrpEEmiss::MuGrpEEmiss(const string &datFlNam, const string &varFlNam, const s
 	gsl_matrix_fread(errIn, tmpEV);
 	fclose(errIn);
 	
-	_errorVar.resize(tmpEV->size1);
+	_errorInvVar.resize(tmpEV->size1);
+	_meanVal.resize(tmpEV->size1);
 	
 	for (size_t iRw = 0; iRw < tmpEV->size1; iRw++) {
+		list<size_t>::iterator trtIt = tmpErrInd.begin();
 		for (size_t jCl = 0; jCl < tmpEV->size2; jCl++) {
-			_errorVar[iRw].push_back(gsl_matrix_get(tmpEV, iRw, jCl));
+			_errorInvVar[iRw].push_back(gsl_matrix_get(tmpEV, iRw, jCl));
+			_meanVal[iRw].push_back(gsl_matrix_get(_valueMat, iRw, *trtIt));
+			++trtIt;
 		}
 	}
 	gsl_matrix_free(tmpEV);
@@ -6828,22 +6883,37 @@ MuGrpEEmiss::MuGrpEEmiss(const string &datFlNam, const string &varFlNam, const s
 	for (vector<size_t>::iterator misIt = _misInd.begin(); misIt != _misInd.end(); ++misIt) {
 		
 		list<size_t>::iterator trtIt = _missErrMat[*misIt].begin();
-		list<double>::iterator varIt = _errorVar[*misIt].begin();
+		list<double>::iterator varIt = _errorInvVar[*misIt].begin();
+		list<double>::iterator mnIt  = _meanVal[*misIt].begin();
 		while (trtIt != _missErrMat[*misIt].end()) {
 			if (gsl_matrix_int_get(tmpMisMat, *misIt, *trtIt) == 1) {
 				trtIt = _missErrMat[*misIt].erase(trtIt);
-				varIt = _errorVar[*misIt].erase(varIt);
+				varIt = _errorInvVar[*misIt].erase(varIt);
+				mnIt  = _meanVal[*misIt].erase(mnIt);
 			}
 			else {
 				++trtIt;
 				++varIt;
+				++mnIt;
 			}
 			
 		}
 	}
 	gsl_matrix_int_free(tmpMisMat);
 	
-	
+	// now ivert all the present variances
+	for (vector< list<double> >::iterator rowIt = _errorInvVar.begin(); rowIt != _errorInvVar.end(); ++rowIt) {
+		for (list<double>::iterator itemIt = (*rowIt).begin(); itemIt != (*rowIt).end(); ++itemIt) {
+			if (*itemIt >= GSL_MACH_EPS) {
+				*itemIt = 1.0/(*itemIt);
+			}
+			else {
+				cerr << "ERROR: experimental error variance " << *itemIt << " is too small in MuGrpEEmiss initialization." << endl;
+				exit(-1);
+			}
+			
+		}
+	}
 }
 MuGrpEEmiss::MuGrpEEmiss(const string &datFlNam, const string &varFlNam, const vector<size_t> &varInd, const string &misMatFlNam, const string &misVecFlNam, RanIndex &up, const size_t &d) : MuGrpMiss(datFlNam, misMatFlNam, misVecFlNam, up, d) {
 	
@@ -6872,11 +6942,15 @@ MuGrpEEmiss::MuGrpEEmiss(const string &datFlNam, const string &varFlNam, const v
 	gsl_matrix_fread(errIn, tmpEV);
 	fclose(errIn);
 	
-	_errorVar.resize(tmpEV->size1);
+	_errorInvVar.resize(tmpEV->size1);
+	_meanVal.resize(tmpEV->size1);
 	
 	for (size_t iRw = 0; iRw < tmpEV->size1; iRw++) {
+		list<size_t>::iterator trtIt = tmpErrInd.begin();
 		for (size_t jCl = 0; jCl < tmpEV->size2; jCl++) {
-			_errorVar[iRw].push_back(gsl_matrix_get(tmpEV, iRw, jCl));
+			_errorInvVar[iRw].push_back(gsl_matrix_get(tmpEV, iRw, jCl));
+			_meanVal[iRw].push_back(gsl_matrix_get(_valueMat, iRw, *trtIt));
+			++trtIt;
 		}
 	}
 	gsl_matrix_free(tmpEV);
@@ -6885,20 +6959,37 @@ MuGrpEEmiss::MuGrpEEmiss(const string &datFlNam, const string &varFlNam, const v
 	for (vector<size_t>::iterator misIt = _misInd.begin(); misIt != _misInd.end(); ++misIt) {
 		
 		list<size_t>::iterator trtIt = _missErrMat[*misIt].begin();
-		list<double>::iterator varIt = _errorVar[*misIt].begin();
+		list<double>::iterator varIt = _errorInvVar[*misIt].begin();
+		list<double>::iterator mnIt  = _meanVal[*misIt].begin();
 		while (trtIt != _missErrMat[*misIt].end()) {
 			if (gsl_matrix_int_get(tmpMisMat, *misIt, *trtIt) == 1) {
 				trtIt = _missErrMat[*misIt].erase(trtIt);
-				varIt = _errorVar[*misIt].erase(varIt);
+				varIt = _errorInvVar[*misIt].erase(varIt);
+				mnIt  = _meanVal[*misIt].erase(mnIt);
 			}
 			else {
 				++trtIt;
 				++varIt;
+				++mnIt;
 			}
 			
 		}
 	}
 	gsl_matrix_int_free(tmpMisMat);
+	// now ivert all the present variances
+	for (vector< list<double> >::iterator rowIt = _errorInvVar.begin(); rowIt != _errorInvVar.end(); ++rowIt) {
+		for (list<double>::iterator itemIt = (*rowIt).begin(); itemIt != (*rowIt).end(); ++itemIt) {
+			if (*itemIt >= GSL_MACH_EPS) {
+				*itemIt = 1.0/(*itemIt);
+			}
+			else {
+				cerr << "ERROR: experimental error variance " << *itemIt << " is too small in MuGrpEEmiss initialization." << endl;
+				exit(-1);
+			}
+
+		}
+	}
+	
 }
 
 MuGrpEEmiss::MuGrpEEmiss(const MuGrpEEmiss &mG){
@@ -6906,7 +6997,8 @@ MuGrpEEmiss::MuGrpEEmiss(const MuGrpEEmiss &mG){
 	gsl_matrix_free(_valueMat);
 	_valueMat   = gsl_matrix_alloc((mG._valueMat)->size1, (mG._valueMat)->size2);
 	gsl_matrix_memcpy(_valueMat, mG._valueMat);
-	_errorVar   = mG._errorVar;
+	_errorInvVar = mG._errorInvVar;
+	_meanVal     = mG._meanVal;
 	
 	_upLevel    = mG._upLevel;
 	_missErrMat = mG._missErrMat;
@@ -6931,7 +7023,8 @@ MuGrpEEmiss & MuGrpEEmiss::operator=(const MuGrpEEmiss &mG){
 	gsl_matrix_free(_valueMat);
 	_valueMat   = gsl_matrix_alloc((mG._valueMat)->size1, (mG._valueMat)->size2);
 	gsl_matrix_memcpy(_valueMat, mG._valueMat);
-	_errorVar   = mG._errorVar;
+	_errorInvVar = mG._errorInvVar;
+	_meanVal     = mG._meanVal;
 	
 	_upLevel    = mG._upLevel;
 	_missErrMat = mG._missErrMat;
@@ -6958,11 +7051,13 @@ MuGrpEEmiss & MuGrpEEmiss::operator=(const MuGrpEEmiss &mG){
 void MuGrpEEmiss::update(const Grp &muPr, const SigmaI &SigIm){
 	for (size_t iRw = 0; iRw < _valueMat->size1; iRw++) {
 		list<size_t>::iterator indIt = _missErrMat[iRw].begin();
-		for ( list<double>::iterator colIt = _errorVar[iRw].begin(); colIt != _errorVar[iRw].end(); ++colIt) {
-			double var = 1.0/(1.0/(*colIt) + gsl_matrix_get(SigIm.getMat(), *indIt, *indIt));
-			double mn  = var * (gsl_matrix_get(_valueMat, iRw, *indIt)/(*colIt) +  gsl_matrix_get(SigIm.getMat(), *indIt, *indIt) * gsl_matrix_get(muPr.fMat(), _upLevel->priorInd(iRw), *indIt) );
+		list<double>::iterator mnIt  = _meanVal[iRw].begin();
+		for ( list<double>::iterator colIt = _errorInvVar[iRw].begin(); colIt != _errorInvVar[iRw].end(); ++colIt) {
+			double var = 1.0/((*colIt) + gsl_matrix_get(SigIm.getMat(), *indIt, *indIt));
+			double mn  = var * ((*mnIt) * (*colIt) +  gsl_matrix_get(SigIm.getMat(), *indIt, *indIt) * gsl_matrix_get(muPr.fMat(), _upLevel->priorInd(iRw), *indIt) );
 			gsl_matrix_set(_valueMat, iRw, *indIt, mn + gsl_ran_gaussian_ziggurat(_rV[0], sqrt(var)));
 			++indIt;
+			++mnIt;
 		}
 	}
 	
@@ -6974,11 +7069,13 @@ void MuGrpEEmiss::update(const Grp &muPr, const SigmaI &SigIm){
 void MuGrpEEmiss::update(const Grp &muPr, const Qgrp &q, const SigmaI &SigIm){
 	for (size_t iRw = 0; iRw < _valueMat->size1; iRw++) {
 		list<size_t>::iterator indIt = _missErrMat[iRw].begin();
-		for ( list<double>::iterator colIt = _errorVar[iRw].begin(); colIt != _errorVar[iRw].end(); ++colIt) {
-			double var = 1.0/(1.0/(*colIt) + q[iRw] * gsl_matrix_get(SigIm.getMat(), *indIt, *indIt));
-			double mn  = var * (gsl_matrix_get(_valueMat, iRw, *indIt)/(*colIt) +  q[iRw] * gsl_matrix_get(SigIm.getMat(), *indIt, *indIt) * gsl_matrix_get(muPr.fMat(), _upLevel->priorInd(iRw), *indIt) );
+		list<double>::iterator mnIt  = _meanVal[iRw].begin();
+		for ( list<double>::iterator colIt = _errorInvVar[iRw].begin(); colIt != _errorInvVar[iRw].end(); ++colIt) {
+			double var = 1.0/((*colIt) + q[iRw] * gsl_matrix_get(SigIm.getMat(), *indIt, *indIt));
+			double mn  = var * ((*mnIt) * (*colIt) +  q[iRw] * gsl_matrix_get(SigIm.getMat(), *indIt, *indIt) * gsl_matrix_get(muPr.fMat(), _upLevel->priorInd(iRw), *indIt) );
 			gsl_matrix_set(_valueMat, iRw, *indIt, mn + gsl_ran_gaussian_ziggurat(_rV[0], sqrt(var)));
 			++indIt;
+			++mnIt;
 		}
 	}
 	

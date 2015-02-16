@@ -21,16 +21,13 @@
  *
  */
 
-/// C++ classes for Hierarchical Bayesian Multi-trait quantitative-genetic models.
+/// C++ classes for hierarchical Bayesian Multi-trait quantitative-genetic models.
 /** \file
  * \author Anthony J. Greenberg
  * \copyright Copyright (c) 2015 Anthony J. Greenberg
- * \version 0.9.0
+ * \version 0.9.1
  * 
- * MuGen is a library that implements a comprehensive approach to Bayesian inference of multi-trait models for quantitative genetics.  It enables genome-wide association 
- * studies and genome-enabled prediction, allows for complicated and unbalanced experimental designs, outlier observations, and missing data.  Internal implementation is
- * multithreaded and uses GNU Scientific Library and BLAS for computation.  These computational details are hidden behind the interface which is designed for users familiar 
- * with basic C++ programming.
+ * This is the project header file containing class definitions and interface documentation.
  *
  */
 
@@ -3450,15 +3447,19 @@ public:
  * If some phenotypes are measured with known error (e.g., technical replicates that are not idividually available), these can be sampled rather than used as point estimates. A mix of traits with and without measurement error is allowed.
  * This class has to be on the bottom of the model hierarchy.
  *
- * \warning Has not been extensively tested, and there are indications that there are bugs.
  */
 class MuGrpEE : public MuGrp {
 protected:
-	/** \brief Matrix of error variances
+	/** \brief Matrix of error inverse-variances
 	 *
-	 * The matrix has the same number of rows as the value matrix, and the number of columns no larger than the value matrix.
+	 * The matrix has the same number of rows as the value matrix, and the number of columns no larger than the value matrix.  Variances are read from a file and inverted on initialization.
 	 */
-	gsl_matrix *_errorVar;
+	gsl_matrix *_errorInvVar;
+	/** \brief Matrix of means
+	 *
+	 * Has the same dimensions as the _errorVar matrix, and stores mean values for the variables that will be sampled.
+	 */
+	gsl_matrix *_meanVal;
 	/** \brief Trait index
 	 *
 	 * Contains indexes of the traits that have measurment errors.  Only one index for all rows, i.e. once a trait has measurment error all samples must have a non-zero error variance.
@@ -3467,10 +3468,10 @@ protected:
 	
 public:
 	/** \brief Default constructor */
-	MuGrpEE() : MuGrp() {_errorVar = gsl_matrix_alloc(1, 1); };
+	MuGrpEE();
 	/** \brief Constructor with index read from a file
 	 *
-	 * The data, error variances and the index identifying traits with errors are read from files.  The index file must be a white-space separated text file.
+	 * The data, error variances and the index identifying traits with errors are read from files.  The index file must be a white-space separated text file.  Variances are inverted after reading and are checked for sanity (i.e. not smaller than machine epsilon).
 	 *
 	 * \param[in] string& data file name
 	 * \param[in] string& variance file name
@@ -3481,7 +3482,7 @@ public:
 	MuGrpEE(const string &datFlNam, const string &varFlNam, const string &indFlNam, RanIndex &up, const size_t &d);
 	/** \brief Constructor with index vector
 	 *
-	 * The data and error variances are read from files, but the index identifying traits with errors is provided in a vector.
+	 * The data and error variances are read from files, but the index identifying traits with errors is provided in a vector.  Variances are inverted after reading and are checked for sanity (i.e. not smaller than machine epsilon).
 	 *
 	 * \param[in] string& data file name
 	 * \param[in] string& variance file name
@@ -3492,7 +3493,7 @@ public:
 	MuGrpEE(const string &datFlNam, const string &varFlNam, const vector<size_t> &varInd, RanIndex &up, const size_t &d);
 	
 	/** \brief Destructor */
-	~MuGrpEE() {gsl_matrix_free(_errorVar); };
+	~MuGrpEE();
 	
 	/** \brief Copy constructor
 	 *
@@ -3539,11 +3540,16 @@ public:
  */
 class MuGrpEEmiss : public MuGrpMiss {
 protected:
-	/** \brief Measurement errors
+	/** \brief Measurement error inverse-variances
+	 *
+	 * The same configuration as the variance vector of lists.  This is the subset of _valueMat that corresponds to the values to be updated with experimental error.
+	 */
+	vector< list<double> > _errorInvVar;
+	/** \brief Means for values with errors
 	 *
 	 * The length of the vector is equal to the number of rows of the value matrix.  For each row, the error variances are in a list that has as many members as there are non-missing phenotypes with errors.
 	 */
-	vector< list<double> > _errorVar;
+	vector< list<double> > _meanVal;
 	/** \brief Error index
 	 *
 	 * The same configuration as the variance vector of lists, but containing indexes of the elements of the value matrix that have measurement errors.
