@@ -6823,7 +6823,7 @@ MuGrpEEmiss::MuGrpEEmiss(const string &datFlNam, const string &varFlNam, const s
 	gsl_matrix_int *tmpMisMat = gsl_matrix_int_alloc(_valueMat->size1, d);
 	FILE *mmIn = fopen(misMatFlNam.c_str(), "r");
 	if (mmIn == NULL) {
-		cerr << "ERROR: cannot missing data index file " << misMatFlNam << " in MuGrpMiss" << endl;
+		cerr << "ERROR: cannot open missing data index file " << misMatFlNam << " in MuGrpMiss" << endl;
 		exit(-1);
 	}
 	gsl_matrix_int_fread(mmIn, tmpMisMat);
@@ -6839,7 +6839,7 @@ MuGrpEEmiss::MuGrpEEmiss(const string &datFlNam, const string &varFlNam, const s
 	int tmpIn;
 	while (varIn >> tmpIn) {
 		if (tmpIn < 0) {
-			cerr << "ERROR: negative indexes not alllowed when reading error variance index from file " << indFlNam << " on initialization of MuGrpEEmiss" << endl;
+			cerr << "ERROR: negative indexes not allowed when reading error variance index from file " << indFlNam << " on initialization of MuGrpEEmiss" << endl;
 			exit(-1);
 		} else if (tmpIn > d){
 			cerr << "ERROR: value of the index (" << tmpIn << ") exceeds the number of variables (" << d << "). Check if you saved a base-0 index for MuGrpEEmiss" << endl;
@@ -6920,7 +6920,7 @@ MuGrpEEmiss::MuGrpEEmiss(const string &datFlNam, const string &varFlNam, const v
 	gsl_matrix_int *tmpMisMat = gsl_matrix_int_alloc(_valueMat->size1, d);
 	FILE *mmIn = fopen(misMatFlNam.c_str(), "r");
 	if (mmIn == NULL) {
-		cerr << "ERROR: cannot missing data index file " << misMatFlNam << " in MuGrpMiss" << endl;
+		cerr << "ERROR: cannot open missing data index file " << misMatFlNam << " in MuGrpMiss" << endl;
 		exit(-1);
 	}
 	gsl_matrix_int_fread(mmIn, tmpMisMat);
@@ -9937,6 +9937,8 @@ void BetaGrpPSR::dump(){
 		fclose(prdIn);
 		colCenter(_Xmat); // essential to mimic an intercept
 		
+		gsl_matrix_scale(_Ystore, 1.0/_numSaves);
+		
 		if (_lowLevel) {
 			gsl_matrix *tmpY = gsl_matrix_calloc(_Xmat->size1, _Ystore->size2);
 			for (size_t iHi = 0; iHi < _lowLevel->getNgrp(); iHi++) {
@@ -10173,7 +10175,8 @@ void BetaGrpSnpMiss::dump(){
 		}
 		fclose(prdIn);
 		gsl_vector_free(tmpX);
-
+		
+		gsl_matrix_scale(_Ystore, 1.0/_numSaves);
 		if (_lowLevel) {
 			gsl_matrix *tmpY = gsl_matrix_calloc(_lowLevel->getNgrp(), _Ystore->size2);
 			for (size_t iHi = 0; iHi < _lowLevel->getNgrp(); iHi++) {
@@ -10413,6 +10416,7 @@ void BetaGrpSnpMissCV::dump(){
 		fclose(prdIn);
 		gsl_vector_free(tmpX);
 		
+		gsl_matrix_scale(_Ystore, 1.0/_numSaves);
 		if (_lowLevel) {
 			gsl_matrix *tmpY = gsl_matrix_calloc(_lowLevel->getNgrp(), _Ystore->size2);
 			for (size_t iHi = 0; iHi < _lowLevel->getNgrp(); iHi++) {
@@ -10662,6 +10666,7 @@ void BetaGrpPSRmiss::dump(){
 		fclose(prdIn);
 		gsl_vector_free(tmpX);
 		
+		gsl_matrix_scale(_Ystore, 1.0/_numSaves);
 		if (_lowLevel) {
 			gsl_matrix *tmpY = gsl_matrix_calloc(_lowLevel->getNgrp(), _Ystore->size2);
 			for (size_t iHi = 0; iHi < _lowLevel->getNgrp(); iHi++) {
