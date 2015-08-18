@@ -52,7 +52,7 @@ string db2str(const double &val){
 int main(int argc, char *argv[]){
 	
 	// parsing command-line flags
-	bool sOn = false; // samplng
+	bool sOn = false; // sampling
 	bool bOn = false; // burnin-in
 	bool tOn = false; // thinning
 	bool nOn = false; // nuRep
@@ -178,7 +178,7 @@ int main(int argc, char *argv[]){
 						break;
 				}
 			}
-				break;
+			break;
 			
 			default: {
 				if (sOn) {
@@ -504,8 +504,8 @@ int main(int argc, char *argv[]){
 	RanIndex *e2bch;
 	RanIndex bch2pr(Nbatch);
 	
-	//MuGrpEEmiss dataI(dfNam, sdfNam, eIndFnam, mMatFnam, mVecFnam, e2e, d);
-	MuGrpMiss dataI(dfNam, mMatFnam, mVecFnam, e2e, d);
+	MuGrpEEmiss dataI(dfNam, sdfNam, eIndFnam, mMatFnam, mVecFnam, e2e, d);
+	//MuGrpMiss dataI(dfNam, mMatFnam, mVecFnam, e2e, d);
 	Grp &data = dataI;
 	
 	MuGrpPEX sExpI(data, e2exp, exp2mu, EXout, SgEXout, 1e-6, nThr);
@@ -603,8 +603,8 @@ int main(int argc, char *argv[]){
 	
 	cout << "Burn-in..." << endl;
 	for (int iBnin = 0; iBnin < Nbnin; iBnin++) {
-		//data.update(dataPr, qE, SigIe);
-		data.update(dataPr, SigIe);
+		data.update(dataPr, qE, SigIe);
+		//data.update(dataPr, SigIe);
 		
 		cvPredI = dLnExp - tBch;
 		betaCv.update(cvPred, qE, SigIe, SigIpr);
@@ -668,8 +668,8 @@ int main(int argc, char *argv[]){
 		
 	cout << "Sampling..." << endl;
 	for (int iSam = 0; iSam < Nsamp; iSam++) {
-		//data.update(dataPr, qE, SigIe);
-		data.update(dataPr, SigIe);
+		data.update(dataPr, qE, SigIe);
+		//data.update(dataPr, SigIe);
 		
 		cvPredI = dLnExp - tBch;
 		betaCv.update(cvPred, qE, SigIe, SigIpr);

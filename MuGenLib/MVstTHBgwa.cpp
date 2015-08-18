@@ -312,7 +312,7 @@ int main(int argc, char *argv[]){
 		}
 	}
 	
-	if ((model != "SM") && (model != "SMP") && (model != "VS") && (model != "RS")) {
+	if ((model != "SM") && (model != "SMP") && (model != "SMC") && (model != "VS") && (model != "RS")) {
 		cerr << "ERROR: Specified SNP model (" << model << ") not supported." << endl;
 		exit(-1);
 	}
@@ -330,7 +330,7 @@ int main(int argc, char *argv[]){
 		addOn.push_back(missF);
 	}
 	addOn.push_back(model);
-	if ((model == "SM") || (model == "SMP")) {
+	if ((model == "SM") || (model == "SMP") || (model == "SMC")) {
 		if (prABF) {
 			addOn.push_back("BF");
 		}
@@ -516,19 +516,20 @@ int main(int argc, char *argv[]){
 	if (model == "VS") {
 		snpBetI = new BetaGrpBVSR(repDev, SigIrep, snpIn, Nmul, ldCt, rp2ln, snp2pr, betOut, nThr);
 	}
-	else
-		if (model == "RS"){
-			snpBetI = new BetaGrpFt(repDev, SigIrep, snpIn, Nsnp, Nmul, ldCt, rp2ln, snp2pr, betOut, nThr);
+	else if (model == "RS"){
+		snpBetI = new BetaGrpFt(repDev, SigIrep, snpIn, Nsnp, Nmul, ldCt, rp2ln, snp2pr, betOut, nThr);
+	}
+	else if (model == "SMP"){
+		if (d == 1) {
+			cerr << "WARNING: trying to do partial regression with only one trait." << endl;
 		}
-	else
-		if (model == "SMP"){
-			if (d == 1) {
-				cerr << "WARNING: trying to do partial regression with only one trait." << endl;
-			}
-			snpBetI = new BetaGrpPSR(snpIn, betOut, rp2ln, Nsnp, d, nThr, prABF); // if prABF is 0.0, it will output p-values
+		snpBetI = new BetaGrpPSR(snpIn, betOut, Nln, Nsnp, d, nThr, prABF); // if prABF is 0.0, it will output p-values
+	}
+	else if (model == "SMC"){
+		snpBetI = new BetaGrpSnpCV(snpIn, betOut, Nln, Nsnp, d, nThr, prABF); // if prABF is 0.0, it will output p-values
 	}
 	else {
-		snpBetI = new BetaGrpSnp(snpIn, betOut, rp2ln, Nsnp, d, nThr, prABF); // if prABF is 0.0, it will output p-values
+		snpBetI = new BetaGrpSnp(snpIn, betOut, Nln, Nsnp, d, nThr, prABF); // if prABF is 0.0, it will output p-values
 	}
 	
 	Grp &snpBet = *snpBetI;
@@ -537,10 +538,10 @@ int main(int argc, char *argv[]){
 	SigmaI SigIbet(d, 1.0, 20.0);
 	Qgrp qB(Nln*Nmul, nuB);
 	
-	MuGrp snpDevI = repDev;
+	MuGrp snpDevI = mu + sca;
 	Grp &snpDev   = snpDevI;
 	
-	if ( (model != "SM") && (model != "SMP") ) {
+	if ( (model != "SM") && (model != "SMP")  && (model != "SMC") ) {
 		cout << "Pre-burnin..." << endl;
 		for (int iSt = 0; iSt < 100; iSt++) {
 			if (miss) {
@@ -585,7 +586,7 @@ int main(int argc, char *argv[]){
 
 	}
 	
-	if ( (model == "SM") || (model == "SMP") ) {
+	if ( (model == "SM") || (model == "SMP") || (model == "SMC") ) {
 		cout << "Single marker model." << endl;
 		cout << "Starting burnin..." << endl;
 		for (int iBnin = 0; iBnin < floor(0.4*Nbnin); iBnin++) {
@@ -666,7 +667,8 @@ int main(int argc, char *argv[]){
 				bvI = mu + gamma;
 				bv.save(BVout);
 				
-				snpBet.update(repDev, SigIrep);
+				snpDevI = mu + sca;
+				snpBet.update(snpDev, SigIrep);
 				
 				SigIe.save();
 				SigIrep.save();
