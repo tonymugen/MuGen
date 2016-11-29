@@ -5315,7 +5315,7 @@ protected:
 	/** \brief Blocks with few levels
 	 *
 	 * For cases where the number of levels of _blkLow differ among blocks, this vector stores the index of the first element past the available one.  
-	 * For bloocks that have the same number of levels as the largest among blocks, the value is zero.  Each object has to have at least one zero in this vector, which is for the block with the largest number of levels.
+	 * For blocks that have the same number of levels as the largest among blocks, the value is zero.  Each object has to have at least one zero in this vector, which is for the block with the largest number of levels.
 	 */
 	vector<size_t> _shortLevels;
 	
@@ -5339,7 +5339,7 @@ public:
 	/** \brief Basic constructor
 	 *
 	 * The provided number of values is the number of rows in the value matrix, i.e. the maximum number of levels of the lower level (data) index.
-	 * The file that has the block start indexes should be a white-space delimited text file.  The file that has the lower level index information should have a matrix of _int_ with the number of rows the same as the number of rows in the data, and the number of columns equal to the number of blocks.
+	 * The file that has the lower level index information should have a matrix of _int_ with the number of rows the same as the number of rows in the data, and the number of columns equal to the number of blocks.
 	 *
 	 * \param[in] Grp& data for initialization
 	 * \param[in] string& name of the file with the low-level index
@@ -5351,7 +5351,7 @@ public:
 	/** \brief Constructor with output file name
 	 *
 	 * The provided number of values is the number of rows in the value matrix, i.e. the maximum number of levels of the lower level (data) index.
-	 * The file that has the block start indexes should be a white-space delimited text file.  The file that has the lower level index information should have a matrix of _int_ with the number of rows the same as the number of rows in the data, and the number of columns equal to the number of blocks.
+	 * The file that has the lower level index information should have a matrix of _int_ with the number of rows the same as the number of rows in the data, and the number of columns equal to the number of blocks.
 	 *
 	 * \param[in] Grp& data for initialization
 	 * \param[in] string& name of the file with the low-level index

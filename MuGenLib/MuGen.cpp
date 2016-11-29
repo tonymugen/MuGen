@@ -4084,7 +4084,7 @@ RanIndex::RanIndex(const size_t &Ntot, const size_t &Nup, const string &fileNam)
 		cerr << "WARNING: Looks like the saved array is base-1.  Converting to base-0" << endl;
 		gsl_vector_int_add_constant(tmp, -1); // looks like the saved array is base-1 (as in R)
 	}
-	else if (mxVal > (Nup -1)){
+	else if (mxVal > (Nup - 1)){
 		cerr << "ERROR: the upper-level index is out of range.  Max value " << mxVal << " is bigger than " << Nup - 1 << endl;
 		exit(-1);
 	}
@@ -7127,9 +7127,8 @@ BetaGrpFt::BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npre
 	gsl_matrix_fread(prdIn, _Xmat);
 	fclose(prdIn);
 	
-	colCenter(_Xmat); // for stability of chains
 	gsl_matrix *y = gsl_matrix_alloc(rsp.dMat()->size1, rsp.dMat()->size2);
-	colCenter(rsp.dMat(), y); // like a regression with intercept for initial values
+	colCenter(rsp.dMat(), y); // approximating a regression with an intercept for initial values (not quite right, but close enough for initialization)
 	
 	if (Npred == 1) {
 		_theta[0] = new MVnormBeta(y, _Xmat, 0, Sig, _rV[0], _valueMat, 0);
@@ -7187,9 +7186,8 @@ BetaGrpFt::BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npre
 	gsl_matrix_fread(prdIn, _Xmat);
 	fclose(prdIn);
 	
-	colCenter(_Xmat);
 	gsl_matrix *y = gsl_matrix_alloc(rsp.dMat()->size1, rsp.dMat()->size2);
-	colCenter(rsp.dMat(), y);
+	colCenter(rsp.dMat(), y); // approximating a regression with an intercept for initial values (not quite right, but close enough for initialization)
 	
 	if (Npred == 1) {
 		_theta[0] = new MVnormBeta(y, _Xmat, 0, Sig, _rV[0], _upLevel->priorInd(0), _valueMat, 0);
@@ -7208,19 +7206,11 @@ BetaGrpFt::BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npre
 }
 
 BetaGrpFt::BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npred, RanIndex &low, RanIndex &up, const int &nThr) : _numSaves(0.0), _nThr(nThr), Grp(){
-	//	the _lowLevel RanIndex plays the role of the design matrix, and relates the unique values of the predictor (low.getNgrp()x1) to the predictor for all the rsp rows
+	//	the _lowLevel RanIndex plays the role of the design matrix, and relates the unique rows of the predictor (low.getNgrp()xNpred) to the predictor for all the rsp rows
 	//  the _fittedAll matrix still has only the unique rows; this is for efficiency when adding it to other Grp classes
 	
 	if (Npred != up.getNtot()) {
 		cerr << "ERROR: number of predictors " << Npred << " is not equal to the number of elements " << up.getNtot() << " in the prior index in BetaGrpFt initialization." << endl;
-		exit(-1);
-	}
-	else if (Npred != low.getNgrp()){
-		cerr << "ERROR: number of predictors " << Npred << " is not equal to the number of groups " << low.getNgrp() << " in the replication index in BetaGrpFt initialization." << endl;
-		exit(-1);
-	}
-	else if (up.getNtot() != low.getNgrp()) {
-		cerr << "ERROR: number of groups " << low.getNgrp() << " in the replication index is not equal to the number of elements " << up.getNtot() << " in the prior index in BetaGrpFt initialization." << endl;
 		exit(-1);
 	}
 	else if (low.getNtot() != rsp.dMat()->size1){
@@ -7273,10 +7263,9 @@ BetaGrpFt::BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npre
 	}
 	gsl_vector_free(row);
 	fclose(prdIn);
-	colCenter(_Xmat);
 	
 	gsl_matrix *y = gsl_matrix_alloc(rsp.dMat()->size1, rsp.dMat()->size2);
-	colCenter(rsp.dMat(), y);
+	colCenter(rsp.dMat(), y); // approximating a regression with an intercept for initial values (not quite right, but close enough for initialization)
 	
 	if (Npred == 1) {
 		_theta[0] = new MVnormBeta(y, _Xmat, 0, Sig, _rV[0], _upLevel->priorInd(0), _valueMat, 0);
@@ -7328,9 +7317,8 @@ BetaGrpFt::BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npre
 	gsl_matrix_fread(prdIn, _Xmat);
 	fclose(prdIn);
 	
-	colCenter(_Xmat); // for stability of chains
 	gsl_matrix *y = gsl_matrix_alloc(rsp.dMat()->size1, rsp.dMat()->size2);
-	colCenter(rsp.dMat(), y); // like a regression with intercept for initial values
+	colCenter(rsp.dMat(), y); // approximating a regression with an intercept for initial values (not quite right, but close enough for initialization)
 	
 	if (Npred == 1) {
 		_theta[0] = new MVnormBeta(y, _Xmat, 0, Sig, _rV[0], _valueMat, 0);
@@ -7390,9 +7378,8 @@ BetaGrpFt::BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npre
 	gsl_matrix_fread(prdIn, _Xmat);
 	fclose(prdIn);
 	
-	colCenter(_Xmat);
 	gsl_matrix *y = gsl_matrix_alloc(rsp.dMat()->size1, rsp.dMat()->size2);
-	colCenter(rsp.dMat(), y);
+	colCenter(rsp.dMat(), y); // approximating a regression with an intercept for initial values (not quite right, but close enough for initialization)
 	
 	if (Npred == 1) {
 		_theta[0] = new MVnormBeta(y, _Xmat, 0, Sig, _rV[0], _upLevel->priorInd(0), _valueMat, 0);
@@ -7413,14 +7400,6 @@ BetaGrpFt::BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npre
 	//	the _lowLevel RanIndex plays the role of the design matrix, and relates the unique values of the predictor (low.getNgrp()x1) to the predictor for all the rsp rows
 	if (Npred != up.getNtot()) {
 		cerr << "ERROR: number of predictors " << Npred << " is not equal to the number of elements " << up.getNtot() << " in the prior index in BetaGrpFt initialization." << endl;
-		exit(-1);
-	}
-	else if (Npred != low.getNgrp()){
-		cerr << "ERROR: number of predictors " << Npred << " is not equal to the number of groups " << low.getNgrp() << " in the replication index in BetaGrpFt initialization." << endl;
-		exit(-1);
-	}
-	else if (up.getNtot() != low.getNgrp()) {
-		cerr << "ERROR: number of groups " << low.getNgrp() << " in the replication index is not equal to the number of elements " << up.getNtot() << " in the prior index in BetaGrpFt initialization." << endl;
 		exit(-1);
 	}
 	else if (low.getNtot() != rsp.dMat()->size1){
@@ -7475,10 +7454,9 @@ BetaGrpFt::BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npre
 	}
 	gsl_vector_free(row);
 	fclose(prdIn);
-	colCenter(_Xmat);
 	
 	gsl_matrix *y = gsl_matrix_alloc(rsp.dMat()->size1, rsp.dMat()->size2);
-	colCenter(rsp.dMat(), y);
+	colCenter(rsp.dMat(), y); // approximating a regression with an intercept for initial values (not quite right, but close enough for initialization)
 	
 	if (Npred == 1) {
 		_theta[0] = new MVnormBeta(y, _Xmat, 0, Sig, _rV[0], _upLevel->priorInd(0), _valueMat, 0);
@@ -7531,9 +7509,9 @@ BetaGrpFt::BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npre
 	gsl_matrix_fread(prdIn, _Xmat);
 	fclose(prdIn);
 	
-	colCenter(_Xmat, absLab); // for stability of chains, also does mean-imputation of missing data
+	meanImpute(_Xmat, absLab);
 	gsl_matrix *y = gsl_matrix_alloc(rsp.dMat()->size1, rsp.dMat()->size2);
-	colCenter(rsp.dMat(), y); // like a regression with intercept for initial values
+	colCenter(rsp.dMat(), y); // approximating a regression with an intercept for initial values (not quite right, but close enough for initialization)
 	
 	if (Npred == 1) {
 		_theta[0] = new MVnormBeta(y, _Xmat, 0, Sig, _rV[0], _valueMat, 0);
@@ -7589,9 +7567,9 @@ BetaGrpFt::BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npre
 	gsl_matrix_fread(prdIn, _Xmat);
 	fclose(prdIn);
 	
-	colCenter(_Xmat, absLab);
+	meanImpute(_Xmat, absLab);
 	gsl_matrix *y = gsl_matrix_alloc(rsp.dMat()->size1, rsp.dMat()->size2);
-	colCenter(rsp.dMat(), y);
+	colCenter(rsp.dMat(), y); // approximating a regression with an intercept for initial values (not quite right, but close enough for initialization)
 	
 	if (Npred == 1) {
 		_theta[0] = new MVnormBeta(y, _Xmat, 0, Sig, _rV[0], _upLevel->priorInd(0), _valueMat, 0);
@@ -7610,14 +7588,6 @@ BetaGrpFt::BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npre
 BetaGrpFt::BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npred, const double &absLab, RanIndex &low, RanIndex &up, const int &nThr) :  _numSaves(0.0), _nThr(nThr), Grp() {
 	if (Npred != up.getNtot()) {
 		cerr << "ERROR: number of predictors " << Npred << " is not equal to the number of elements " << up.getNtot() << " in the prior index in BetaGrpFt initialization." << endl;
-		exit(-1);
-	}
-	else if (Npred != low.getNgrp()){
-		cerr << "ERROR: number of predictors " << Npred << " is not equal to the number of groups " << low.getNgrp() << " in the replication index in BetaGrpFt initialization." << endl;
-		exit(-1);
-	}
-	else if (up.getNtot() != low.getNgrp()) {
-		cerr << "ERROR: number of groups " << low.getNgrp() << " in the replication index is not equal to the number of elements " << up.getNtot() << " in the prior index in BetaGrpFt initialization." << endl;
 		exit(-1);
 	}
 	else if (low.getNtot() != rsp.dMat()->size1){
@@ -7668,11 +7638,10 @@ BetaGrpFt::BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npre
 		}
 		
 	}
-	colCenter(_Xmat);
 	gsl_matrix_free(tmpX);
 	
 	gsl_matrix *y = gsl_matrix_alloc(rsp.dMat()->size1, rsp.dMat()->size2);
-	colCenter(rsp.dMat(), y);
+	colCenter(rsp.dMat(), y); // approximating a regression with an intercept for initial values (not quite right, but close enough for initialization)
 	
 	if (Npred == 1) {
 		_theta[0] = new MVnormBeta(y, _Xmat, 0, Sig, _rV[0], _upLevel->priorInd(0), _valueMat, 0);
@@ -7723,9 +7692,9 @@ BetaGrpFt::BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npre
 	gsl_matrix_fread(prdIn, _Xmat);
 	fclose(prdIn);
 	
-	colCenter(_Xmat, absLab); // for stability of chains and mean-imputation of missing data
+	meanImpute(_Xmat, absLab);
 	gsl_matrix *y = gsl_matrix_alloc(rsp.dMat()->size1, rsp.dMat()->size2);
-	colCenter(rsp.dMat(), y); // like a regression with intercept for initial values
+	colCenter(rsp.dMat(), y); // approximating a regression with an intercept for initial values (not quite right, but close enough for initialization)
 	
 	if (Npred == 1) {
 		_theta[0] = new MVnormBeta(y, _Xmat, 0, Sig, _rV[0], _valueMat, 0);
@@ -7784,9 +7753,9 @@ BetaGrpFt::BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npre
 	gsl_matrix_fread(prdIn, _Xmat);
 	fclose(prdIn);
 	
-	colCenter(_Xmat, absLab);
+	meanImpute(_Xmat, absLab);
 	gsl_matrix *y = gsl_matrix_alloc(rsp.dMat()->size1, rsp.dMat()->size2);
-	colCenter(rsp.dMat(), y);
+	colCenter(rsp.dMat(), y); // approximating a regression with an intercept for initial values (not quite right, but close enough for initialization)
 	
 	if (Npred == 1) {
 		_theta[0] = new MVnormBeta(y, _Xmat, 0, Sig, _rV[0], _upLevel->priorInd(0), _valueMat, 0);
@@ -7805,14 +7774,6 @@ BetaGrpFt::BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npre
 BetaGrpFt::BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npred, const double &absLab, RanIndex &low, RanIndex &up, const string &outFlNam, const int &nThr) :  _numSaves(0.0), _nThr(nThr), Grp() {
 	if (Npred != up.getNtot()) {
 		cerr << "ERROR: number of predictors " << Npred << " is not equal to the number of elements " << up.getNtot() << " in the prior index in BetaGrpFt initialization." << endl;
-		exit(-1);
-	}
-	else if (Npred != low.getNgrp()){
-		cerr << "ERROR: number of predictors " << Npred << " is not equal to the number of groups " << low.getNgrp() << " in the replication index in BetaGrpFt initialization." << endl;
-		exit(-1);
-	}
-	else if (up.getNtot() != low.getNgrp()) {
-		cerr << "ERROR: number of groups " << low.getNgrp() << " in the replication index is not equal to the number of elements " << up.getNtot() << " in the prior index in BetaGrpFt initialization." << endl;
 		exit(-1);
 	}
 	else if (low.getNtot() != rsp.dMat()->size1){
@@ -7865,7 +7826,6 @@ BetaGrpFt::BetaGrpFt(const Grp &rsp, const string &predFlNam, const size_t &Npre
 		}
 		
 	}
-	colCenter(_Xmat);
 	gsl_matrix_free(tmpX);
 	
 	gsl_matrix *y = gsl_matrix_alloc(rsp.dMat()->size1, rsp.dMat()->size2);
@@ -7925,7 +7885,7 @@ BetaGrpFt::BetaGrpFt(const Grp &rsp, const SigmaI &SigI, const string &predFlNam
 	fclose(prdIn);
 	
 	gsl_matrix *y = gsl_matrix_alloc(rsp.dMat()->size1, rsp.dMat()->size2);
-	colCenter(rsp.dMat(), y);
+	colCenter(rsp.dMat(), y); // approximating a regression with an intercept for initial values (not quite right, but close enough for initialization)
 	
 	gsl_vector *XtX = gsl_vector_alloc(_Xmat->size2);
 	gsl_permutation *allP = gsl_permutation_alloc(_Xmat->size2);
@@ -7967,14 +7927,6 @@ BetaGrpFt::BetaGrpFt(const Grp &rsp, const SigmaI &SigI, const string &predFlNam
 		cerr << "ERROR: number of predictors " << Npred << " is not equal to the number of elements " << up.getNtot() << " in the prior index in BetaGrpFt initialization." << endl;
 		exit(-1);
 	}
-	else if (Npred != low.getNgrp()){
-		cerr << "ERROR: number of predictors " << Npred << " is not equal to the number of groups " << low.getNgrp() << " in the replication index in BetaGrpFt initialization." << endl;
-		exit(-1);
-	}
-	else if (up.getNtot() != low.getNgrp()) {
-		cerr << "ERROR: number of groups " << low.getNgrp() << " in the replication index is not equal to the number of elements " << up.getNtot() << " in the prior index in BetaGrpFt initialization." << endl;
-		exit(-1);
-	}
 	else if (low.getNtot() != rsp.dMat()->size1){
 		cerr << "ERROR: number of elements " << low.getNgrp() << " in the replication index is not equal to the number of rows " << rsp.dMat()->size1 << " in the response matrix in BetaGrpFt initialization." << endl;
 		exit(-1);
@@ -8011,7 +7963,7 @@ BetaGrpFt::BetaGrpFt(const Grp &rsp, const SigmaI &SigI, const string &predFlNam
 	
 	MuGrp rspMn = rsp.mean(*_lowLevel);
 	gsl_matrix *y = gsl_matrix_alloc(rspMn.dMat()->size1, rspMn.dMat()->size2);
-	colCenter(rspMn.dMat(), y);
+	colCenter(rspMn.dMat(), y); // approximating a regression with an intercept for initial values (not quite right, but close enough for initialization)
 	
 	gsl_vector *XtX = gsl_vector_alloc(_Xmat->size2);
 	gsl_permutation *allP = gsl_permutation_alloc(_Xmat->size2);
@@ -8040,7 +7992,6 @@ BetaGrpFt::BetaGrpFt(const Grp &rsp, const SigmaI &SigI, const string &predFlNam
 		}
 	}
 	gsl_matrix_free(tmpX);
-	colCenter(_Xmat);
 	
 	_theta.resize(_Xmat->size2);
 	_valueMat  = gsl_matrix_calloc(_Xmat->size2, rsp.phenD());
@@ -8093,7 +8044,7 @@ BetaGrpFt::BetaGrpFt(const Grp &rsp, const SigmaI &SigI, const string &predFlNam
 	fclose(prdIn);
 	
 	gsl_matrix *y = gsl_matrix_alloc(rsp.dMat()->size1, rsp.dMat()->size2);
-	colCenter(rsp.dMat(), y);
+	colCenter(rsp.dMat(), y); // approximating a regression with an intercept for initial values (not quite right, but close enough for initialization)
 	
 	gsl_vector *XtX = gsl_vector_alloc(_Xmat->size2);
 	gsl_permutation *allP = gsl_permutation_alloc(_Xmat->size2);
@@ -8134,14 +8085,6 @@ BetaGrpFt::BetaGrpFt(const Grp &rsp, const SigmaI &SigI, const string &predFlNam
 		cerr << "ERROR: number of predictors " << Npred << " is not equal to the number of elements " << up.getNtot() << " in the prior index in BetaGrpFt initialization." << endl;
 		exit(-1);
 	}
-	else if (Npred != low.getNgrp()){
-		cerr << "ERROR: number of predictors " << Npred << " is not equal to the number of groups " << low.getNgrp() << " in the replication index in BetaGrpFt initialization." << endl;
-		exit(-1);
-	}
-	else if (up.getNtot() != low.getNgrp()) {
-		cerr << "ERROR: number of groups " << low.getNgrp() << " in the replication index is not equal to the number of elements " << up.getNtot() << " in the prior index in BetaGrpFt initialization." << endl;
-		exit(-1);
-	}
 	else if (low.getNtot() != rsp.dMat()->size1){
 		cerr << "ERROR: number of elements " << low.getNgrp() << " in the replication index is not equal to the number of rows " << rsp.dMat()->size1 << " in the response matrix in BetaGrpFt initialization." << endl;
 		exit(-1);
@@ -8175,11 +8118,10 @@ BetaGrpFt::BetaGrpFt(const Grp &rsp, const SigmaI &SigI, const string &predFlNam
 	}
 	gsl_matrix_fread(prdIn, _Xmat);
 	fclose(prdIn);
-	colCenter(_Xmat, absLab);
 	
 	MuGrp rspMn = rsp.mean(*_lowLevel);
 	gsl_matrix *y = gsl_matrix_alloc(rspMn.dMat()->size1, rspMn.dMat()->size2);
-	colCenter(rspMn.dMat(), y);
+	colCenter(rspMn.dMat(), y); // approximating a regression with an intercept for initial values (not quite right, but close enough for initialization)
 	
 	gsl_vector *XtX = gsl_vector_alloc(_Xmat->size2);
 	gsl_permutation *allP = gsl_permutation_alloc(_Xmat->size2);
@@ -8208,7 +8150,6 @@ BetaGrpFt::BetaGrpFt(const Grp &rsp, const SigmaI &SigI, const string &predFlNam
 		}
 	}
 	gsl_matrix_free(tmpX);
-	colCenter(_Xmat);
 	
 	_theta.resize(_Xmat->size2);
 	_valueMat  = gsl_matrix_calloc(_Xmat->size2, rsp.phenD());
@@ -8507,8 +8448,8 @@ void BetaGrpFt::_ldToss(const gsl_vector *var, const gsl_permutation *prm, const
 					rSq = gsl_pow_2(rSq)*(tstVr*pckVr);
 					if (rSq >= rSqMax) { // have to check if ANY of the previously picked SNPs are in LD with the additional candidate
 						if (crEdge == _Xmat->size2 - 1) {
-							break;
 							rLd.resize(nPicked+1);
+							break;
 						}
 						rLd[iEl].push_back(gsl_permutation_get(prm, crEdge));
 						crEdge++;
@@ -8683,7 +8624,7 @@ void BetaGrpFt::update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm){
 void BetaGrpFt::update(const Grp &dat, const SigmaI &SigIm, const SigmaI &SigIp){
 #pragma omp parallel for num_threads(_nThr)
 	for (int iTh = 0; iTh < _theta.size(); iTh++) {
-		_theta[iTh]->update(dat, SigIm, SigIp, _rV[0]);
+		_theta[iTh]->update(dat, SigIm, SigIp, _rV[omp_get_thread_num()]);
 	}
 	_updateFitted();
 }
@@ -8698,7 +8639,7 @@ void BetaGrpFt::update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, const
 void BetaGrpFt::update(const Grp &dat, const SigmaI &SigIm, const Qgrp &qPr, const SigmaI &SigIp){
 #pragma omp parallel for num_threads(_nThr)
 	for (size_t iTh = 0; iTh < _theta.size(); iTh++) {
-		_theta[iTh]->update(dat, SigIm, qPr[iTh], SigIp, _rV[0]);
+		_theta[iTh]->update(dat, SigIm, qPr[iTh], SigIp, _rV[omp_get_thread_num()]);
 	}
 	_updateFitted();
 }
@@ -8714,7 +8655,7 @@ void BetaGrpFt::update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, const
 void BetaGrpFt::update(const Grp &dat, const SigmaI &SigIm, const Grp &muPr, const SigmaI &SigIp){
 #pragma omp parallel for num_threads(_nThr)
 	for (int iTh = 0; iTh < _theta.size(); iTh++) {
-		_theta[iTh]->update(dat, SigIm, muPr, SigIp, _rV[0]);
+		_theta[iTh]->update(dat, SigIm, muPr, SigIp, _rV[omp_get_thread_num()]);
 	}
 	_updateFitted();
 }
@@ -8728,7 +8669,7 @@ void BetaGrpFt::update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, const
 void BetaGrpFt::update(const Grp &dat, const SigmaI &SigIm, const Grp &muPr, const Qgrp &qPr, const SigmaI &SigIp){
 #pragma omp parallel for num_threads(_nThr)
 	for (int iTh = 0; iTh < _theta.size(); iTh++) {
-		_theta[iTh]->update(dat, SigIm, muPr, qPr[iTh], SigIp, _rV[0]);
+		_theta[iTh]->update(dat, SigIm, muPr, qPr[iTh], SigIp, _rV[omp_get_thread_num()]);
 	}
 	_updateFitted();
 }
@@ -9046,6 +8987,11 @@ void BetaGrpPEX::update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, cons
 
 
 BetaGrpPC::BetaGrpPC(const Grp &rsp, const string &predFlNam, const string &evFlNam, const size_t &Npred, RanIndex &up, const int &nThr){
+	if (Npred != up.getNtot()) {
+		cerr << "ERROR: number of predictors " << Npred << " is not equal to the number of elements " << up.getNtot() << " in the prior index in BetaGrpFt initialization." << endl;
+		exit(-1);
+	}
+	
 	gsl_matrix_free(_fittedAll);
 	gsl_matrix_free(_Xmat);
 	_fittedEach.resize(Npred);
@@ -9099,7 +9045,7 @@ BetaGrpPC::BetaGrpPC(const Grp &rsp, const string &predFlNam, const string &evFl
 	}
 	
 	gsl_matrix *yCtr = gsl_matrix_alloc(rsp.dMat()->size1, rsp.dMat()->size2);
-	colCenter(rsp.dMat(), yCtr);
+	colCenter(rsp.dMat(), yCtr); // approximating a regression with an intercept for initial values (not quite right, but close enough for initialization)
 	for (size_t Xj = 0; Xj < Npred; Xj++) {
 		_fittedEach[Xj].resize(rsp.Ndata()*rsp.phenD());
 		_theta[Xj] = new MVnormBetaFt(yCtr, _Xmat, Xj, _fittedEach[Xj], Sig, _rV[0], _upLevel->priorInd(Xj), _valueMat, Xj);
@@ -9113,6 +9059,15 @@ BetaGrpPC::BetaGrpPC(const Grp &rsp, const string &predFlNam, const string &evFl
 }
 
 BetaGrpPC::BetaGrpPC(const Grp &rsp, const string &predFlNam, const string &evFlNam, const size_t &Npred, RanIndex &low, RanIndex &up, const int &nThr){
+	if (Npred != up.getNtot()) {
+		cerr << "ERROR: number of predictors " << Npred << " is not equal to the number of elements " << up.getNtot() << " in the prior index in BetaGrpFt initialization." << endl;
+		exit(-1);
+	}
+	else if (low.getNtot() != rsp.dMat()->size1){
+		cerr << "ERROR: number of elements " << low.getNgrp() << " in the replication index is not equal to the number of rows " << rsp.dMat()->size1 << " in the response matrix in BetaGrpFt initialization." << endl;
+		exit(-1);
+	}
+	
 	gsl_matrix_free(_fittedAll);
 	gsl_matrix_free(_Xmat);
 	_fittedEach.resize(Npred);
@@ -9157,7 +9112,6 @@ BetaGrpPC::BetaGrpPC(const Grp &rsp, const string &predFlNam, const string &evFl
 	}
 	gsl_vector_free(tmpRow);
 	fclose(prdIn);
-	colCenter(_Xmat);  // centering may be necessary if the design is unbalanced
 	
 	FILE *evIn = fopen(evFlNam.c_str(), "r");
 	if (evIn == NULL) {
@@ -9173,7 +9127,7 @@ BetaGrpPC::BetaGrpPC(const Grp &rsp, const string &predFlNam, const string &evFl
 	}
 	
 	gsl_matrix *y = gsl_matrix_alloc(_Xmat->size1, rsp.dMat()->size2);
-	colCenter(rsp.dMat(), y);
+	colCenter(rsp.dMat(), y); // approximating a regression with an intercept for initial values (not quite right, but close enough for initialization)
 	
 	for (size_t Xj = 0; Xj < Npred; Xj++) {
 		_fittedEach[Xj].resize(low.getNtot()*rsp.phenD());
@@ -9188,6 +9142,11 @@ BetaGrpPC::BetaGrpPC(const Grp &rsp, const string &predFlNam, const string &evFl
 }
 
 BetaGrpPC::BetaGrpPC(const Grp &rsp, const string &predFlNam, const string &evFlNam, const size_t &Npred, RanIndex &up, const string &outFlNam, const int &nThr){
+	if (Npred != up.getNtot()) {
+		cerr << "ERROR: number of predictors " << Npred << " is not equal to the number of elements " << up.getNtot() << " in the prior index in BetaGrpFt initialization." << endl;
+		exit(-1);
+	}
+
 	gsl_matrix_free(_fittedAll);
 	gsl_matrix_free(_Xmat);
 	_fittedEach.resize(Npred);
@@ -9243,7 +9202,7 @@ BetaGrpPC::BetaGrpPC(const Grp &rsp, const string &predFlNam, const string &evFl
 	}
 	
 	gsl_matrix *yCtr = gsl_matrix_alloc(rsp.dMat()->size1, rsp.dMat()->size2);
-	colCenter(rsp.dMat(), yCtr);
+	colCenter(rsp.dMat(), yCtr); // approximating a regression with an intercept for initial values (not quite right, but close enough for initialization)
 	for (size_t Xj = 0; Xj < Npred; Xj++) {
 		_fittedEach[Xj].resize(rsp.Ndata()*rsp.phenD());
 		_theta[Xj] = new MVnormBetaFt(yCtr, _Xmat, Xj, _fittedEach[Xj], Sig, _rV[0], _upLevel->priorInd(Xj), _valueMat, Xj);
@@ -9257,6 +9216,15 @@ BetaGrpPC::BetaGrpPC(const Grp &rsp, const string &predFlNam, const string &evFl
 }
 
 BetaGrpPC::BetaGrpPC(const Grp &rsp, const string &predFlNam, const string &evFlNam, const size_t &Npred, RanIndex &low, RanIndex &up, const string &outFlNam, const int &nThr){
+	if (Npred != up.getNtot()) {
+		cerr << "ERROR: number of predictors " << Npred << " is not equal to the number of elements " << up.getNtot() << " in the prior index in BetaGrpFt initialization." << endl;
+		exit(-1);
+	}
+	else if (low.getNtot() != rsp.dMat()->size1){
+		cerr << "ERROR: number of elements " << low.getNgrp() << " in the replication index is not equal to the number of rows " << rsp.dMat()->size1 << " in the response matrix in BetaGrpFt initialization." << endl;
+		exit(-1);
+	}
+	
 	gsl_matrix_free(_fittedAll);
 	gsl_matrix_free(_Xmat);
 	_fittedEach.resize(Npred);
@@ -9303,7 +9271,6 @@ BetaGrpPC::BetaGrpPC(const Grp &rsp, const string &predFlNam, const string &evFl
 	}
 	gsl_vector_free(tmpRow);
 	fclose(prdIn);
-	colCenter(_Xmat);  // centering may be necessary if the design is unbalanced
 	
 	FILE *evIn = fopen(evFlNam.c_str(), "r");
 	if (evIn == NULL) {
@@ -9319,7 +9286,7 @@ BetaGrpPC::BetaGrpPC(const Grp &rsp, const string &predFlNam, const string &evFl
 	}
 	
 	gsl_matrix *y = gsl_matrix_alloc(_Xmat->size1, rsp.dMat()->size2);
-	colCenter(rsp.dMat(), y);
+	colCenter(rsp.dMat(), y); // approximating a regression with an intercept for initial values (not quite right, but close enough for initialization)
 	
 	for (size_t Xj = 0; Xj < Npred; Xj++) {
 		_fittedEach[Xj].resize(low.getNtot()*rsp.phenD());
@@ -11391,8 +11358,8 @@ void BetaGrpBVSR::_ldToss(const gsl_vector *var, const gsl_permutation *prm, con
 					rSq = gsl_pow_2(rSq)*(tstVr*pckVr);
 					if (rSq >= rSqMax) { // have to check if ANY of the previously picked SNPs are in LD with the additional candidate
 						if (crEdge == _Xmat->size2 - 1) {
-							break;
 							rLd.resize(nPicked+1);
+							break;
 						}
 						rLd[iEl].push_back(gsl_permutation_get(prm, crEdge));
 						crEdge++;
@@ -12086,9 +12053,8 @@ BetaBlk::BetaBlk(const Grp &dat, const string &predFlName, const size_t &Npred, 
 		xColInd.push_back(iPr);
 	}
 	
-	colCenter(_Xmat); // for stability of chains
 	gsl_matrix *y = gsl_matrix_alloc(dat.dMat()->size1, dat.dMat()->size2);
-	colCenter(dat.dMat(), y); // like a regression with intercept for initial values
+	colCenter(dat.dMat(), y); // approximating a regression with an intercept for initial values (not quite right, but close enough for initialization)
 	
 	_eachX.resize(_blkStart.size());
 	for (size_t iBlk = 0; iBlk < xColInd.size(); iBlk++) {
@@ -12197,9 +12163,8 @@ BetaBlk::BetaBlk(const Grp &dat, const string &predFlName, const size_t &Npred, 
 			xColInd.push_back(iPr);
 	}
 	
-	colCenter(_Xmat); // for stability of chains
 	gsl_matrix *y = gsl_matrix_alloc(dat.dMat()->size1, dat.dMat()->size2);
-	colCenter(dat.dMat(), y); // like a regression with intercept for initial values
+	colCenter(dat.dMat(), y); // approximating a regression with an intercept for initial values (not quite right, but close enough for initialization)
 	
 	_eachX.resize(_blkStart.size());
 	for (size_t iBlk = 0; iBlk < xColInd.size(); iBlk++) {
@@ -12306,9 +12271,8 @@ BetaBlk::BetaBlk(const Grp &dat, const string &predFlName, const size_t &Npred, 
 		xColInd.push_back(iPr);
 	}
 	
-	colCenter(_Xmat); // for stability of chains
 	gsl_matrix *y = gsl_matrix_alloc(dat.dMat()->size1, dat.dMat()->size2);
-	colCenter(dat.dMat(), y); // like a regression with intercept for initial values
+	colCenter(dat.dMat(), y); // approximating a regression with an intercept for initial values (not quite right, but close enough for initialization)
 	
 	_eachX.resize(_blkStart.size());
 	for (size_t iBlk = 0; iBlk < xColInd.size(); iBlk++) {
@@ -12417,9 +12381,8 @@ BetaBlk::BetaBlk(const Grp &dat, const string &predFlName, const size_t &Npred, 
 		xColInd.push_back(iPr);
 	}
 	
-	colCenter(_Xmat); // for stability of chains
 	gsl_matrix *y = gsl_matrix_alloc(dat.dMat()->size1, dat.dMat()->size2);
-	colCenter(dat.dMat(), y); // like a regression with intercept for initial values
+	colCenter(dat.dMat(), y); // approximating a regression with an intercept for initial values (not quite right, but close enough for initialization)
 	
 	_eachX.resize(_blkStart.size());
 	for (size_t iBlk = 0; iBlk < xColInd.size(); iBlk++) {
@@ -12526,9 +12489,8 @@ BetaBlk::BetaBlk(const Grp &dat, const string &predFlName, const size_t &Npred, 
 		xColInd.push_back(iPr);
 	}
 	
-	colCenter(_Xmat, absLab); // for stability of chains
 	gsl_matrix *y = gsl_matrix_alloc(dat.dMat()->size1, dat.dMat()->size2);
-	colCenter(dat.dMat(), y); // like a regression with intercept for initial values
+	colCenter(dat.dMat(), y); // approximating a regression with an intercept for initial values (not quite right, but close enough for initialization)
 	
 	_eachX.resize(_blkStart.size());
 	for (size_t iBlk = 0; iBlk < xColInd.size(); iBlk++) {
@@ -12636,9 +12598,8 @@ BetaBlk::BetaBlk(const Grp &dat, const string &predFlName, const size_t &Npred, 
 		xColInd.push_back(iPr);
 	}
 	
-	colCenter(_Xmat, absLab); // for stability of chains
 	gsl_matrix *y = gsl_matrix_alloc(dat.dMat()->size1, dat.dMat()->size2);
-	colCenter(dat.dMat(), y); // like a regression with intercept for initial values
+	colCenter(dat.dMat(), y); // approximating a regression with an intercept for initial values (not quite right, but close enough for initialization)
 	
 	_eachX.resize(_blkStart.size());
 	for (size_t iBlk = 0; iBlk < xColInd.size(); iBlk++) {
@@ -12745,9 +12706,9 @@ BetaBlk::BetaBlk(const Grp &dat, const string &predFlName, const size_t &Npred, 
 		xColInd.push_back(iPr);
 	}
 	
-	colCenter(_Xmat, absLab); // for stability of chains
+	meanImpute(_Xmat, absLab);
 	gsl_matrix *y = gsl_matrix_alloc(dat.dMat()->size1, dat.dMat()->size2);
-	colCenter(dat.dMat(), y); // like a regression with intercept for initial values
+	colCenter(dat.dMat(), y); // approximating a regression with an intercept for initial values (not quite right, but close enough for initialization)
 	
 	_eachX.resize(_blkStart.size());
 	for (size_t iBlk = 0; iBlk < xColInd.size(); iBlk++) {
@@ -12857,9 +12818,9 @@ BetaBlk::BetaBlk(const Grp &dat, const string &predFlName, const size_t &Npred, 
 		xColInd.push_back(iPr);
 	}
 	
-	colCenter(_Xmat, absLab); // for stability of chains
+	meanImpute(_Xmat, absLab);
 	gsl_matrix *y = gsl_matrix_alloc(dat.dMat()->size1, dat.dMat()->size2);
-	colCenter(dat.dMat(), y); // like a regression with intercept for initial values
+	colCenter(dat.dMat(), y); // approximating a regression with an intercept for initial values (not quite right, but close enough for initialization)
 	
 	_eachX.resize(_blkStart.size());
 	for (size_t iBlk = 0; iBlk < xColInd.size(); iBlk++) {
