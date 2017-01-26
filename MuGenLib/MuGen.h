@@ -3297,20 +3297,6 @@ public:
 	 *
 	 */
 	MuGrpPEX(const Grp &dat, RanIndex &low, RanIndex &up, const string outMuFlNam, const double &Spr, const int &nThr);
-	/** \brief Full constructor with location parameter and covariance file names
-	 *
-	 * Initializing constructor that provides starting values for the location parameter and redundant parameter matrices.  Sets the name of the files where the adjusted location parameter and covariance matrix chains will be saved.
-	 *
-	 * \param[in] Grp& data
-	 * \param[in] RanIndex& index to the lower (data) level
-	 * \param[in] RanIndex& index to the upper (prior) level
-	 * \param[in] string& output location file name
-	 * \param[in] string& output covariance file name
-	 * \param[in] double& inverse-prior for the redundant parameter matrix
-	 * \param[in] int& number of threads
-	 *
-	 */
-	MuGrpPEX(const Grp &dat, RanIndex &low, RanIndex &up, const string outMuFlNam, const string outSigFlNam, const double &Spr, const int &nThr);
 	
 	/** \brief Destructor */
 	~MuGrpPEX();
@@ -3338,6 +3324,13 @@ public:
 	 * Appends the current adjusted mean values to the file whose name was set during construction.
 	 */
 	void save();
+	/** \brief Save adjusted values to named file
+	 *
+	 * Appends the current adjusted mean values to the named file.
+	 *
+	 * \param[in] string& file name
+	 */
+	void save(const string &outFlNam);
 	/** \brief Save with the covariance matrix
 	 *
 	 * Appends the current adjusted mean values and prior covariance matrix to the files whose names were set during construction.
@@ -4273,9 +4266,23 @@ public:
 	 * \return gsl_matrix* pointer to the adjusted-value fitted matrix
 	 */
 	virtual const gsl_matrix *fMat() const{return _fittedAllAdj; };
-	
-	void save();
-	void save(const string &outFlNam);
+	/** \brief Save adjusted values
+	 *
+	 * Appends the current adjusted mean values to the file whose name was set during construction.
+	 */
+	virtual void save();
+	/** \brief Save adjusted values to named file
+	 *
+	 * Appends the current adjusted mean values to the named file.
+	 *
+	 * \param[in] string& file name
+	 */
+	virtual void save(const string &outFlNam);
+	/** \brief Save adjusted values with the adjusted covariance matrix
+	 *
+	 * Appends the current adjusted mean values and prior covariance matrix to the files whose names were set during construction.
+	 */
+	virtual void save(const SigmaI &SigI);
 	
 	virtual void update(const Grp &dat, const SigmaI &SigIm, const SigmaI &SigIp);
 	virtual void update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, const SigmaI &SigIp);
@@ -4455,6 +4462,10 @@ public:
 	 * \return gsl_matrix* pointer to the adjusted-value fitted matrix
 	 */
 	const gsl_matrix *fMat() const{return _fittedAllAdj; };
+	
+	void save(){ BetaGrpPEX::save(); };
+	void save(const string &outFlNam){ BetaGrpPEX::save(outFlNam); };
+	void save(const SigmaI &SigI){ BetaGrpPEX::save(SigI); };
 	
 	void update(const Grp &dat, const SigmaI &SigIm, const SigmaI &SigIp) { BetaGrpPEX::update(dat, SigIm, SigIp); };
 	void update(const Grp &dat, const Qgrp &q, const SigmaI &SigIm, const SigmaI &SigIp){ BetaGrpPEX::update(dat, q, SigIm, SigIp); };
@@ -5748,6 +5759,11 @@ public:
 	 * \param[in] FILE* file stream name
 	 */
 	void save(FILE *fileStr) {gsl_matrix_fwrite(fileStr, _mat); };
+	/** \brief Access the output file
+	 *
+	 * \return string file name
+	 */
+	string getOutFile() const {return _outFlNam; };
 	
 	/** \brief Access to the inverse-covariance matrix
 	 *

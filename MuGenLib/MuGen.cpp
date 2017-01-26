@@ -6227,62 +6227,6 @@ MuGrpPEX::MuGrpPEX(const Grp &dat, RanIndex &low, RanIndex &up, const string out
 	
 }
 
-MuGrpPEX::MuGrpPEX(const Grp &dat, RanIndex &low, RanIndex &up, const string outMuFlNam, const string outSigFlNam, const double &sPr, const int &nThr) : MuGrp(){
-	gsl_matrix_free(_valueMat);
-	
-	_ftA.resize(dat.Ndata());
-	_nThr = nThr;
-	
-	if (low.getNgrp() != up.getNtot()) {
-		cerr << "ERROR: # of elements in index to the upper level is wrong!!!" << endl;
-		exit(1);
-	}
-	else if (low.getNtot() != dat.Ndata()){
-		cerr << "ERROR: the number of rows in data does not correspond to the number of points in the low index!!!" << endl;
-		exit(1);
-	}
-	_lowLevel = &low;
-	_upLevel  = &up;
-	
-	_outFlNam = outMuFlNam;
-	remove(_outFlNam.c_str());
-	_outSigFlNam = outSigFlNam;
-	remove(_outSigFlNam.c_str());
-	
-	gsl_vector *tmpMn = gsl_vector_alloc(dat.phenD());
-	gsl_vector *tmpSd = gsl_vector_alloc(dat.phenD());
-	
-	_theta.resize(low.getNgrp());
-	_valueMat  = gsl_matrix_alloc(low.getNgrp(), dat.phenD());
-	_adjValMat = gsl_matrix_calloc(low.getNgrp(), dat.phenD());
-	_tSigIAt   = gsl_matrix_alloc(dat.phenD(), dat.phenD());
-	_A         = Apex(sPr, dat.phenD(), _ftA);
-	
-	for (size_t iEl = 0; iEl < low.getNgrp(); iEl++) {
-		gsl_vector_set_zero(tmpMn);
-		for (vector<size_t>::const_iterator el = low[iEl].begin(); el != low[iEl].end(); ++el) {
-			gsl_vector_add(tmpMn, dat[*el]->getVec());
-		}
-		gsl_vector_scale(tmpMn, 1.0/low[iEl].size());
-		gsl_matrix_set_row(_valueMat, iEl, tmpMn);
-		
-		for (size_t j = 0; j < dat[0]->len(); j++) {
-			gsl_vector_set(tmpSd, j, fabs(gsl_vector_get(tmpMn, j)));
-		}
-		
-	}
-	
-	for (size_t iMn = 0; iMn < low.getNgrp(); iMn++) {
-		_ftA[iMn].resize(dat.Ndata()*dat.phenD());
-		_theta[iMn] = new MVnormMuPEX(_valueMat, iMn, tmpSd, _rV[0], (*_lowLevel)[iMn], _upLevel->priorInd(iMn), _A, _tSigIAt);
-	}
-	
-	_updateFitted();
-	gsl_vector_free(tmpSd);
-	gsl_vector_free(tmpMn);
-
-}
-
 MuGrpPEX::MuGrpPEX(const MuGrpPEX &mGp){
 	gsl_matrix_free(_valueMat);
 	_valueMat = gsl_matrix_alloc((mGp._valueMat)->size1, (mGp._valueMat)->size2);
@@ -6341,6 +6285,23 @@ void MuGrpPEX::save(){
 
 }
 
+void MuGrpPEX::save(const string &outFlNam){
+	if (_outFlNam == outFlNam) {
+		FILE *outH = fopen(outFlNam.c_str(), "a");
+		gsl_matrix_fwrite(outH, _adjValMat);
+		fclose(outH);
+		
+	}
+	else {
+		_outFlNam = outFlNam;
+		remove(_outFlNam.c_str());
+		FILE *outH = fopen(outFlNam.c_str(), "a");
+		gsl_matrix_fwrite(outH, _adjValMat);
+		fclose(outH);
+	}
+	
+}
+
 void MuGrpPEX::save(const SigmaI &SigI){
 	gsl_matrix *Sig   = gsl_matrix_alloc(SigI.getMat()->size1, SigI.getMat()->size1);
 	gsl_matrix *SigTr = gsl_matrix_alloc(SigI.getMat()->size1, SigI.getMat()->size1);
@@ -6351,7 +6312,7 @@ void MuGrpPEX::save(const SigmaI &SigI){
 	gsl_blas_dsymm(CblasLeft, CblasLower, 1.0, Sig, _A.getMat(), 0.0, SigTr);
 	gsl_blas_dgemm(CblasTrans, CblasNoTrans, 1.0, _A.getMat(), SigTr, 0.0, Sig);
 	
-	FILE *outS = fopen(_outSigFlNam.c_str(), "a");
+	FILE *outS = fopen(SigI.getOutFile().c_str(), "a");
 	gsl_matrix_fwrite(outS, Sig);
 	fclose(outS);
 	
@@ -8829,6 +8790,30 @@ void BetaGrpPEX::save(const string &outFlNam){
 		gsl_matrix_fwrite(outH, adjMat);
 		fclose(outH);
 	}
+	gsl_matrix_free(adjMat);
+}
+void BetaGrpPEX::save(const SigmaI &SigI){
+	gsl_matrix *Sig   = gsl_matrix_alloc(SigI.getMat()->size1, SigI.getMat()->size1);
+	gsl_matrix *SigTr = gsl_matrix_alloc(SigI.getMat()->size1, SigI.getMat()->size1);
+	gsl_matrix_memcpy(Sig, SigI.getMat());
+	gsl_linalg_cholesky_decomp(Sig);
+	gsl_linalg_cholesky_invert(Sig);
+	
+	gsl_blas_dsymm(CblasLeft, CblasLower, 1.0, Sig, _A.getMat(), 0.0, SigTr);
+	gsl_blas_dgemm(CblasTrans, CblasNoTrans, 1.0, _A.getMat(), SigTr, 0.0, Sig);
+	
+	FILE *outS = fopen(SigI.getOutFile().c_str(), "a");
+	gsl_matrix_fwrite(outS, Sig);
+	fclose(outS);
+	
+	gsl_matrix_free(Sig);
+	gsl_matrix_free(SigTr);
+	
+	gsl_matrix *adjMat = gsl_matrix_alloc(_valueMat->size1, _valueMat->size2);
+	gsl_blas_dgemm(CblasNoTrans, CblasNoTrans, 1.0, _valueMat, _A.getMat(), 0.0, adjMat);
+	FILE *outM = fopen(_outFlNam.c_str(), "a");
+	gsl_matrix_fwrite(outM, adjMat);
+	fclose(outM);
 	gsl_matrix_free(adjMat);
 }
 
